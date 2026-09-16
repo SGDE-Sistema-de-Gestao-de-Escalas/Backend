@@ -1,0 +1,52 @@
+name: Backend CI
+
+# Repositório monorepo: o Laravel vive na raiz do repo, o React fica em /frontend.
+# Só corre quando algo fora de /frontend muda, para não disparar em alterações
+# que são só do frontend.
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - 'frontend/**'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - 'frontend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # confirmar com `php -v`
+          extensions: mbstring, pdo, pdo_sqlite, bcmath
+          coverage: none
+
+      - name: Instalar dependências Composer
+        run: composer install --prefer-dist --no-progress
+
+      - name: Preparar ficheiro .env de testes
+        run: cp .env.example .env
+
+      - name: Gerar chave da aplicação
+        run: php artisan key:generate
+
+      - name: Preparar base de dados SQLite para os testes
+        run: touch database/database.sqlite
+
+      - name: Correr migrations
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+
+      - name: Correr testes
+        run: php artisan test
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
