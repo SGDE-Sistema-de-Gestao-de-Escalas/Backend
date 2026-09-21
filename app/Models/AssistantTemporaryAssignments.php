@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class AssistantTemporaryAssignments extends Model
+{
+    /** @use HasFactory<\Database\Factories\AssistantTemporaryAssignmentsFactory> */
+    use HasFactory;
+
+    public function assistant()
+    {
+        return $this->belongsTo(Assistant::class);
+    }
+
+    public function originSchool()
+    {
+        return $this->belongsTo(School::class);
+    }
+
+    public function destinationSchool()
+    {
+        return $this->belongsTo(School::class);
+    }
+}
