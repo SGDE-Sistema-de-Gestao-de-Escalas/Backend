@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Schedules;
 
-use App\Models\Assistant;
-use App\Http\Requests\StoreAssistantRequest;
-use App\Http\Requests\UpdateAssistantRequest;
+use App\Models\Schedule;
+use App\Http\Requests\StoreScheduleRequest;
+use App\Http\Requests\UpdateScheduleRequest;
 
-class AssistantController extends Controller
+class ScheduleController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +19,7 @@ class AssistantController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAssistantRequest $request)
+    public function store(StoreScheduleRequest $request)
     {
         //
     }
@@ -27,7 +27,7 @@ class AssistantController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Assistant $assistant)
+    public function show(Schedule $schedule)
     {
         //
     }
@@ -35,7 +35,7 @@ class AssistantController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAssistantRequest $request, Assistant $assistant)
+    public function update(UpdateScheduleRequest $request, Schedule $schedule)
     {
         //
     }
@@ -43,7 +43,7 @@ class AssistantController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Assistant $assistant)
+    public function destroy(Schedule $schedule)
     {
         //
     }

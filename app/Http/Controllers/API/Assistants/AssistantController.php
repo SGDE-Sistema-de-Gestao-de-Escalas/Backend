@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Assistants;
 
-use App\Models\Role;
-use App\Http\Requests\StoreRoleRequest;
-use App\Http\Requests\UpdateRoleRequest;
+use App\Models\Assistant;
+use App\Http\Requests\StoreAssistantRequest;
+use App\Http\Requests\UpdateAssistantRequest;
 
-class RoleController extends Controller
+class AssistantController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +19,7 @@ class RoleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreRoleRequest $request)
+    public function store(StoreAssistantRequest $request)
     {
         //
     }
@@ -27,7 +27,7 @@ class RoleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Role $role)
+    public function show(Assistant $assistant)
     {
         //
     }
@@ -35,7 +35,7 @@ class RoleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateRoleRequest $request, Role $role)
+    public function update(UpdateAssistantRequest $request, Assistant $assistant)
     {
         //
     }
@@ -43,7 +43,7 @@ class RoleController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Role $role)
+    public function destroy(Assistant $assistant)
     {
         //
     }

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Absences;
 
-use App\Models\Schedule;
-use App\Http\Requests\StoreScheduleRequest;
-use App\Http\Requests\UpdateScheduleRequest;
+use App\Models\AbsenceType;
+use App\Http\Requests\StoreAbsenceTypeRequest;
+use App\Http\Requests\UpdateAbsenceTypeRequest;
 
-class ScheduleController extends Controller
+class AbsenceTypeController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +19,7 @@ class ScheduleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreScheduleRequest $request)
+    public function store(StoreAbsenceTypeRequest $request)
     {
         //
     }
@@ -27,7 +27,7 @@ class ScheduleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Schedule $schedule)
+    public function show(AbsenceType $absenceType)
     {
         //
     }
@@ -35,7 +35,7 @@ class ScheduleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateScheduleRequest $request, Schedule $schedule)
+    public function update(UpdateAbsenceTypeRequest $request, AbsenceType $absenceType)
     {
         //
     }
@@ -43,7 +43,7 @@ class ScheduleController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Schedule $schedule)
+    public function destroy(AbsenceType $absenceType)
     {
         //
     }

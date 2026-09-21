@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Absences;
 
-use App\Models\AbsenceType;
-use App\Http\Requests\StoreAbsenceTypeRequest;
-use App\Http\Requests\UpdateAbsenceTypeRequest;
+use App\Models\Absence;
+use App\Http\Requests\StoreAbsenceRequest;
+use App\Http\Requests\UpdateAbsenceRequest;
 
-class AbsenceTypeController extends Controller
+class AbsenceController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +19,7 @@ class AbsenceTypeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAbsenceTypeRequest $request)
+    public function store(StoreAbsenceRequest $request)
     {
         //
     }
@@ -27,7 +27,7 @@ class AbsenceTypeController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(AbsenceType $absenceType)
+    public function show(Absence $absence)
     {
         //
     }
@@ -35,7 +35,7 @@ class AbsenceTypeController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAbsenceTypeRequest $request, AbsenceType $absenceType)
+    public function update(UpdateAbsenceRequest $request, Absence $absence)
     {
         //
     }
@@ -43,7 +43,7 @@ class AbsenceTypeController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(AbsenceType $absenceType)
+    public function destroy(Absence $absence)
     {
         //
     }

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Auth;
 
-use App\Models\Absence;
-use App\Http\Requests\StoreAbsenceRequest;
-use App\Http\Requests\UpdateAbsenceRequest;
+use App\Models\Role;
+use App\Http\Requests\StoreRoleRequest;
+use App\Http\Requests\UpdateRoleRequest;
 
-class AbsenceController extends Controller
+class RoleController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +19,7 @@ class AbsenceController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAbsenceRequest $request)
+    public function store(StoreRoleRequest $request)
     {
         //
     }
@@ -27,7 +27,7 @@ class AbsenceController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Absence $absence)
+    public function show(Role $role)
     {
         //
     }
@@ -35,7 +35,7 @@ class AbsenceController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAbsenceRequest $request, Absence $absence)
+    public function update(UpdateRoleRequest $request, Role $role)
     {
         //
     }
@@ -43,7 +43,7 @@ class AbsenceController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Absence $absence)
+    public function destroy(Role $role)
     {
         //
     }

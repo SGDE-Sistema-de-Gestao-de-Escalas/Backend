@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+
+class AuthService
+{
+    public function attemptLogin(array $credentials): array
+    {
+        $user = User::with('role')->where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['As credenciais estão incorretas.'],
+            ]);
+        }
+
+        $user->tokens()->delete();
+
+        $token = $user->createToken('sgde-access-token')->plainTextToken;
+
+        return [
+            'user' => $user,
+            'token' => $token,
+        ];
+    }
+
+    public function updatePassword(User $user, string $newPassword): void
+    {
+        $user->update([
+            'password' => Hash::make($newPassword),
+        ]);
+    }
+
+    public function logout(User $user): void
+    {
+        $user->currentAccessToken()->delete();
+    }
+}

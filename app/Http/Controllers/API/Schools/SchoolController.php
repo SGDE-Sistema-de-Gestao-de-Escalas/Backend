@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Schools;
 
 use App\Models\School;
 use App\Http\Requests\StoreSchoolRequest;

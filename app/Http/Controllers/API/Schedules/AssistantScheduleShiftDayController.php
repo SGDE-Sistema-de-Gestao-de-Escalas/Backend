@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Schedules;
 
 use App\Models\AssistantScheduleShiftDay;
 use App\Http\Requests\StoreAssistantScheduleShiftDayRequest;
