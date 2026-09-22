@@ -13,7 +13,7 @@ class SchedulePolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+       return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -21,7 +21,17 @@ class SchedulePolicy
      */
     public function view(User $user, Schedule $schedule): bool
     {
-        return false;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if (! $user->isStaff()) {
+            return false;
+        }
+
+        return $schedule->assistant()
+            ->where('user_id', $user->id)
+            ->exists();
     }
 
     /**

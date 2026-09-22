@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Absences;
 
-use App\Models\Assistant;
-use App\Http\Requests\StoreAssistantRequest;
-use App\Http\Requests\UpdateAssistantRequest;
+use App\Models\Absence;
+use App\Http\Requests\StoreAbsenceRequest;
+use App\Http\Requests\UpdateAbsenceRequest;
+use App\Http\Controllers\Controller;
 
-class AssistantController extends Controller
+class AbsenceController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,7 +20,7 @@ class AssistantController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAssistantRequest $request)
+    public function store(StoreAbsenceRequest $request)
     {
         //
     }
@@ -27,7 +28,7 @@ class AssistantController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Assistant $assistant)
+    public function show(Absence $absence)
     {
         //
     }
@@ -35,7 +36,7 @@ class AssistantController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAssistantRequest $request, Assistant $assistant)
+    public function update(UpdateAbsenceRequest $request, Absence $absence)
     {
         //
     }
@@ -43,7 +44,7 @@ class AssistantController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Assistant $assistant)
+    public function destroy(Absence $absence)
     {
         //
     }

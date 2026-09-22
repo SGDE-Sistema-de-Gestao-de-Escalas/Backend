@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Assistants;
 
 use App\Models\AssistantTemporaryAssignments;
 use App\Http\Requests\StoreAssistantTemporaryAssignmentsRequest;

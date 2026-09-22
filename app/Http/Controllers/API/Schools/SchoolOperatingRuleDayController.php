@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\Schools;
 
 use App\Models\SchoolOperatingRuleDay;
 use App\Http\Requests\StoreSchoolOperatingRuleDayRequest;

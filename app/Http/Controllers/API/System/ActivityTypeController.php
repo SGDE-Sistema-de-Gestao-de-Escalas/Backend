@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\System;
 
 use App\Models\ActivityType;
 use App\Http\Requests\StoreActivityTypeRequest;

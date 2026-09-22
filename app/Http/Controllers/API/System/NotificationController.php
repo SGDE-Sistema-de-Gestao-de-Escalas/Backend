@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API\System;
 
 use App\Models\Notification;
 use App\Http\Requests\StoreNotificationRequest;
