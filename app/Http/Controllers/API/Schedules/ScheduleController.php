@@ -5,6 +5,8 @@ namespace App\Http\Controllers\API\Schedules;
 use App\Models\Schedule;
 use App\Http\Requests\StoreScheduleRequest;
 use App\Http\Requests\UpdateScheduleRequest;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 
 class ScheduleController extends Controller
 {
@@ -13,7 +15,18 @@ class ScheduleController extends Controller
      */
     public function index()
     {
-        //
+        $user = $request->user();
+
+        $query = Schedule::query();
+        
+        // Limita a listagem às escalas do próprio assistente.
+        if (! $user->isAdmin()) {
+            $query->whereHas('assistant', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            });
+        }
+
+    return $query->paginate(20);
     }
 
     /**

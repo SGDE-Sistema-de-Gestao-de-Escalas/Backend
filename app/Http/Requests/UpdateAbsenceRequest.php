@@ -12,7 +12,7 @@ class UpdateAbsenceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()?->can('manage-system') ?? false;
     }
 
     /**

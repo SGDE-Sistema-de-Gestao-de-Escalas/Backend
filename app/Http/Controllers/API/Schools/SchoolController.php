@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Schools;
 use App\Models\School;
 use App\Http\Requests\StoreSchoolRequest;
 use App\Http\Requests\UpdateSchoolRequest;
+use App\Http\Controllers\Controller;
 
 class SchoolController extends Controller
 {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Absences;
 use App\Models\Absence;
 use App\Http\Requests\StoreAbsenceRequest;
 use App\Http\Requests\UpdateAbsenceRequest;
+use App\Http\Controllers\Controller;
 
 class AbsenceController extends Controller
 {

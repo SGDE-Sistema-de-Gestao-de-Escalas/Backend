@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Assistants;
 use App\Models\Assistant;
 use App\Http\Requests\StoreAssistantRequest;
 use App\Http\Requests\UpdateAssistantRequest;
+use App\Http\Controllers\Controller;
 
 class AssistantController extends Controller
 {
