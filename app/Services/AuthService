@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
-    public function attemptLogin(array $credentials): array
+    public function attemptLogin(array $credentials): ?array
     {
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
