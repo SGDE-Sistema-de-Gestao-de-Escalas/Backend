@@ -12,6 +12,7 @@ class Role extends Model
 
     protected $fillable = [
         'name',
+        'slug',
         'description',
     ];
     
@@ -20,3 +21,4 @@ class Role extends Model
         return $this->hasMany(User::class);
     }
 }
+

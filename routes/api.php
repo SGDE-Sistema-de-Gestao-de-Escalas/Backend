@@ -21,6 +21,9 @@ Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1')
     ->name('auth.login');
 
+Route::post('/password/forgot', [AuthController::class, 'requestPasswordReset'])
+    ->name('password.email');
+
 // Repor Password (utilizado após receber o email)
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->name('password.update');
@@ -28,7 +31,7 @@ Route::post('/password/reset', [AuthController::class, 'resetPassword'])
 // Rotas OAuth
 Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthController::class, 'redirect'])
     ->name('oauth.redirect');
-Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'callback'])
+Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'externalLoginCallback'])
     ->name('oauth.callback');
 
 // Exige autenticação em todas as rotas deste grupo.
@@ -41,6 +44,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Termina a sessão do utilizador autenticado.
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('auth.logout');
+
+    Route::post('/update-password', [AuthController::class, 'updatePassword'])
+        ->name('password.change');
 
     // Restringe as operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
