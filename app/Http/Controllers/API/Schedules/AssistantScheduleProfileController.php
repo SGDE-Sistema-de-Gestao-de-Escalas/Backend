@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schedules;
 
 use App\Models\AssistantScheduleProfile;
-use App\Http\Requests\StoreAssistantScheduleProfileRequest;
-use App\Http\Requests\UpdateAssistantScheduleProfileRequest;
+use App\Http\Requests\Schedules\StoreAssistantScheduleProfileRequest;
+use App\Http\Requests\Schedules\UpdateAssistantScheduleProfileRequest;
 
 class AssistantScheduleProfileController extends Controller
 {

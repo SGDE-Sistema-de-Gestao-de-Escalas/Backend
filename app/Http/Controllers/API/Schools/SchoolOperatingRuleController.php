@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schools;
 
 use App\Models\SchoolOperatingRule;
-use App\Http\Requests\StoreSchoolOperatingRuleRequest;
-use App\Http\Requests\UpdateSchoolOperatingRuleRequest;
+use App\Http\Requests\Schools\StoreSchoolOperatingRuleRequest;
+use App\Http\Requests\Schools\UpdateSchoolOperatingRuleRequest;
 
 class SchoolOperatingRuleController extends Controller
 {

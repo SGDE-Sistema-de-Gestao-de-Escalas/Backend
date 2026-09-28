@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Assistants;
 
 use App\Models\AssistantException;
-use App\Http\Requests\StoreAssistantExceptionRequest;
-use App\Http\Requests\UpdateAssistantExceptionRequest;
+use App\Http\Requests\Assistants\StoreAssistantExceptionRequest;
+use App\Http\Requests\Assistants\UpdateAssistantExceptionRequest;
 
 class AssistantExceptionController extends Controller
 {

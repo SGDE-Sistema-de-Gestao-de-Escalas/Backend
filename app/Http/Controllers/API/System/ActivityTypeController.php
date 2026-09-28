@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\System;
 
 use App\Models\ActivityType;
-use App\Http\Requests\StoreActivityTypeRequest;
-use App\Http\Requests\UpdateActivityTypeRequest;
+use App\Http\Requests\System\StoreActivityTypeRequest;
+use App\Http\Requests\System\UpdateActivityTypeRequest;
 
 class ActivityTypeController extends Controller
 {

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schools;
 
 use App\Models\SchoolOperatingRuleDay;
-use App\Http\Requests\StoreSchoolOperatingRuleDayRequest;
-use App\Http\Requests\UpdateSchoolOperatingRuleDayRequest;
+use App\Http\Requests\Schools\StoreSchoolOperatingRuleDayRequest;
+use App\Http\Requests\Schools\UpdateSchoolOperatingRuleDayRequest;
 
 class SchoolOperatingRuleDayController extends Controller
 {

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Assistants;
 
 use App\Models\AssistantTemporaryAssignments;
-use App\Http\Requests\StoreAssistantTemporaryAssignmentsRequest;
-use App\Http\Requests\UpdateAssistantTemporaryAssignmentsRequest;
+use App\Http\Requests\Assistants\StoreAssistantTemporaryAssignmentsRequest;
+use App\Http\Requests\Assistants\UpdateAssistantTemporaryAssignmentsRequest;
 
 class AssistantTemporaryAssignmentsController extends Controller
 {
