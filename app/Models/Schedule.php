@@ -10,6 +10,13 @@ class Schedule extends Model
     /** @use HasFactory<\Database\Factories\ScheduleFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'school_id',
+        'assistant_id',
+        'start_date',
+        'end_date',
+    ];
+
     public function school()
     {
         return $this->belongsTo(School::class);

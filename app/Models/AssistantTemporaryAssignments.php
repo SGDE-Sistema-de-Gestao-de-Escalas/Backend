@@ -10,6 +10,14 @@ class AssistantTemporaryAssignments extends Model
     /** @use HasFactory<\Database\Factories\AssistantTemporaryAssignmentsFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'assistant_id',
+        'origin_school_id',
+        'destination_school_id',
+        'start_date',
+        'end_date',
+    ];
+
     public function assistant()
     {
         return $this->belongsTo(Assistant::class);

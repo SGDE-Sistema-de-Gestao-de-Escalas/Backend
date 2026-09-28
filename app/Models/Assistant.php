@@ -10,6 +10,17 @@ class Assistant extends Model
     /** @use HasFactory<\Database\Factories\AssistantFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'user_id',
+        'name',
+        'email',
+        'phone',
+        'address',
+        'city',
+        'postal_code',
+        'country',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);

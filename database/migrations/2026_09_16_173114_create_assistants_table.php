@@ -17,9 +17,25 @@ return new class extends Migration
             $table->foreignId('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
-            $table->string('name');
+            $table->string('first_name');
+            $table->string('last_name');
             $table->string('email')->unique()->nullable();
             $table->string('phone')->unique()->nullable();
+            $table->string('nif', 9)->unique()->nullable();
+            $table->string('social_security_number', 11)->unique()->nullable();
+            $table->date('birth_date')->nullable();
+            $table->date('admission_date')->nullable();
+
+            $table->string('criminal_record_path')->nullable();
+            $table->date('criminal_record_expiry')->nullable();
+
+            $table->string('address_street')->nullable();
+            $table->string('address_zip_code')->nullable();
+
+            $table->string('emergency_contact_name')->nullable();
+            $table->string('emergency_contact_phone')->nullable();
+            $table->string('emergency_contact_kinship')->nullable();
+            
             $table->boolean('available_for_transfer')->default(false);
             $table->timestamps();
             $table->softdeletes();

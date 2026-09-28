@@ -10,6 +10,13 @@ class SchoolOperatingRuleDay extends Model
     /** @use HasFactory<\Database\Factories\SchoolOperatingRuleDayFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'school_operating_rule_id',
+        'day_of_week',
+        'start_time',
+        'end_time',
+    ];
+
     public function schoolOperatingRule()
     {
         return $this->belongsTo(SchoolOperatingRule::class);

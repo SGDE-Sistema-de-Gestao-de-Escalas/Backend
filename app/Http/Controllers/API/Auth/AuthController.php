@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\DTOs\UserDTO;
+use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -20,20 +20,16 @@ class AuthController extends Controller
         ]);
 
         $authData = $this->authService->attemptLogin($credentials);
-        
-        if (!$authData) {
-            return response()->json(['message' => 'Credenciais inválidas.'], 401);
-        }
 
         return response()->json([
             'access_token' => $authData['token'],
-            'user' => new UserDTO($authData['user']),
+            'user' => new UserResource($authData['user']),
         ]);
     }
 
     public function updatePassword(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'current_password' => 'required|string',
             'new_password' => 'required|string|min:8|confirmed',
         ]);
@@ -48,5 +44,30 @@ class AuthController extends Controller
         $this->authService->logout($request->user());
 
         return response()->json(['message' => 'Logout realizado com sucesso.']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $this->authService->resetPasswordWithToken($validated);
+
+        return response()->json(['message' => 'Conta finalizada com sucesso. Vamos redirecioná-lo para a página de login.']);
+
+    }
+
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $this->authService->sendPasswordResetLink($validated['email']);
+
+        return response()->json(['message' => 'Se o email existir na nossa base de dados, enviámos um link para repor a sua password.']);
     }
 }
