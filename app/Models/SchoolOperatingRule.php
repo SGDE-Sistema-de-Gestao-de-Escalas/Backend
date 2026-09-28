@@ -10,6 +10,12 @@ class SchoolOperatingRule extends Model
     /** @use HasFactory<\Database\Factories\SchoolOperatingRuleFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'school_id',
+        'name',
+        'description',
+    ];
+
     public function school()
     {
         return $this->belongsTo(School::class);

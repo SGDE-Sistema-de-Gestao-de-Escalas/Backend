@@ -108,4 +108,15 @@ class AuthService
             ]);
         }
     }
+
+    public function sendPasswordResetLink(string $email): void
+    {
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            $token = Password::broker()->createToken($user);
+            
+            Mail::to($user->email)->send(new ResetPasswordMail($user, $token));
+        }
+    }
 }

@@ -10,6 +10,11 @@ class ActivityType extends Model
     /** @use HasFactory<\Database\Factories\ActivityTypeFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'name',
+        'description',
+    ];
+
     public function schools()
     {
         return $this->belongsToMany(School::class);

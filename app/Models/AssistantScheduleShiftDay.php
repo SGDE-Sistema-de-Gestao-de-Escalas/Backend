@@ -10,6 +10,13 @@ class AssistantScheduleShiftDay extends Model
     /** @use HasFactory<\Database\Factories\AssistantScheduleShiftDayFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'assistant_schedule_shift_id',
+        'day_of_week',
+        'start_time',
+        'end_time',
+    ];
+
     public function assistantScheduleShift()
     {
         return $this->belongsTo(AssistantScheduleShift::class);

@@ -10,6 +10,11 @@ class AbsenceType extends Model
     /** @use HasFactory<\Database\Factories\AbsenceTypeFactory> */
     use HasFactory;
 
+    protected $fillable = [
+        'name',
+        'description',
+    ];
+
     public function absences()
     {
         return $this->hasMany(Absence::class);

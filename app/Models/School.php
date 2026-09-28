@@ -12,6 +12,13 @@ class School extends Model
     use HasFactory;
     use SoftDeletes;
 
+    protected $fillable = [
+        'name',
+        'address',
+        'phone',
+        'email',
+    ];
+
     public function assistants()
     {
         return $this->hasMany(Assistant::class);
