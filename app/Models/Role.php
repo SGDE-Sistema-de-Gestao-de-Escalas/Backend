@@ -9,6 +9,10 @@ class Role extends Model
 {
     /** @use HasFactory<\Database\Factories\RoleFactory> */
     use HasFactory;
+
+    protected $fillable = [
+        'name', 'description', 'slug',
+    ];
     
     public function users()
     {

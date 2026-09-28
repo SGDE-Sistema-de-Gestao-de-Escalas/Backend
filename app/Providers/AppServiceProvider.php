@@ -25,5 +25,12 @@ class AppServiceProvider extends ServiceProvider
             fn (User $user): bool => $user->isAdmin()
         );
         
+        \Illuminate\Support\Facades\Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
+            $event->extendSocialite('azure', \SocialiteProviders\Azure\AzureExtendSocialite::class);
+        });
+
+        \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function (User $user, string $token) {
+            return env('FRONTEND_URL', 'http://localhost:3000') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+        });
     }
 }

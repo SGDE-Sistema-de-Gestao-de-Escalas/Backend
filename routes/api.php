@@ -21,6 +21,16 @@ Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1')
     ->name('auth.login');
 
+// Repor Password (utilizado após receber o email)
+Route::post('/password/reset', [AuthController::class, 'resetPassword'])
+    ->name('password.update');
+
+// Rotas OAuth
+Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthController::class, 'redirect'])
+    ->name('oauth.redirect');
+Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'callback'])
+    ->name('oauth.callback');
+
 // Exige autenticação em todas as rotas deste grupo.
 Route::middleware('auth:sanctum')->group(function () {
 
