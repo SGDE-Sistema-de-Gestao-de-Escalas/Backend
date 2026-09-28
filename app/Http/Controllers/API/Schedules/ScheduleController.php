@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schedules;
 
 use App\Models\Schedule;
-use App\Http\Requests\StoreScheduleRequest;
-use App\Http\Requests\UpdateScheduleRequest;
+use App\Http\Requests\Schedules\StoreScheduleRequest;
+use App\Http\Requests\Schedules\UpdateScheduleRequest;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 

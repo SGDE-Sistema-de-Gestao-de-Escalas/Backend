@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Models\Role;
-use App\Http\Requests\StoreRoleRequest;
-use App\Http\Requests\UpdateRoleRequest;
+use App\Http\Requests\Auth\StoreRoleRequest;
+use App\Http\Requests\Auth\UpdateRoleRequest;
 use App\Http\Controllers\Controller;
 
 class RoleController extends Controller

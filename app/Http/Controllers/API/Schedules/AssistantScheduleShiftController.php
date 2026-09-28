@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schedules;
 
 use App\Models\AssistantScheduleShift;
-use App\Http\Requests\StoreAssistantScheduleShiftRequest;
-use App\Http\Requests\UpdateAssistantScheduleShiftRequest;
+use App\Http\Requests\Schedules\StoreAssistantScheduleShiftRequest;
+use App\Http\Requests\Schedules\UpdateAssistantScheduleShiftRequest;
 
 class AssistantScheduleShiftController extends Controller
 {

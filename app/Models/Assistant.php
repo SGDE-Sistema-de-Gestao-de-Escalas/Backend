@@ -43,7 +43,7 @@ class Assistant extends Model
 
     public function assistantTemporaryAssignments()
     {
-        return $this->hasMany(AssistantTemporaryAssignment::class);
+        return $this->hasMany(AssistantTemporaryAssignments::class);
     }
 
     public function assistantScheduleProfiles()

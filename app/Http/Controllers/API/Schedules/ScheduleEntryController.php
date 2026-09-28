@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Schedules;
 
 use App\Models\ScheduleEntry;
-use App\Http\Requests\StoreScheduleEntryRequest;
-use App\Http\Requests\UpdateScheduleEntryRequest;
+use App\Http\Requests\Schedules\StoreScheduleEntryRequest;
+use App\Http\Requests\Schedules\UpdateScheduleEntryRequest;
 
 class ScheduleEntryController extends Controller
 {

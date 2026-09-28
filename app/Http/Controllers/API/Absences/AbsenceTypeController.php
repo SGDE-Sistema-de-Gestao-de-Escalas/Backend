@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\API\Absences;
 
 use App\Models\AbsenceType;
-use App\Http\Requests\StoreAbsenceTypeRequest;
-use App\Http\Requests\UpdateAbsenceTypeRequest;
+use App\Http\Requests\Absences\StoreAbsenceTypeRequest;
+use App\Http\Requests\Absences\UpdateAbsenceTypeRequest;
 
 class AbsenceTypeController extends Controller
 {
