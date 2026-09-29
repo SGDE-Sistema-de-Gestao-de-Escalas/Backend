@@ -5,6 +5,7 @@ use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
+use App\Http\Controllers\API\Auth\UserController;
 use App\Models\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -44,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Restringe as operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
+        Route::apiResource('users', UserController::class);
         Route::apiResource('roles', RoleController::class);
         Route::apiResource('schools', SchoolController::class);
         Route::apiResource('assistants', AssistantController::class);
