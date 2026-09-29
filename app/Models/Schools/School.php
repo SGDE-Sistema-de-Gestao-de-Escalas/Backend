@@ -5,13 +5,11 @@ namespace App\Models\Schools;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class School extends Model
 {
     /** @use HasFactory<\Database\Factories\SchoolFactory> */
     use HasFactory, HasUuids;
-    use SoftDeletes;
 
     protected $fillable = [
         'name',

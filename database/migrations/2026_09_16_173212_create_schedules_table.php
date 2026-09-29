@@ -18,10 +18,11 @@ return new class extends Migration
             $table->date('week_start');
             $table->date('week_end');
             $table->enum('status', ['draft', 'published', 'archived'])->default('draft');
-            $table->unsignedBigInteger('assistant_schedule_profile_id')->nullable();
+            $table->foreignUuid('assistant_schedule_profile_id')->nullable()->constrained('assistant_schedule_profiles');
             $table->timestamp('generated_at')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
