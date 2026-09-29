@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\SchoolOperatingRuleDay;
+use App\Models\Schools\SchoolOperatingRuleDay;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\AbsenceType;
+use App\Models\Absences\AbsenceType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Assistants;
 
-use App\Models\AssistantTemporaryAssignments;
+use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Http\Requests\Assistants\StoreAssistantTemporaryAssignmentsRequest;
 use App\Http\Requests\Assistants\UpdateAssistantTemporaryAssignmentsRequest;
 

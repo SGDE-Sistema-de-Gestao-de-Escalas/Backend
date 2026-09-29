@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\ActivityType;
+use App\Models\System\ActivityType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

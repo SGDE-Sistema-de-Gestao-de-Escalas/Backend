@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\AssistantScheduleProfile;
+use App\Models\Schedules\AssistantScheduleProfile;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
