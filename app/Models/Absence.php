@@ -1,14 +1,15 @@
-<?php
+﻿<?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Absence extends Model
 {
     /** @use HasFactory<\Database\Factories\AbsenceFactory> */
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     protected $fillable = [
         'assistant_id',
@@ -29,3 +30,4 @@ class Absence extends Model
     }
 
 }
+

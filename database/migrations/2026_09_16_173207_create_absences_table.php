@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('absences', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_id')->constrained('assistants');
-            $table->foreignId('absence_type_id')->constrained('absence_types');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_id')->constrained('assistants');
+            $table->foreignuuid('absence_type_id')->constrained('absence_types');
             $table->unsignedBigInteger('created_by_user_id');
             $table->unsignedBigInteger('justified_by_user_id')->nullable();
             $table->date('valid_from');

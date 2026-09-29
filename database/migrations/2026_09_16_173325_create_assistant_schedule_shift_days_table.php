@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('assistant_schedule_shift_days', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_schedule_shift_id')
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_schedule_shift_id')
                   ->constrained(
                       table: 'assistant_schedule_shifts',
                       indexName: 'fk_shift_days_shift_id'

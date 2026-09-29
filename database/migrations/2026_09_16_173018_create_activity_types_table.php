@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('activity_types', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('school_id')->constrained('schools');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('school_id')->constrained('schools');
             $table->string('name');
             $table->string('color', 7);
             $table->boolean('is_system')->default(false);

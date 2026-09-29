@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ResetPasswordMail;
 
 class AuthService
 {
@@ -74,16 +77,13 @@ class AuthService
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'provider' => $data['provider'],
-            'provider_id' => $data['provider_id'],
+            'provider' => $data['provider'] ?? null,
+            'provider_id' => $data['provider_id'] ?? null,
             'role_id' => $data['role_id'],
             'password' => Hash::make($data['password']),
         ]);
 
-        /** @var \Illuminate\Auth\Passwords\PasswordBroker $broker */
-        $broker = \Illuminate\Support\Facades\Password::broker();
-        $token = $broker->createToken($user);
-        $token = \Illuminate\Support\Facades\Password::broker()->createToken($user);
+        $token = Password::broker()->createToken($user);
         $user->sendPasswordResetNotification($token);
 
         return $user;
@@ -91,7 +91,7 @@ class AuthService
 
     public function resetPasswordWithToken(array $data): void
     {
-        $status = \Illuminate\Support\Facades\Password::broker()->reset(
+        $status = Password::broker()->reset(
             $data,
             function ($user, $password) {
                 $user->forceFill([
@@ -102,7 +102,7 @@ class AuthService
             }
         );
 
-        if ($status !== \Illuminate\Support\Facades\Password::PASSWORD_RESET) {
+        if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
                 'email' => [__($status)],
             ]);

@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('assistant_schedule_profiles', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_id')->constrained('assistants');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_id')->constrained('assistants');
             $table->enum('type', ['fixo', 'rotativo']);
             $table->enum('rotation_period', ['weekly', 'biweekly', 'monthly'])->nullable();
             $table->enum('starts_with', ['A', 'B'])->nullable();

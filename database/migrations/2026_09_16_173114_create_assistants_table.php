@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('assistants', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained('users')->nullable();
-            $table->foreignId('school_id')->constrained('schools');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('user_id')->constrained('users')->nullable();
+            $table->foreignuuid('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
             $table->string('first_name');
