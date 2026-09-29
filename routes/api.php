@@ -6,7 +6,7 @@ use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
-use App\Models\Schedule;
+use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 

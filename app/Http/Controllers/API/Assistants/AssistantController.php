@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Assistants;
 
-use App\Models\Assistant;
+use App\Models\Assistants\Assistant;
 use App\Http\Requests\Assistants\StoreAssistantRequest;
 use App\Http\Requests\Assistants\UpdateAssistantRequest;
 use App\Http\Controllers\Controller;

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Schedules;
 
-use App\Models\Schedule;
+use App\Models\Schedules\Schedule;
 use App\Http\Requests\Schedules\StoreScheduleRequest;
 use App\Http\Requests\Schedules\UpdateScheduleRequest;
 use Illuminate\Http\Request;

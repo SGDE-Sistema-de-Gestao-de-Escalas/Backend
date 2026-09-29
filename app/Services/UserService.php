@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\Auth\User;
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
-use App\Models\Role;
+use App\Models\Auth\Role;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;

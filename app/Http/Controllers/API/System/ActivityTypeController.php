@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\System;
 
-use App\Models\ActivityType;
+use App\Models\System\ActivityType;
 use App\Http\Requests\System\StoreActivityTypeRequest;
 use App\Http\Requests\System\UpdateActivityTypeRequest;
 
