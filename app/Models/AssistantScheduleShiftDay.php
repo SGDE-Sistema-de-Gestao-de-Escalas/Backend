@@ -1,14 +1,15 @@
-<?php
+﻿<?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class AssistantScheduleShiftDay extends Model
 {
     /** @use HasFactory<\Database\Factories\AssistantScheduleShiftDayFactory> */
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     protected $fillable = [
         'assistant_schedule_shift_id',
@@ -22,3 +23,4 @@ class AssistantScheduleShiftDay extends Model
         return $this->belongsTo(AssistantScheduleShift::class);
     }
 }
+

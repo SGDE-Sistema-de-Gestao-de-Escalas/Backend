@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('assistant_schedule_shifts', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_schedule_profile_id')->constrained('assistant_schedule_profiles');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_schedule_profile_id')->constrained('assistant_schedule_profiles');
             $table->enum('shift_label', ['A', 'B']);
             $table->time('entry_time');
             $table->time('exit_time');

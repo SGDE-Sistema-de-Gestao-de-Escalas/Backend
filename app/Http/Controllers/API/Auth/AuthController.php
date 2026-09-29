@@ -17,7 +17,12 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
+            'remember_me' => 'boolean'
         ]);
+
+        if (!empty($credentials['remember_me'])) {
+            config(['sanctum.expiration' => 60 * 24 * 30]); // 30 dias
+        }
 
         $authData = $this->authService->attemptLogin($credentials);
 

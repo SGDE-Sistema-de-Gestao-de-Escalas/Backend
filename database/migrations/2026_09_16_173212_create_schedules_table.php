@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('schedules', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_id')->constrained('assistants');
-            $table->foreignId('school_id')->constrained('schools');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_id')->constrained('assistants');
+            $table->foreignuuid('school_id')->constrained('schools');
             $table->date('week_start');
             $table->date('week_end');
             $table->enum('status', ['draft', 'published', 'archived'])->default('draft');

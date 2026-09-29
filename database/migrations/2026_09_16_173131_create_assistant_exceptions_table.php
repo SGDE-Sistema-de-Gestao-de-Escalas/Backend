@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('assistant_exceptions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assistant_id')->constrained('assistants');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('assistant_id')->constrained('assistants');
             $table->string('type');
             $table->text('description')->nullable();
             $table->date('valid_from');

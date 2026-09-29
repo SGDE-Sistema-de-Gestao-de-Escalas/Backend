@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('school_operating_rule_days', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('school_operating_rule_id')->constrained('school_operating_rules');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('school_operating_rule_id')->constrained('school_operating_rules');
             $table->unsignedTinyInteger('day_of_week'); 
             $table->timestamps();
         });

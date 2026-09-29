@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('schedule_entries', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('schedule_id')->constrained('schedules');
-            $table->foreignId('activity_type_id')->constrained('activity_types');
+            $table->uuid('id')->primary();
+            $table->foreignuuid('schedule_id')->constrained('schedules');
+            $table->foreignuuid('activity_type_id')->constrained('activity_types');
             $table->date('date');
             $table->time('start_time');
             $table->time('end_time');
