@@ -67,14 +67,6 @@ class AuthService
             ]);
         }
 
-        // Se o utilizador existe, associamos a conta social (caso ainda não esteja associada)
-        if (!$user->provider_id) {
-            $user->update([
-                'provider' => $provider,
-                'provider_id' => $socialUser->getId(),
-            ]);
-        }
-
         $user->tokens()->delete();
         
         return $user->createToken('sgde-access-token')->plainTextToken;
