@@ -4,6 +4,8 @@ namespace App\Providers;
 use App\Models\Auth\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use App\Models\Auth\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,7 +21,9 @@ class AppServiceProvider extends ServiceProvider
      * Bootstrap any application services.
      */
     public function boot(): void
-    {
+    {   
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        
         Gate::define(
             'manage-system', 
             fn (User $user): bool => $user->isAdmin()

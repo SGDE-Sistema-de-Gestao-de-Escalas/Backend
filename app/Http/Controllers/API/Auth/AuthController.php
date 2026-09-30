@@ -32,10 +32,19 @@ class AuthController extends Controller
         ]);
     }
 
+    public function me(Request $request): UserResource
+    {
+        $user = $request->user();
+
+        $user->load('role');
+
+        return new UserResource($user);
+    }
+
     public function updatePassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'current_password' => 'required|string',
+            'current_password' => 'required|string|current_password:sanctum',
             'new_password' => 'required|string|min:8|confirmed',
         ]);
 
