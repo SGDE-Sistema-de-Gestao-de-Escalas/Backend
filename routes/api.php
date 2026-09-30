@@ -35,8 +35,8 @@ Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthCon
 Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'externalLoginCallback'])
     ->name('oauth.callback');
 
-// Exige autenticação em todas as rotas deste grupo.
-Route::middleware('auth:sanctum')->group(function () {
+// Exige autenticação e uma conta ativa em todas as rotas deste grupo.
+Route::middleware(['auth:sanctum','active'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])

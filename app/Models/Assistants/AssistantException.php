@@ -5,11 +5,12 @@ namespace App\Models\Assistants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AssistantException extends Model
 {
     /** @use HasFactory<\Database\Factories\AssistantExceptionFactory> */
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
         'assistant_id',

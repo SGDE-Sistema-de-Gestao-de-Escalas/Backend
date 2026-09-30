@@ -33,7 +33,7 @@ class UpdateUserRequest extends FormRequest
             'role_id' => [
                 'sometimes',
                 'required',
-                'integer',
+                'uuid',
                 Rule::exists('roles', 'id')
                     ->whereIn('slug', ['admin', 'staff']),
             ],

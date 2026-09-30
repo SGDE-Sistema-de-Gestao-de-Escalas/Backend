@@ -15,8 +15,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignuuid('assistant_id')->constrained('assistants');
             $table->foreignuuid('absence_type_id')->constrained('absence_types');
-            $table->unsignedBigInteger('created_by_user_id');
-            $table->unsignedBigInteger('justified_by_user_id')->nullable();
+            $table->foreignUuid('created_by_user_id')->nullable()->constrained('users');
+            $table->foreignUuid('justified_by_user_id')->nullable()->constrained('users');
             $table->date('valid_from');
             $table->date('valid_until')->nullable();
             $table->unsignedSmallInteger('total_days');
@@ -25,6 +25,7 @@ return new class extends Migration
             $table->enum('status', ['justified', 'unjustified', 'waiting_for_document'])->default('unjustified');
             $table->text('notes')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
