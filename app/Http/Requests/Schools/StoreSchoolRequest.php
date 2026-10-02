@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
+use App\Models\School;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,7 +13,7 @@ class StoreSchoolRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('manage-system') ?? false;
+        return $this->user()?->can('create', School::class) ?? false;
     }
 
     /**

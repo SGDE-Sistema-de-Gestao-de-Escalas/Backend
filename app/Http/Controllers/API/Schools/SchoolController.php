@@ -7,19 +7,32 @@ use App\Http\Requests\Schools\StoreSchoolRequest;
 use App\Http\Requests\Schools\UpdateSchoolRequest;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SchoolResource;
+use App\Services\SchoolService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class SchoolController extends Controller
 {
+    public function __construct(
+        private readonly SchoolService $schoolService
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
     public function index(): AnonymousResourceCollection
     {
-        return SchoolResource::collection(
-            School::orderBy('name')->paginate()
-        );
+        Gate::authorize('viewAny', School::class);
+
+        $schools = School::withCount([
+                'assistants',
+                'schedules' => fn ($query) => $query->where('status', '!=', 'archived'),
+            ])
+            ->orderBy('name')
+            ->paginate();
+
+        return SchoolResource::collection($schools);
     }
 
     /**
@@ -27,7 +40,7 @@ class SchoolController extends Controller
      */
     public function store(StoreSchoolRequest $request): JsonResponse
     {
-        $school = School::create($request->validated());
+        $school = $this->schoolService->create($request->validated());
 
         return (new SchoolResource($school))
             ->response()
@@ -39,6 +52,13 @@ class SchoolController extends Controller
      */
     public function show(School $school): SchoolResource
     {
+        Gate::authorize('view', $school);
+
+        $school->loadCount([
+            'assistants',
+            'schedules' => fn ($query) => $query->where('status', '!=', 'archived'),
+        ]);
+
         return new SchoolResource($school);
     }
 
@@ -47,9 +67,9 @@ class SchoolController extends Controller
      */
     public function update(UpdateSchoolRequest $request, School $school): SchoolResource
     {
-        $school->update($request->validated());
+        $updatedSchool = $this->schoolService->update($school, $request->validated());
 
-        return new SchoolResource($school);
+        return new SchoolResource($updatedSchool);
     }
 
     /**
@@ -57,7 +77,18 @@ class SchoolController extends Controller
      */
     public function destroy(School $school): JsonResponse
     {
-        $school->delete();
+        Gate::authorize('delete', $school);
+
+        $blockReason = $this->schoolService->deletionBlockReason($school);
+
+        if ($blockReason !== null) {
+            return response()->json([
+                'error' => 'CONFLICT',
+                'message' => $blockReason,
+            ], 409);
+        }
+
+        $this->schoolService->delete($school);
 
         return response()->json(['message' => 'Escola removida com sucesso.']);
     }
