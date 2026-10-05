@@ -13,10 +13,24 @@ class School extends Model
 
     protected $fillable = [
         'name',
+        'acronym',
         'address',
         'phone',
         'email',
+        'active',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'active' => 'boolean',
+        ];
+    }
 
     public function assistants()
     {
@@ -40,12 +54,11 @@ class School extends Model
 
     public function outgoingTemporaryAssignments()
     {
-        return $this->hasMany(AssistantTemporaryAssignment::class, 'origin_school_id');
+        return $this->hasMany(AssistantTemporaryAssignments::class, 'origin_school_id');
     }
 
     public function incomingTemporaryAssignments()
     {
-        return $this->hasMany(AssistantTemporaryAssignment::class, 'destination_school_id');
+        return $this->hasMany(AssistantTemporaryAssignments::class, 'destination_school_id');
     }
 }
-
