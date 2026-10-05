@@ -30,7 +30,7 @@ class SchoolController extends Controller
                 'schedules' => fn ($query) => $query->where('status', '!=', 'archived'),
             ])
             ->orderBy('name')
-            ->paginate();
+            ->get();
 
         return SchoolResource::collection($schools);
     }
