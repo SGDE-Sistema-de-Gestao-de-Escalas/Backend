@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\School;
+use App\Models\Schools\School;
 
 class SchoolService
 {

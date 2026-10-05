@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Schedules;
 
-use App\Models\AssistantScheduleShiftDay;
+use App\Models\Schedules\AssistantScheduleShiftDay;
 use App\Http\Requests\Schedules\StoreAssistantScheduleShiftDayRequest;
 use App\Http\Requests\Schedules\UpdateAssistantScheduleShiftDayRequest;
 

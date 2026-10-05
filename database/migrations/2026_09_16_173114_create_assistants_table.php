@@ -17,8 +17,6 @@ return new class extends Migration
             $table->foreignuuid('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
-            $table->string('first_name');
-            $table->string('last_name');
             $table->string('email')->unique()->nullable();
             $table->string('phone')->unique()->nullable();
             $table->string('nif', 9)->unique()->nullable();
@@ -38,7 +36,7 @@ return new class extends Migration
             
             $table->boolean('available_for_transfer')->default(false);
             $table->timestamps();
-            $table->softdeletes();
+            $table->softDeletes();
         });
     }
 

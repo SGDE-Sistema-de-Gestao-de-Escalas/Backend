@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\AssistantTemporaryAssignments;
+use App\Models\Assistants\AssistantTemporaryAssignments;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

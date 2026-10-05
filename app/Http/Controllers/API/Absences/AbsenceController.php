@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Absences;
 
-use App\Models\Absence;
+use App\Models\Absences\Absence;
 use App\Http\Requests\Absences\StoreAbsenceRequest;
 use App\Http\Requests\Absences\UpdateAbsenceRequest;
 use App\Http\Controllers\Controller;

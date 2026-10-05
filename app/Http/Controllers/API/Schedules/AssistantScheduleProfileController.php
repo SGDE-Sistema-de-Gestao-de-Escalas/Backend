@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Schedules;
 
-use App\Models\AssistantScheduleProfile;
+use App\Models\Schedules\AssistantScheduleProfile;
 use App\Http\Requests\Schedules\StoreAssistantScheduleProfileRequest;
 use App\Http\Requests\Schedules\UpdateAssistantScheduleProfileRequest;
 

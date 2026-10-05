@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\ScheduleEntry;
+use App\Models\Schedules\ScheduleEntry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

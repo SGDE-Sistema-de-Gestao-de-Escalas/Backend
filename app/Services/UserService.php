@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\Auth\User;
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
-use App\Models\Role;
+use App\Models\Auth\Role;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -39,8 +39,8 @@ class UserService
                 Arr::only($data, ['name', 'email', 'role_id'])
             );
 
-            $wasAdmin = (int) $user->getOriginal('role_id')
-                === (int) $adminRole->id;
+            $wasAdmin = (string) $user->getOriginal('role_id')
+                === (string) $adminRole->id;
 
             if ($wasAdmin && $user->is_active && $user->isDirty('role_id'))
             {
@@ -89,7 +89,7 @@ class UserService
 
             if (
                 $target->is_active
-                && (int) $target->role_id === (int) $adminRole->id
+                && (string) $target->role_id === (string) $adminRole->id
             ) {
                 $activeAdmins = User::where('role_id', $adminRole->id)
                     ->where('is_active', true)

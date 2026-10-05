@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\SchoolOperatingRule;
+use App\Models\Schools\SchoolOperatingRule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

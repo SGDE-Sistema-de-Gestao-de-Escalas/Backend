@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Schools;
 
-use App\Models\School;
+use App\Models\Schools\School;
 use App\Http\Requests\Schools\StoreSchoolRequest;
 use App\Http\Requests\Schools\UpdateSchoolRequest;
 use App\Http\Controllers\Controller;

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\Auth\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Password;
@@ -15,7 +15,10 @@ class AuthService
     {
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+        if (!$user 
+            || !Hash::check($credentials['password'], $user->password)
+            || !$user->is_active
+            ) {
             throw ValidationException::withMessages([
                 'email' => ['As credenciais estão incorretas.'],
             ]);
@@ -56,12 +59,11 @@ class AuthService
                 'email' => ['Utilizador não registado. Por favor, peça ao administrador para criar a sua conta primeiro.'],
             ]);
         }
-
-        // Se o utilizador existe, associamos a conta social (caso ainda não esteja associada)
-        if (!$user->provider_id) {
-            $user->update([
-                'provider' => $provider,
-                'provider_id' => $socialUser->getId(),
+        
+        //Se o utilizador existe, verificamos se a sua conta esta ativa
+        if (!$user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => ['Não foi possível iniciar sessão com esta conta.'],
             ]);
         }
 

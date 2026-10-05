@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\Assistants;
 
-use App\Models\AssistantException;
+use App\Models\Assistants\AssistantException;
 use App\Http\Requests\Assistants\StoreAssistantExceptionRequest;
 use App\Http\Requests\Assistants\UpdateAssistantExceptionRequest;
 

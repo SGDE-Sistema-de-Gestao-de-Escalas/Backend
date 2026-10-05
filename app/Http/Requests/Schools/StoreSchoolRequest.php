@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
-use App\Models\School;
+use App\Models\Schools\School;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
