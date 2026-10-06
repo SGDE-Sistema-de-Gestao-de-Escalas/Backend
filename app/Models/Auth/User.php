@@ -10,7 +10,11 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use App\Models\Assistants\Assistant;
+use App\Models\System\Notification;
 
+#[UseFactory(UserFactory::class)]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -23,7 +27,8 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'role_id',
-        'name',
+        'first_name',
+        'last_name',
         'email',
         'password',
         'provider',
@@ -51,6 +56,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'anonymized_at' => 'datetime',
         ];
     }
 

@@ -41,8 +41,9 @@ class UserDestroyTest extends TestCase
 
         Sanctum::actingAs($admin);
 
-        $this->deleteJson("/api/users/{$staff->id}")
-            ->assertNoContent();
+        $this->postJson("/api/users/{$staff->id}/deactivate")
+            ->assertOk()
+            ->assertJsonPath('message', 'Utilizador desativado com sucesso.');
 
         $staff->refresh();
         $admin->refresh();
@@ -76,7 +77,7 @@ class UserDestroyTest extends TestCase
 
         Sanctum::actingAs($admin);
 
-        $this->deleteJson("/api/users/{$admin->id}")
+        $this->postJson("/api/users/{$admin->id}/deactivate")
             ->assertForbidden();
 
         $admin->refresh();
@@ -112,7 +113,7 @@ class UserDestroyTest extends TestCase
 
         Sanctum::actingAs($actor);
 
-        $this->deleteJson("/api/users/{$target->id}")
+        $this->postJson("/api/users/{$target->id}/deactivate")
             ->assertForbidden();
 
         $target->refresh();
@@ -124,5 +125,47 @@ class UserDestroyTest extends TestCase
         );
 
         $this->assertDatabaseCount('users', 2);
+    }
+
+    public function test_admin_can_permanently_delete_user_without_history(): void
+    {
+        $adminRole = Role::factory()->create([
+            'name' => 'Administrator',
+            'slug' => 'admin',
+        ]);
+
+        $admin = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+        ]);
+
+        $target = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+        ]);
+
+        $token = $target->createToken('existing-access')->accessToken;
+
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson("/api/users/{$target->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Utilizador eliminado definitivamente com sucesso.')
+            ->assertJsonPath('delete_action', 'hard_delete');
+
+        $this->assertDatabaseMissing('users', [
+            'id' => $target->id,
+        ]);
+
+        $this->assertNull(
+            User::withTrashed()->find($target->id)
+        );
+
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'id' => $token->id,
+        ]);
+
+        $this->assertTrue($admin->fresh()->is_active);
+        $this->assertDatabaseCount('users', 1);
     }
 }

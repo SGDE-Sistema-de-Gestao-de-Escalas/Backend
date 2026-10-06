@@ -18,7 +18,8 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
 
             'email' => [
                 'sometimes',
@@ -37,6 +38,8 @@ class UpdateUserRequest extends FormRequest
                 Rule::exists('roles', 'id')
                     ->whereIn('slug', ['admin', 'staff']),
             ],
+
+            'is_active' => ['sometimes', 'required', 'boolean', 'accepted'],
         ];
     }
 }

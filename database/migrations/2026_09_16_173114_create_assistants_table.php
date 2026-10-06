@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignuuid('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
-            $table->string('email')->unique()->nullable();
             $table->string('phone')->unique()->nullable();
             $table->string('nif', 9)->unique()->nullable();
             $table->string('social_security_number', 11)->unique()->nullable();

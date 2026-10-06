@@ -1,5 +1,5 @@
 <x-mail::message>
-# Olá, {{ $user->name }}
+# Olá, {{ $user->first_name }} {{ $user->last_name }}   
 
 Recebemos um pedido para repor a palavra-passe da tua conta no SGDE.
 
