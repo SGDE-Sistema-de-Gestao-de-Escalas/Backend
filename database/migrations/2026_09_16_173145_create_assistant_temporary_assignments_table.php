@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignuuid('assistant_id')->constrained('assistants');
             $table->foreignuuid('origin_school_id')->constrained('schools');
             $table->foreignuuid('destination_school_id')->constrained('schools');
-            $table->unsignedBigInteger('created_by_user_id');
-            $table->unsignedBigInteger('validated_by_user_id')->nullable(); //check
+            $table->foreignUuid('created_by_user_id')->constrained('users');
+            $table->foreignUuid('validated_by_user_id')->nullable()->constrained('users');  
             $table->date('valid_from');
             $table->date('valid_until')->nullable();
             $table->text('notes')->nullable();

@@ -51,8 +51,10 @@ Route::middleware(['auth:sanctum','active'])->group(function () {
 
     // Restringe as operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
+        Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])
+            ->name('users.deactivate');
         Route::apiResource('users', UserController::class);
-        Route::apiResource('roles', RoleController::class);
+        Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
         Route::apiResource('assistants', AssistantController::class);
         Route::apiResource('absences', AbsenceController::class);

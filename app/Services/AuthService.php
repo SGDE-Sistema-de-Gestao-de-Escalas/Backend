@@ -77,7 +77,8 @@ class AuthService
         $data['password'] = \Illuminate\Support\Str::random(16);
         
         $user = User::create([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
             'provider' => $data['provider'] ?? null,
             'provider_id' => $data['provider_id'] ?? null,

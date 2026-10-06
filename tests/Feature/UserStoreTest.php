@@ -12,16 +12,11 @@ class UserStoreTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_create_staff_user(): void
+    public function test_admin_can_create_admin_user_without_role_id(): void
     {
         $adminRole = Role::factory()->create([
             'name' => 'Administrator',
             'slug' => 'admin',
-        ]);
-
-        $staffRole = Role::factory()->create([
-            'name' => 'Staff',
-            'slug' => 'staff',
         ]);
 
         $admin = User::factory()->create([
@@ -32,25 +27,28 @@ class UserStoreTest extends TestCase
         Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/users', [
-            'name' => 'Ana Silva',
+            'first_name' => 'Ana',
+            'last_name' => 'Silva',
             'email' => 'ana@example.com',
-            'role_id' => $staffRole->id,
         ]);
 
         $response
             ->assertCreated()
-            ->assertJsonPath('data.name', 'Ana Silva')
+            ->assertJsonPath('message', 'Utilizador criado com sucesso.')
+            ->assertJsonPath('data.first_name', 'Ana')
+            ->assertJsonPath('data.last_name', 'Silva')
             ->assertJsonPath('data.email', 'ana@example.com')
-            ->assertJsonPath('data.role', 'staff')
+            ->assertJsonPath('data.role', 'admin')
             ->assertJsonPath('data.is_active', true)
             ->assertJsonMissingPath('data.password')
             ->assertJsonMissingPath('data.remember_token');
 
         $this->assertDatabaseHas('users', [
             'id' => $response->json('data.id'),
-            'name' => 'Ana Silva',
+            'first_name' => 'Ana',
+            'last_name' => 'Silva',
             'email' => 'ana@example.com',
-            'role_id' => $staffRole->id,
+            'role_id' => $adminRole->id,
             'is_active' => true,
         ]);
 
@@ -75,7 +73,8 @@ class UserStoreTest extends TestCase
         ]);
 
         $existingUser = User::factory()->create([
-            'name' => 'Ana Original',
+            'first_name' => 'Ana',
+            'last_name' => 'Original',
             'email' => 'ana@example.com',
             'role_id' => $staffRole->id,
             'is_active' => true,
@@ -84,9 +83,9 @@ class UserStoreTest extends TestCase
         Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/users', [
-            'name' => 'Outra Ana',
+            'first_name' => 'Outra',
+            'last_name' => 'Ana',
             'email' => $existingUser->email,
-            'role_id' => $staffRole->id,
         ]);
 
         $response
@@ -97,9 +96,47 @@ class UserStoreTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $existingUser->id,
-            'name' => 'Ana Original',
+            'first_name' => 'Ana',
+            'last_name' => 'Original',
             'email' => 'ana@example.com',
             'role_id' => $staffRole->id,
+        ]);
+    }
+
+    public function test_admin_cannot_create_user_with_role_id(): void
+    {
+        $adminRole = Role::factory()->create([
+            'name' => 'Administrator',
+            'slug' => 'admin',
+        ]);
+
+        $staffRole = Role::factory()->create([
+            'name' => 'Staff',
+            'slug' => 'staff',
+        ]);
+
+        $admin = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/users', [
+            'first_name' => 'Ana',
+            'last_name' => 'Silva',
+            'email' => 'ana@example.com',
+            'role_id' => $staffRole->id,
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['role_id']);
+
+        $this->assertDatabaseCount('users', 1);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'ana@example.com',
         ]);
     }
 }

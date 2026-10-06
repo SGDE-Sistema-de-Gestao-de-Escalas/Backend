@@ -21,18 +21,24 @@ class UserSeeder extends Seeder
 
 
 
-        User::firstOrCreate([
-            'name' => 'Miguel Silva',
-            'email' => 'admin@sgde.pt',
-            'password' => Hash::make('admin123'),
-            'role_id' => $adminRole->id,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@sgde.pt'],
+            [
+                'first_name' => 'Miguel',
+                'last_name' => 'Silva',
+                'password' => Hash::make('admin123'),
+                'role_id' => $adminRole->id,
+            ]
+        );
 
-        User::firstOrCreate([
-            'name' => 'Ana Costa',
-            'email' => 'assistente@sgde.pt',
-            'password' => Hash::make('staff123'),
-            'role_id' => $staffRole->id,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'assistente@sgde.pt'],
+            [
+                'first_name' => 'Ana',
+                'last_name' => 'Costa',
+                'password' => Hash::make('staff123'),
+                'role_id' => $staffRole->id,
+            ]
+        );
     }
 }
