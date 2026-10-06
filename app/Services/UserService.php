@@ -15,7 +15,8 @@ class UserService
     public function create(array $data): User
     {
         $user = User::create([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
             'role_id' => $data['role_id'],
             'password' => Str::random(64),
@@ -36,7 +37,7 @@ class UserService
                 ->firstOrFail();
 
             $user->fill(
-                Arr::only($data, ['name', 'email', 'role_id'])
+                Arr::only($data, ['first_name', 'last_name', 'email', 'role_id'])
             );
 
             $wasAdmin = (string) $user->getOriginal('role_id')
