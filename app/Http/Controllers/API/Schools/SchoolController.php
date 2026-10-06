@@ -41,6 +41,7 @@ class SchoolController extends Controller
         $school = $this->schoolService->create($request->validated());
 
         return (new SchoolResource($school))
+            ->additional(['message' => 'Escola criada com sucesso.'])
             ->response()
             ->setStatusCode(201);
     }
@@ -65,7 +66,8 @@ class SchoolController extends Controller
     {
         $updatedSchool = $this->schoolService->update($school, $request->validated());
 
-        return new SchoolResource($updatedSchool);
+        return (new SchoolResource($updatedSchool))
+            ->additional(['message' => $this->updateMessage($updatedSchool)]);
     }
 
     /**
@@ -83,5 +85,20 @@ class SchoolController extends Controller
         $this->schoolService->delete($school);
 
         return response()->json(['message' => 'Escola removida com sucesso.']);
+    }
+
+    /**
+     * Mensagem devolvida após uma atualização: se o estado `active` mudou
+     * diz-o explicitamente, caso contrário confirma a atualização dos dados.
+     */
+    private function updateMessage(School $school): string
+    {
+        if ($school->wasChanged('active')) {
+            return $school->active
+                ? 'Escola ativada com sucesso.'
+                : 'Escola desativada com sucesso.';
+        }
+
+        return 'Dados da escola atualizados com sucesso.';
     }
 }

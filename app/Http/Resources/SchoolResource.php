@@ -25,6 +25,7 @@ class SchoolResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'active' => $this->active,
+            'status_message' => $this->active ? 'Escola ativa' : 'Escola inativa',
             'assistants' => $this->assistants_count ?? $this->assistants()->count(),
             'assistants_count' => $this->assistants_count ?? $this->assistants()->count(),
             'can_delete' => $deletionBlockReason === null,
