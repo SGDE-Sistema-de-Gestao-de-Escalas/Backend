@@ -20,16 +20,30 @@ class AuthController extends Controller
             'remember_me' => 'boolean'
         ]);
 
+        $cookieMinutes = !empty($credentials['remember_me']) ? 60 * 24 * 30 : 60 * 24; // 30 dias ou 24 horas
+
         if (!empty($credentials['remember_me'])) {
-            config(['sanctum.expiration' => 60 * 24 * 30]); // 30 dias
+            config(['sanctum.expiration' => $cookieMinutes]);
         }
 
         $authData = $this->authService->attemptLogin($credentials);
 
+        $cookie = cookie(
+            name: 'access_token',
+            value: $authData['token'],
+            minutes: $cookieMinutes,
+            path: '/',
+            domain: null,
+            secure: config('app.env') === 'production',
+            httpOnly: true,
+            raw: false,
+            sameSite: 'Lax'
+        );
+
         return response()->json([
             'access_token' => $authData['token'],
             'user' => new UserResource($authData['user']),
-        ]);
+        ])->withCookie($cookie);
     }
 
     public function me(Request $request): UserResource
@@ -57,7 +71,8 @@ class AuthController extends Controller
     {
         $this->authService->logout($request->user());
 
-        return response()->json(['message' => 'Logout realizado com sucesso.']);
+        return response()->json(['message' => 'Logout realizado com sucesso.'])
+            ->withoutCookie('access_token');
     }
 
     public function resetPassword(Request $request): JsonResponse

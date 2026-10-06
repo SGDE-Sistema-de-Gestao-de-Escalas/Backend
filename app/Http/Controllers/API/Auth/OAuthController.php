@@ -42,11 +42,23 @@ class OAuthController extends Controller
             
             $token = $this->authService->handleOAuthCallback($provider, $socialUser);
 
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000') . '/auth/callback?token=' . $token;
-            return redirect()->away($frontendUrl);
+            $cookie = cookie(
+                name: 'access_token',
+                value: $token,
+                minutes: 60 * 24 * 30, // 30 dias
+                path: '/',
+                domain: null,
+                secure: config('app.env') === 'production',
+                httpOnly: true,
+                raw: false,
+                sameSite: 'Lax'
+            );
+
+            $frontendUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback';
+            return redirect()->away($frontendUrl)->withCookie($cookie);
             
         } catch (\Exception $e) {
-            $frontendErrorUrl = env('FRONTEND_URL', 'http://localhost:3000') . '/auth/callback?error=' . urlencode($e->getMessage());
+            $frontendErrorUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback?error=' . urlencode($e->getMessage());
             return redirect()->away($frontendErrorUrl);
         }
     }
