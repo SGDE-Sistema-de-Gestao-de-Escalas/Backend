@@ -2,9 +2,11 @@
 
 namespace App\Models\System;
 
+use App\Models\Schedules\ScheduleEntry;
+use App\Models\Schools\School;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class ActivityType extends Model
 {
@@ -12,13 +14,29 @@ class ActivityType extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'school_id',
         'name',
-        'description',
+        'color',
+        'is_system',
+        'active',
     ];
 
-    public function schools()
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
     {
-        return $this->belongsToMany(School::class);
+        return [
+            'is_system' => 'boolean',
+            'active' => 'boolean',
+        ];
+    }
+
+    public function school()
+    {
+        return $this->belongsTo(School::class);
     }
 
     public function scheduleEntries()
@@ -26,4 +44,3 @@ class ActivityType extends Model
         return $this->hasMany(ScheduleEntry::class);
     }
 }
-
