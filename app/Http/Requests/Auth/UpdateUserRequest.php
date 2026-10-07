@@ -39,6 +39,8 @@ class UpdateUserRequest extends FormRequest
                 Rule::exists('roles', 'id')
                     ->whereIn('slug', ['admin', 'staff']),
             ],
+
+            'is_active' => ['sometimes', 'required', 'boolean', 'accepted'],
         ];
     }
 }

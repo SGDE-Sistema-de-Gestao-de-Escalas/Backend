@@ -30,4 +30,11 @@ class UserPolicy
     {
         return $actor->isAdmin() && ! $actor->is($target);
     }
+
+    public function forceDelete(User $actor, User $target): bool
+    {
+        return $actor->is_active
+            && $this->delete($actor, $target);
+    }
+    
 }

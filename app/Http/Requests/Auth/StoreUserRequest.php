@@ -28,10 +28,7 @@ class StoreUserRequest extends FormRequest
             ],
 
             'role_id' => [
-                'required',
-                'uuid',
-                Rule::exists('roles', 'id')
-                    ->whereIn('slug', ['admin', 'staff']),
+                'missing'
             ],
         ];
     }
