@@ -7,6 +7,7 @@ use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -54,6 +55,10 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
 
     Route::post('/update-password', [AuthController::class, 'updatePassword'])
         ->name('password.change');
+
+    // Pedidos de Privacidade e RGPD (qualquer utilizador autenticado)
+    Route::post('/privacy/request-deactivation', [PrivacyController::class, 'requestDeactivation'])
+        ->name('privacy.request-deactivation');
 
     // Gestão de utilizadores (autorização granular via UserPolicy e FormRequests)
     Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])

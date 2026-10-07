@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use App\Models\Assistants\Assistant;
+use App\Mail\PrivacyDeactivationRequestMail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -325,5 +327,25 @@ class UserService
         }
 
         return null;
+    }
+
+    public function requestDeactivation(User $user, ?string $reason = null): void
+    {
+        $user->loadMissing(['role', 'assistant.school']);
+
+        $schoolName = $user->assistant?->school?->name ?? 'Geral / Sem Escola Específica';
+
+        $admins = User::query()
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
+            ->get();
+
+        if ($admins->isNotEmpty()) {
+            Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
+                user: $user,
+                schoolName: $schoolName,
+                reason: $reason
+            ));
+        }
     }
 }
