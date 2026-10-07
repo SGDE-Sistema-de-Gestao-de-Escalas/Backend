@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\API\Assistants;
 
+use App\Http\Controllers\Controller;
 use App\Models\Assistants\AssistantException;
 use App\Http\Requests\Assistants\StoreAssistantExceptionRequest;
 use App\Http\Requests\Assistants\UpdateAssistantExceptionRequest;
+use App\Http\Resources\Assistants\AssistantExceptionResource;
 
 class AssistantExceptionController extends Controller
 {
@@ -13,7 +15,8 @@ class AssistantExceptionController extends Controller
      */
     public function index()
     {
-        //
+        $exceptions = AssistantException::with('assistant')->get();
+        return AssistantExceptionResource::collection($exceptions);
     }
 
     /**
@@ -21,7 +24,8 @@ class AssistantExceptionController extends Controller
      */
     public function store(StoreAssistantExceptionRequest $request)
     {
-        //
+        $exception = AssistantException::create($request->validated());
+        return new AssistantExceptionResource($exception);
     }
 
     /**
@@ -29,7 +33,7 @@ class AssistantExceptionController extends Controller
      */
     public function show(AssistantException $assistantException)
     {
-        //
+        return new AssistantExceptionResource($assistantException);
     }
 
     /**
@@ -37,7 +41,8 @@ class AssistantExceptionController extends Controller
      */
     public function update(UpdateAssistantExceptionRequest $request, AssistantException $assistantException)
     {
-        //
+        $assistantException->update($request->validated());
+        return new AssistantExceptionResource($assistantException);
     }
 
     /**
@@ -45,6 +50,7 @@ class AssistantExceptionController extends Controller
      */
     public function destroy(AssistantException $assistantException)
     {
-        //
+        $assistantException->delete();
+        return response()->noContent();
     }
 }
