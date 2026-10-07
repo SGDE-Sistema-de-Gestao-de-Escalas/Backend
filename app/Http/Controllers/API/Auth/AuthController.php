@@ -5,12 +5,18 @@ namespace App\Http\Controllers\API\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
+use App\Services\UserService;
+use App\Http\Requests\Auth\UpdateUserRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuthService $authService) {}
+    public function __construct(
+        private readonly AuthService $authService,
+        private readonly UserService $userService,
+    ) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -53,6 +59,31 @@ class AuthController extends Controller
         $user->load('role');
 
         return new UserResource($user);
+    }
+
+    public function updateMe(UpdateUserRequest $request): UserResource
+    {
+        $user = $request->user();
+        $updatedUser = $this->userService->update($user, $request->validated());
+
+        return (new UserResource($updatedUser))
+            ->additional(['message' => 'Perfil atualizado com sucesso.']);
+    }
+
+    public function destroyMe(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        Gate::authorize('delete', $user);
+
+        $action = $this->userService->delete($user, $user);
+
+        return response()->json([
+            'message' => $action === 'anonymize'
+                ? 'Conta anonimizada com sucesso. O histórico foi mantido.'
+                : 'Conta eliminada definitivamente com sucesso.',
+            'delete_action' => $action,
+        ]);
     }
 
     public function updatePassword(Request $request): JsonResponse

@@ -13,7 +13,7 @@ class RolePolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+         return $user->is_active && $user->isAdmin();
     }
 
     /**

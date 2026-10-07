@@ -7,36 +7,65 @@ use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize(): \Illuminate\Auth\Access\Response|bool
     {
-        return $this->user()?->can(
-            'update',
-            $this->route('user')
-        ) ?? false;
+        $target = $this->route('user') ?? $this->user();
+
+        if (! $target) {
+            return false;
+        }
+
+        $response = \Illuminate\Support\Facades\Gate::inspect('update', $target);
+
+        return $response->allowed() ? true : $response;
     }
 
     public function rules(): array
     {
-        return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+        $target = $this->route('user') ?? $this->user();
+        $targetId = is_object($target) ? $target->id : $target;
+        $isAdmin = $this->user()?->isAdmin() ?? false;
+        $presenceRule = $this->isMethod('PUT') ? 'required' : 'sometimes';
 
+        $rules = [
+            'first_name' => [$presenceRule, 'string', 'max:255'],
+            'last_name' => [$presenceRule, 'string', 'max:255'],
             'email' => [
-                'sometimes',
-                'required',
+                $presenceRule,
                 'string',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')
-                    ->ignore($this->route('user')),
+                    ->ignore($this->route('user'))
+                    ->whereNull('deleted_at'),
             ],
+        ];
 
-            'role_id' => [
+        if ($isAdmin) {
+            $rules['role_id'] = [
                 'sometimes',
                 'required',
                 'uuid',
                 Rule::exists('roles', 'id')
                     ->whereIn('slug', ['admin', 'staff']),
-            ],
+            ];
+
+            $rules['is_active'] = ['sometimes', 'required', 'boolean', 'accepted'];
+        } else {
+            $rules['role_id'] = ['prohibited'];
+            $rules['is_active'] = ['prohibited'];
+            $rules['school_id'] = ['prohibited'];
+        }
+
+        return $rules;
+    }
+
+    public function messages(): array
+    {
+        return [
+            'role_id.prohibited' => 'Não tem permissão para alterar o perfil de utilizador.',
+            'is_active.prohibited' => 'Não tem permissão para alterar o estado da conta.',
+            'school_id.prohibited' => 'Não tem permissão para alterar a associação de escola.',
         ];
     }
 }

@@ -13,7 +13,7 @@ class AssistantPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -21,7 +21,7 @@ class AssistantPolicy
      */
     public function view(User $user, Assistant $assistant): bool
     {
-        return false;
+        return $user->isAdmin() || $assistant->user_id === $user->id;
     }
 
     /**
@@ -29,7 +29,7 @@ class AssistantPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,7 +37,7 @@ class AssistantPolicy
      */
     public function update(User $user, Assistant $assistant): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -45,7 +45,7 @@ class AssistantPolicy
      */
     public function delete(User $user, Assistant $assistant): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -53,7 +53,7 @@ class AssistantPolicy
      */
     public function restore(User $user, Assistant $assistant): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -61,6 +61,14 @@ class AssistantPolicy
      */
     public function forceDelete(User $user, Assistant $assistant): bool
     {
-        return false;
+        return $user->isAdmin();
+    }
+
+    /**
+     * Determine whether the user can anonymize the assistant.
+     */
+    public function anonymize(User $user, Assistant $assistant): bool
+    {
+        return $user->isAdmin();
     }
 }

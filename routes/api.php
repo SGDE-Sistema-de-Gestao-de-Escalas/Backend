@@ -1,11 +1,14 @@
 <?php
 use App\Http\Controllers\API\Absences\AbsenceController;
+use App\Http\Controllers\API\Absences\AbsenceTypeController;
 use App\Http\Controllers\API\Assistants\AssistantController;
 use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Assistants\AssistantExceptionController;
+use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -36,11 +39,17 @@ Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthCon
     ->name('oauth.callback');
 
 // Exige autenticação e uma conta ativa em todas as rotas deste grupo.
-Route::middleware(['auth:sanctum','active'])->group(function () {
+// Estas rotas são globais (não dependem de uma escola) e NÃO usam o
+// school.context: um X-School-ID antigo ou inválido não as pode bloquear.
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
         ->name('auth.me');
+    Route::match(['put', 'patch'], '/me', [AuthController::class, 'updateMe'])
+        ->name('auth.me.update');
+    Route::delete('/me', [AuthController::class, 'destroyMe'])
+        ->name('auth.me.destroy');
 
     // Termina a sessão do utilizador autenticado.
     Route::post('/logout', [AuthController::class, 'logout'])
@@ -49,12 +58,39 @@ Route::middleware(['auth:sanctum','active'])->group(function () {
     Route::post('/update-password', [AuthController::class, 'updatePassword'])
         ->name('password.change');
 
-    // Restringe as operações de gestão aos administradores.
+    // Pedidos de Privacidade e RGPD (qualquer utilizador autenticado)
+    Route::get('/me/export', [PrivacyController::class, 'export'])
+        ->name('privacy.me.export');
+    Route::post('/privacy/request-deactivation', [PrivacyController::class, 'requestDeactivation'])
+        ->name('privacy.request-deactivation');
+
+    // Gestão de utilizadores (autorização granular via UserPolicy e FormRequests)
+    Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])
+        ->name('users.deactivate');
+    Route::apiResource('users', UserController::class);
+
+    // Parametrização global da plataforma: só administradores.
     Route::middleware('can:manage-system')->group(function () {
-        Route::apiResource('users', UserController::class);
-        Route::apiResource('roles', RoleController::class);
+        Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
+        Route::get('/assistants/{assistant}/can-anonymize', [AssistantController::class, 'canAnonymize'])
+            ->withTrashed()
+            ->name('assistants.can-anonymize');
+        Route::post('/assistants/{assistant}/anonymize', [AssistantController::class, 'anonymize'])
+            ->withTrashed()
+            ->name('assistants.anonymize');
+        Route::apiResource('absence-types', AbsenceTypeController::class);
+    });
+});
+
+// Rotas que dependem de uma escola. O school.context lê o cabeçalho opcional
+// X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
+Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
+
+    // Restringe a gestão destes recursos aos administradores.
+    Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class);
+        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
     });
 

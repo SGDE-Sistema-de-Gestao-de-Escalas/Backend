@@ -12,7 +12,6 @@ use App\Http\Requests\Auth\UpdateUserRequest;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 
 class UserController extends Controller
@@ -21,11 +20,12 @@ class UserController extends Controller
         private readonly UserService $userService
     ) {}
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', User::class);
 
         $users = User::with('role')
+            ->where('id', '!=', $request->user()->getKey())
             ->orderBy('id')
             ->paginate(20);
 
@@ -48,6 +48,7 @@ class UserController extends Controller
         $user = $this->userService->create($data);
 
         return (new UserResource($user))
+            ->additional(['message' => 'Utilizador criado com sucesso.'])
             ->response()
             ->setStatusCode(201);
     }
@@ -56,18 +57,45 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
+        $wasInactive = ! $user->is_active;
         $updatedUser = $this->userService->update($user, $data);
 
-        return new UserResource($updatedUser);
+        $message = $wasInactive && $updatedUser->is_active
+            ? 'Utilizador ativado com sucesso.'
+            : 'Dados do utilizador atualizados com sucesso.';
+
+        return (new UserResource($updatedUser))
+            ->additional(['message' => $message]);
     }
 
-    public function destroy(Request $request, User $user): Response
+    public function deactivate(Request $request, User $user): JsonResponse
     {
+        Gate::authorize('deactivate', $user);
+
         $this->userService->deactivate(
             $request->user(),
             $user
         );
 
-        return response()->noContent();
+        return response()->json([
+            'message' => 'Utilizador desativado com sucesso.',
+        ]);
+    }
+
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        Gate::authorize('delete', $user);
+
+        $action = $this->userService->delete(
+            $request->user(),
+            $user
+        );
+
+        return response()->json([
+            'message' => $action === 'anonymize'
+                ? 'Utilizador anonimizado com sucesso. O histórico foi mantido.'
+                : 'Utilizador eliminado definitivamente com sucesso.',
+            'delete_action' => $action,
+        ]);
     }
 }

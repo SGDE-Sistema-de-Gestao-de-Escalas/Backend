@@ -10,7 +10,12 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Models\Assistants\Assistant;
+use App\Models\System\Notification;
 
+#[UseFactory(UserFactory::class)]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -23,7 +28,8 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'role_id',
-        'name',
+        'first_name',
+        'last_name',
         'email',
         'password',
         'provider',
@@ -51,7 +57,18 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'anonymized_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Nome completo (só leitura), usado nos emails e nas respostas da API.
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(
+            fn () => trim(($this->first_name ?? '').' '.($this->last_name ?? ''))
+        );
     }
 
     public function role()

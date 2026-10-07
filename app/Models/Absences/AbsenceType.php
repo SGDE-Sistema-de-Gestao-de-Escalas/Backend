@@ -13,12 +13,18 @@ class AbsenceType extends Model
 
     protected $fillable = [
         'name',
-        'description',
+        'requires_document',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'requires_document' => 'boolean',
+        ];
+    }
 
     public function absences()
     {
         return $this->hasMany(Absence::class);
     }
 }
-

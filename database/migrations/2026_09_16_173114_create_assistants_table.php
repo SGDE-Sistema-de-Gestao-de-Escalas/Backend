@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignuuid('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
-            $table->string('email')->unique()->nullable();
             $table->string('phone')->unique()->nullable();
             $table->string('nif', 9)->unique()->nullable();
             $table->string('social_security_number', 11)->unique()->nullable();
@@ -29,12 +28,14 @@ return new class extends Migration
 
             $table->string('address_street')->nullable();
             $table->string('address_zip_code')->nullable();
+            $table->string('address_city')->nullable();
 
             $table->string('emergency_contact_name')->nullable();
             $table->string('emergency_contact_phone')->nullable();
             $table->string('emergency_contact_kinship')->nullable();
             
             $table->boolean('available_for_transfer')->default(false);
+            $table->boolean('is_anonymized')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });
