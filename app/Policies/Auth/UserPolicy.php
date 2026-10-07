@@ -21,9 +21,13 @@ class UserPolicy
         return $actor->isAdmin();
     }
 
-    public function update(User $actor, User $target): bool
+    public function update(User $actor, User $target): \Illuminate\Auth\Access\Response
     {
-        return $actor->isAdmin();
+        if ($actor->isAdmin() || $actor->is($target)) {
+            return \Illuminate\Auth\Access\Response::allow();
+        }
+
+        return \Illuminate\Auth\Access\Response::deny('Não tem permissão para alterar dados de outros utilizadores.');
     }
 
     public function delete(User $actor, User $target): bool

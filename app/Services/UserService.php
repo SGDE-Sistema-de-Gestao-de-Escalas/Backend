@@ -87,10 +87,6 @@ class UserService
     public function deactivate(User $actor, User $target): void
     {
         DB::transaction(function () use ($actor, $target) {
-            $adminRole = Role::where('slug', 'admin')
-                ->lockForUpdate()
-                ->firstOrFail();
-
             $actor = User::whereKey($actor->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -102,6 +98,10 @@ class UserService
             abort_unless($actor->is_active, 403);
 
             Gate::forUser($actor)->authorize('delete', $target);
+
+            $adminRole = Role::where('slug', 'admin')
+                ->lockForUpdate()
+                ->firstOrFail();
 
             if (
                 $target->is_active
