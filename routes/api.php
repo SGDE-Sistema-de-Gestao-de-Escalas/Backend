@@ -7,6 +7,7 @@ use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Assistants\AssistantExceptionController;
 use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
@@ -83,6 +84,7 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class);
+        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
     });
 
