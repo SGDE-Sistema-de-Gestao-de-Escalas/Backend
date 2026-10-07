@@ -55,6 +55,8 @@ Route::middleware(['auth:sanctum','active'])->group(function () {
         ->name('password.change');
 
     // Pedidos de Privacidade e RGPD (qualquer utilizador autenticado)
+    Route::get('/me/export', [PrivacyController::class, 'export'])
+        ->name('privacy.me.export');
     Route::post('/privacy/request-deactivation', [PrivacyController::class, 'requestDeactivation'])
         ->name('privacy.request-deactivation');
 

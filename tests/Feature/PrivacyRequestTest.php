@@ -135,4 +135,92 @@ class PrivacyRequestTest extends TestCase
                 && $mail->reason === null;
         });
     }
+
+    public function test_guest_cannot_export_personal_data(): void
+    {
+        $response = $this->getJson('/api/me/export');
+
+        $response->assertUnauthorized();
+    }
+
+    public function test_authenticated_user_can_export_personal_data_without_assistant(): void
+    {
+        $adminRole = Role::factory()->create(['name' => 'Administrator', 'slug' => 'admin']);
+
+        $admin = User::factory()->create([
+            'first_name' => 'Carlos',
+            'last_name'  => 'Ramos',
+            'email'      => 'carlos.ramos@example.com',
+            'role_id'    => $adminRole->id,
+            'is_active'  => true,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/me/export');
+
+        $response
+            ->assertOk()
+            ->assertHeader('Content-Disposition')
+            ->assertJsonPath('perfil.first_name', 'Carlos')
+            ->assertJsonPath('perfil.last_name', 'Ramos')
+            ->assertJsonPath('perfil.email', 'carlos.ramos@example.com')
+            ->assertJsonPath('perfil.role', 'admin')
+            ->assertJsonPath('perfil.is_active', true)
+            ->assertJsonMissingPath('assistente');
+
+        $this->assertStringContainsString(
+            'dados-pessoais-' . $admin->id,
+            $response->headers->get('Content-Disposition')
+        );
+    }
+
+    public function test_staff_with_assistant_exports_personal_data_with_school_and_no_sensitive_fields(): void
+    {
+        $adminRole = Role::factory()->create(['name' => 'Administrator', 'slug' => 'admin']);
+        $staffRole = Role::factory()->create(['name' => 'Staff', 'slug' => 'staff']);
+
+        $staff = User::factory()->create([
+            'first_name' => 'Maria',
+            'last_name'  => 'Lopes',
+            'email'      => 'maria.lopes@example.com',
+            'role_id'    => $staffRole->id,
+            'is_active'  => true,
+        ]);
+
+        $school = School::create([
+            'name'    => 'Escola Básica Exportação',
+            'acronym' => 'EB-EXP',
+            'active'  => true,
+        ]);
+
+        Assistant::create([
+            'user_id'                => $staff->id,
+            'school_id'              => $school->id,
+            'internal_number'        => 'AST-EXPORT',
+            'phone'                  => '915000000',
+            'birth_date'             => '1990-06-15',
+            'address_street'         => 'Avenida Principal 10',
+            'address_zip_code'       => '4000-123',
+            'available_for_transfer' => false,
+        ]);
+
+        Sanctum::actingAs($staff);
+
+        $response = $this->getJson('/api/me/export');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('perfil.first_name', 'Maria')
+            ->assertJsonPath('perfil.email', 'maria.lopes@example.com')
+            ->assertJsonPath('perfil.role', 'staff')
+            ->assertJsonPath('assistente.internal_number', 'AST-EXPORT')
+            ->assertJsonPath('assistente.phone', '915000000')
+            ->assertJsonPath('assistente.birth_date', '1990-06-15')
+            ->assertJsonPath('assistente.address_street', 'Avenida Principal 10')
+            ->assertJsonPath('assistente.school', 'Escola Básica Exportação')
+            // Campos sensíveis NIF e NISS não devem aparecer no export
+            ->assertJsonMissingPath('assistente.nif')
+            ->assertJsonMissingPath('assistente.social_security_number');
+    }
 }

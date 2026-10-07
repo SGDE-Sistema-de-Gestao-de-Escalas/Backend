@@ -348,4 +348,45 @@ class UserService
             ));
         }
     }
+
+    public function exportPersonalData(User $user): array
+    {
+        $user->loadMissing(['role', 'assistant.school']);
+
+        $assistant = $user->assistant;
+
+        $data = [
+            'exportado_em' => now()->toIso8601String(),
+            'perfil' => [
+                'first_name'        => $user->first_name,
+                'last_name'         => $user->last_name,
+                'email'             => $user->email,
+                'role'              => $user->role?->slug,
+                'is_active'         => $user->is_active,
+                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'created_at'        => $user->created_at?->toIso8601String(),
+                'updated_at'        => $user->updated_at?->toIso8601String(),
+            ],
+        ];
+
+        if ($assistant !== null) {
+            $data['assistente'] = [
+                'internal_number'      => $assistant->internal_number,
+                'phone'                => $assistant->phone,
+                'birth_date'           => $assistant->birth_date?->format('Y-m-d'),
+                'admission_date'       => $assistant->admission_date?->format('Y-m-d'),
+                'address_street'       => $assistant->address_street,
+                'address_zip_code'     => $assistant->address_zip_code,
+                'available_for_transfer' => $assistant->available_for_transfer,
+                'school'               => $assistant->school?->name,
+                'emergency_contact' => [
+                    'name'     => $assistant->emergency_contact_name,
+                    'phone'    => $assistant->emergency_contact_phone,
+                    'kinship'  => $assistant->emergency_contact_kinship,
+                ],
+            ];
+        }
+
+        return $data;
+    }
 }
