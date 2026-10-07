@@ -17,6 +17,10 @@ class SchoolService
      * apagar uma escola que ainda tenha qualquer uma destas linhas falharia
      * na base de dados. Contam inclusivamente os registos já eliminados
      * (soft delete): continuam a existir na tabela e a referenciar a escola.
+     *
+     * Exceção: as atividades (`activityTypes`) só bloqueiam se já estiverem
+     * a ser usadas em entradas de horário. As predefinidas existem em todas
+     * as escolas desde a criação e são removidas com a escola.
      */
     private const BLOCKING_RELATIONS = [
         'assistants',
@@ -29,9 +33,22 @@ class SchoolService
 
     private const BLOCK_MESSAGE = 'Esta escola tem registos associados e não pode ser eliminada.';
 
+    public function __construct(
+        private readonly ActivityTypeService $activityTypeService
+    ) {}
+
+    /**
+     * Cria a escola já com as atividades predefinidas (pedidas pelo cliente).
+     */
     public function create(array $data): School
     {
-        return School::create($data);
+        return DB::transaction(function () use ($data) {
+            $school = School::create($data);
+
+            $this->activityTypeService->seedDefaultsForSchool($school);
+
+            return $school;
+        });
     }
 
     public function update(School $school, array $data): School
@@ -62,6 +79,9 @@ class SchoolService
                 throw new SchoolDeletionConflictException($blockReason);
             }
 
+            // As atividades (sem uso em horários) acompanham a escola.
+            $lockedSchool->activityTypes()->delete();
+
             $lockedSchool->delete();
         });
     }
@@ -79,7 +99,7 @@ class SchoolService
         $counts = [];
 
         foreach (self::BLOCKING_RELATIONS as $relation) {
-            $counts[$relation.' as '.self::countAttribute($relation)] = fn ($query) => self::withDeleted($query);
+            $counts[$relation.' as '.self::countAttribute($relation)] = fn ($query) => self::blockingQuery($relation, $query);
         }
 
         return $counts;
@@ -99,7 +119,7 @@ class SchoolService
     {
         foreach (self::BLOCKING_RELATIONS as $relation) {
             $count = $school->{self::countAttribute($relation)}
-                ?? self::withDeleted($school->{$relation}())->count();
+                ?? self::blockingQuery($relation, $school->{$relation}())->count();
 
             if ($count > 0) {
                 return self::BLOCK_MESSAGE;
@@ -117,6 +137,20 @@ class SchoolService
     private static function countAttribute(string $relation): string
     {
         return 'blocking_'.Str::snake($relation).'_count';
+    }
+
+    /**
+     * Restringe a contagem de uma relação bloqueante: as atividades só contam
+     * se estiverem em uso em horários; as restantes contam todas as linhas,
+     * incluindo as eliminadas.
+     */
+    private static function blockingQuery(string $relation, $query)
+    {
+        if ($relation === 'activityTypes') {
+            return $query->whereHas('scheduleEntries');
+        }
+
+        return self::withDeleted($query);
     }
 
     /**
