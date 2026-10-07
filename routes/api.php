@@ -1,5 +1,6 @@
 <?php
 use App\Http\Controllers\API\Absences\AbsenceController;
+use App\Http\Controllers\API\Absences\AbsenceTypeController;
 use App\Http\Controllers\API\Assistants\AssistantController;
 use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
@@ -65,6 +66,7 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
         Route::apiResource('schools', SchoolController::class);
         Route::apiResource('assistants', AssistantController::class);
         Route::apiResource('absences', AbsenceController::class);
+        Route::apiResource('absence-types', AbsenceTypeController::class);
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
