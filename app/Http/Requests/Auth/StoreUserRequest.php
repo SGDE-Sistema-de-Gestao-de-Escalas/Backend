@@ -24,7 +24,7 @@ class StoreUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email'),
+                Rule::unique('users', 'email')->whereNull('deleted_at'),
             ],
 
             'role_id' => [

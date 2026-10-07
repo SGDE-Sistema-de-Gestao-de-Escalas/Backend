@@ -28,7 +28,8 @@ class UpdateUserRequest extends FormRequest
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')
-                    ->ignore($this->route('user')),
+                    ->ignore($this->route('user'))
+                    ->whereNull('deleted_at'),
             ],
 
             'role_id' => [

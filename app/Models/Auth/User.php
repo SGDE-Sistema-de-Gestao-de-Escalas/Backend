@@ -60,6 +60,16 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Nome completo (só leitura), usado nos emails e nas respostas da API.
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(
+            fn () => trim(($this->first_name ?? '').' '.($this->last_name ?? ''))
+        );
+    }
+
     public function role()
     {
         return $this->belongsTo(Role::class);
