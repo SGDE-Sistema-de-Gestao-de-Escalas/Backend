@@ -29,8 +29,9 @@ class AppServiceProvider extends ServiceProvider
             fn (User $user): bool => $user->isAdmin()
         );
         
+
         \Illuminate\Support\Facades\Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
-            $event->extendSocialite('azure', \SocialiteProviders\Azure\AzureExtendSocialite::class);
+            $event->extendSocialite('azure', \SocialiteProviders\Azure\Provider::class);
         });
 
         \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function (User $user, string $token) {

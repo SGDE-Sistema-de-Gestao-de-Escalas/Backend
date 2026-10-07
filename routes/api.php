@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Assistants\AssistantExceptionController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -58,6 +59,7 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
         Route::apiResource('assistants', AssistantController::class);
+        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
     });
 
