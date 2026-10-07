@@ -546,7 +546,8 @@ class UserAnonymizeTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->deleteJson("/api/users/{$admin->id}")
-            ->assertForbidden();
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['user']);
 
         $admin->refresh();
 

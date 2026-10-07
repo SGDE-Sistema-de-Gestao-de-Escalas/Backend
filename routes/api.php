@@ -44,6 +44,8 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
         ->name('auth.me');
     Route::match(['put', 'patch'], '/me', [AuthController::class, 'updateMe'])
         ->name('auth.me.update');
+    Route::delete('/me', [AuthController::class, 'destroyMe'])
+        ->name('auth.me.destroy');
 
     // Termina a sessão do utilizador autenticado.
     Route::post('/logout', [AuthController::class, 'logout'])
