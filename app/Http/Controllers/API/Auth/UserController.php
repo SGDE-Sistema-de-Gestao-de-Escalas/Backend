@@ -69,7 +69,7 @@ class UserController extends Controller
 
     public function deactivate(Request $request, User $user): JsonResponse
     {
-        Gate::authorize('delete', $user);
+        Gate::authorize('deactivate', $user);
 
         $this->userService->deactivate(
             $request->user(),

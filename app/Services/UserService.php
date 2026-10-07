@@ -84,9 +84,9 @@ class UserService
         });
     }
 
-    public function deactivate(User $actor, User $target): void
+    public function deactivate(User $actor, User $target, string $action = 'deactivate'): void
     {
-        DB::transaction(function () use ($actor, $target) {
+        DB::transaction(function () use ($actor, $target, $action) {
             $actor = User::whereKey($actor->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -97,7 +97,11 @@ class UserService
 
             abort_unless($actor->is_active, 403);
 
-            Gate::forUser($actor)->authorize('delete', $target);
+            if ($action === 'deactivate') {
+                Gate::forUser($actor)->authorize('deactivate', $target);
+            } else {
+                Gate::forUser($actor)->authorize('delete', $target);
+            }
 
             $adminRole = Role::where('slug', 'admin')
                 ->lockForUpdate()
@@ -113,10 +117,12 @@ class UserService
                     ->get(['id']);
 
                 if ($activeAdmins->count() <= 1) {
+                    $message = $action === 'delete'
+                        ? 'Não é possível eliminar o último administrador ativo.'
+                        : 'Não é possível desativar o último administrador ativo.';
+
                     throw ValidationException::withMessages([
-                        'user' => [
-                            'Não é possível desativar o último administrador ativo.',
-                        ],
+                        'user' => [$message],
                     ]);
                 }
             }
@@ -131,7 +137,7 @@ class UserService
     public function anonymize(User $actor, User $target): void
     {
         DB::transaction(function () use ($actor, $target) {
-            $this->deactivate($actor, $target);
+            $this->deactivate($actor, $target, 'delete');
 
             $target->refresh();
 
@@ -229,7 +235,7 @@ class UserService
     public function delete(User $actor, User $target): string
     {
         return DB::transaction(function () use ($actor, $target) {
-            $this->deactivate($actor, $target);
+            $this->deactivate($actor, $target, 'delete');
 
             $target->refresh();
 
