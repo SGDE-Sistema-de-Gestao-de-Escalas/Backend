@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Absences;
 
+use App\Models\Absences\AbsenceType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,7 +13,7 @@ class StoreAbsenceTypeRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()?->can('create', AbsenceType::class) ?? false;
     }
 
     /**
@@ -23,7 +24,8 @@ class StoreAbsenceTypeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'name' => ['required', 'string', 'max:255', 'unique:absence_types,name'],
+            'requires_document' => ['sometimes', 'boolean'],
         ];
     }
 }

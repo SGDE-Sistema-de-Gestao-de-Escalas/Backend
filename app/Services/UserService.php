@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use App\Models\Assistants\Assistant;
+use App\Mail\PrivacyDeactivationRequestMail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -84,13 +86,9 @@ class UserService
         });
     }
 
-    public function deactivate(User $actor, User $target): void
+    public function deactivate(User $actor, User $target, string $action = 'deactivate'): void
     {
-        DB::transaction(function () use ($actor, $target) {
-            $adminRole = Role::where('slug', 'admin')
-                ->lockForUpdate()
-                ->firstOrFail();
-
+        DB::transaction(function () use ($actor, $target, $action) {
             $actor = User::whereKey($actor->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -101,7 +99,15 @@ class UserService
 
             abort_unless($actor->is_active, 403);
 
-            Gate::forUser($actor)->authorize('delete', $target);
+            if ($action === 'deactivate') {
+                Gate::forUser($actor)->authorize('deactivate', $target);
+            } else {
+                Gate::forUser($actor)->authorize('delete', $target);
+            }
+
+            $adminRole = Role::where('slug', 'admin')
+                ->lockForUpdate()
+                ->firstOrFail();
 
             if (
                 $target->is_active
@@ -113,10 +119,12 @@ class UserService
                     ->get(['id']);
 
                 if ($activeAdmins->count() <= 1) {
+                    $message = $action === 'delete'
+                        ? 'Não é possível eliminar o último administrador ativo.'
+                        : 'Não é possível desativar o último administrador ativo.';
+
                     throw ValidationException::withMessages([
-                        'user' => [
-                            'Não é possível desativar o último administrador ativo.',
-                        ],
+                        'user' => [$message],
                     ]);
                 }
             }
@@ -131,7 +139,7 @@ class UserService
     public function anonymize(User $actor, User $target): void
     {
         DB::transaction(function () use ($actor, $target) {
-            $this->deactivate($actor, $target);
+            $this->deactivate($actor, $target, 'delete');
 
             $target->refresh();
 
@@ -229,7 +237,7 @@ class UserService
     public function delete(User $actor, User $target): string
     {
         return DB::transaction(function () use ($actor, $target) {
-            $this->deactivate($actor, $target);
+            $this->deactivate($actor, $target, 'delete');
 
             $target->refresh();
 
@@ -319,5 +327,66 @@ class UserService
         }
 
         return null;
+    }
+
+    public function requestDeactivation(User $user, ?string $reason = null): void
+    {
+        $user->loadMissing(['role', 'assistant.school']);
+
+        $schoolName = $user->assistant?->school?->name ?? 'Geral / Sem Escola Específica';
+
+        $admins = User::query()
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
+            ->get();
+
+        if ($admins->isNotEmpty()) {
+            Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
+                user: $user,
+                schoolName: $schoolName,
+                reason: $reason
+            ));
+        }
+    }
+
+    public function exportPersonalData(User $user): array
+    {
+        $user->loadMissing(['role', 'assistant.school']);
+
+        $assistant = $user->assistant;
+
+        $data = [
+            'exportado_em' => now()->toIso8601String(),
+            'perfil' => [
+                'first_name'        => $user->first_name,
+                'last_name'         => $user->last_name,
+                'email'             => $user->email,
+                'role'              => $user->role?->slug,
+                'is_active'         => $user->is_active,
+                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'created_at'        => $user->created_at?->toIso8601String(),
+                'updated_at'        => $user->updated_at?->toIso8601String(),
+            ],
+        ];
+
+        if ($assistant !== null) {
+            $data['assistente'] = [
+                'internal_number'      => $assistant->internal_number,
+                'phone'                => $assistant->phone,
+                'birth_date'           => $assistant->birth_date?->format('Y-m-d'),
+                'admission_date'       => $assistant->admission_date?->format('Y-m-d'),
+                'address_street'       => $assistant->address_street,
+                'address_zip_code'     => $assistant->address_zip_code,
+                'available_for_transfer' => $assistant->available_for_transfer,
+                'school'               => $assistant->school?->name,
+                'emergency_contact' => [
+                    'name'     => $assistant->emergency_contact_name,
+                    'phone'    => $assistant->emergency_contact_phone,
+                    'kinship'  => $assistant->emergency_contact_kinship,
+                ],
+            ];
+        }
+
+        return $data;
     }
 }

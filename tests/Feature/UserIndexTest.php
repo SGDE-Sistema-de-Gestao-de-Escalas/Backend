@@ -36,7 +36,7 @@ class UserIndexTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_admin_can_list_users(): void
+    public function test_admin_can_list_other_users_without_including_self(): void
     {
         $role = Role::factory()->create([
             'name' => 'Administrator',
@@ -48,21 +48,24 @@ class UserIndexTest extends TestCase
             'is_active' => true,
         ]);
 
+        $otherAdmin = User::factory()->create([
+            'role_id' => $role->id,
+            'is_active' => true,
+        ]);
+
         Sanctum::actingAs($admin);
 
         $this->getJson('/api/users')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $admin->id)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $otherAdmin->id)
             ->assertJsonPath('data.0.role', 'admin')
             ->assertJsonPath('data.0.is_active', true)
-            ->assertJsonPath('data.0.can_delete', false)
-            ->assertJsonPath('data.0.delete_action', null)
-            ->assertJsonPath('data.0.delete_message', null)
-            ->assertJsonPath(
-                'data.0.cannot_delete_reason',
-                'Não pode eliminar a sua própria conta.'
-            )
+            ->assertJsonPath('data.0.can_delete', true)
+            ->assertJsonPath('data.0.delete_action', 'hard_delete')
+            ->assertJsonPath('data.0.delete_message', 'A conta será apagada definitivamente.')
+            ->assertJsonPath('data.0.cannot_delete_reason', null)
             ->assertJsonMissingPath('data.0.password')
             ->assertJsonMissingPath('data.0.remember_token');
 
@@ -101,7 +104,7 @@ class UserIndexTest extends TestCase
 
         $response = $this->getJson('/api/users');
 
-        $response->assertOk()->assertJsonCount(2, 'data');
+        $response->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1);
 
         $staffRow = collect($response->json('data'))
             ->firstWhere('id', $staff->id);

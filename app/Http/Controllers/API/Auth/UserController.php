@@ -20,11 +20,12 @@ class UserController extends Controller
         private readonly UserService $userService
     ) {}
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', User::class);
 
         $users = User::with('role')
+            ->where('id', '!=', $request->user()->getKey())
             ->orderBy('id')
             ->paginate(20);
 
@@ -69,6 +70,8 @@ class UserController extends Controller
 
     public function deactivate(Request $request, User $user): JsonResponse
     {
+        Gate::authorize('deactivate', $user);
+
         $this->userService->deactivate(
             $request->user(),
             $user
@@ -81,6 +84,8 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): JsonResponse
     {
+        Gate::authorize('delete', $user);
+
         $action = $this->userService->delete(
             $request->user(),
             $user

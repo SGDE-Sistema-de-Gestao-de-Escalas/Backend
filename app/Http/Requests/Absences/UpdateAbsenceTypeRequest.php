@@ -4,6 +4,7 @@ namespace App\Http\Requests\Absences;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateAbsenceTypeRequest extends FormRequest
 {
@@ -12,7 +13,7 @@ class UpdateAbsenceTypeRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()?->can('update', $this->route('absence_type')) ?? false;
     }
 
     /**
@@ -22,8 +23,11 @@ class UpdateAbsenceTypeRequest extends FormRequest
      */
     public function rules(): array
     {
+        $absenceType = $this->route('absence_type');
+
         return [
-            //
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('absence_types', 'name')->ignore($absenceType)],
+            'requires_document' => ['sometimes', 'boolean'],
         ];
     }
 }
