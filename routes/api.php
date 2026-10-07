@@ -38,8 +38,9 @@ Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthCon
     ->name('oauth.callback');
 
 // Exige autenticação e uma conta ativa em todas as rotas deste grupo.
-// O school.context lê o cabeçalho opcional X-School-ID (ver SetSchoolContext).
-Route::middleware(['auth:sanctum','active','school.context'])->group(function () {
+// Estas rotas são globais (não dependem de uma escola) e NÃO usam o
+// school.context: um X-School-ID antigo ou inválido não as pode bloquear.
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
@@ -67,13 +68,22 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
         ->name('users.deactivate');
     Route::apiResource('users', UserController::class);
 
-    // Restringe as restantes operações de gestão aos administradores.
+    // Parametrização global da plataforma: só administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
+        Route::apiResource('absence-types', AbsenceTypeController::class);
+    });
+});
+
+// Rotas que dependem de uma escola. O school.context lê o cabeçalho opcional
+// X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
+Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
+
+    // Restringe a gestão destes recursos aos administradores.
+    Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class);
         Route::apiResource('absences', AbsenceController::class);
-        Route::apiResource('absence-types', AbsenceTypeController::class);
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
