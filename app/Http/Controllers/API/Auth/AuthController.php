@@ -5,12 +5,17 @@ namespace App\Http\Controllers\API\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
+use App\Services\UserService;
+use App\Http\Requests\Auth\UpdateUserRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuthService $authService) {}
+    public function __construct(
+        private readonly AuthService $authService,
+        private readonly UserService $userService,
+    ) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -53,6 +58,15 @@ class AuthController extends Controller
         $user->load('role');
 
         return new UserResource($user);
+    }
+
+    public function updateMe(UpdateUserRequest $request): UserResource
+    {
+        $user = $request->user();
+        $updatedUser = $this->userService->update($user, $request->validated());
+
+        return (new UserResource($updatedUser))
+            ->additional(['message' => 'Perfil atualizado com sucesso.']);
     }
 
     public function updatePassword(Request $request): JsonResponse

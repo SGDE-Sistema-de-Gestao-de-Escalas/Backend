@@ -41,6 +41,8 @@ Route::middleware(['auth:sanctum','active'])->group(function () {
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
         ->name('auth.me');
+    Route::match(['put', 'patch'], '/me', [AuthController::class, 'updateMe'])
+        ->name('auth.me.update');
 
     // Termina a sessão do utilizador autenticado.
     Route::post('/logout', [AuthController::class, 'logout'])
@@ -49,11 +51,13 @@ Route::middleware(['auth:sanctum','active'])->group(function () {
     Route::post('/update-password', [AuthController::class, 'updatePassword'])
         ->name('password.change');
 
-    // Restringe as operações de gestão aos administradores.
+    // Gestão de utilizadores (autorização granular via UserPolicy e FormRequests)
+    Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])
+        ->name('users.deactivate');
+    Route::apiResource('users', UserController::class);
+
+    // Restringe as restantes operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
-        Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])
-            ->name('users.deactivate');
-        Route::apiResource('users', UserController::class);
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
         Route::apiResource('assistants', AssistantController::class);
