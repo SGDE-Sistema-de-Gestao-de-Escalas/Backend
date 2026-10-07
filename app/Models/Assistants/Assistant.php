@@ -38,6 +38,7 @@ class Assistant extends Model
         'emergency_contact_phone',
         'emergency_contact_kinship',
         'available_for_transfer',
+        'is_anonymized',
     ];
 
     /**
@@ -52,7 +53,21 @@ class Assistant extends Model
             'admission_date' => 'date:Y-m-d',
             'criminal_record_expiry' => 'date:Y-m-d',
             'available_for_transfer' => 'boolean',
+            'is_anonymized' => 'boolean',
         ];
+    }
+
+    /**
+     * Scope para o Motor de Horários: apenas assistentes ativos e não-anonimizados.
+     */
+    public function scopeForScheduleGeneration($query)
+    {
+        return $query->whereHas('user', function ($q) {
+            $q->where('is_active', true);
+        })->where(function ($q) {
+            $q->where('is_anonymized', false)
+              ->orWhereNull('is_anonymized');
+        });
     }
 
     public function user()
