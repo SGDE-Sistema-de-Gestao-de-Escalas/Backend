@@ -20,11 +20,12 @@ class UserController extends Controller
         private readonly UserService $userService
     ) {}
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', User::class);
 
         $users = User::with('role')
+            ->where('id', '!=', $request->user()->getKey())
             ->orderBy('id')
             ->paginate(20);
 
