@@ -102,4 +102,49 @@ class AssistantController extends Controller
 
         return response()->json(['message' => 'Assistente removido com sucesso.']);
     }
+
+    /**
+     * Verificar elegibilidade para anonimização.
+     * GET /api/assistants/{id}/can-anonymize
+     */
+    public function canAnonymize(Assistant $assistant): JsonResponse
+    {
+        Gate::authorize('anonymize', $assistant);
+
+        $result = $this->assistantService->checkCanAnonymize($assistant);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Anonimizar assistente (Direito ao Esquecimento RGPD).
+     * POST /api/assistants/{id}/anonymize
+     */
+    public function anonymize(Assistant $assistant): JsonResponse
+    {
+        Gate::authorize('anonymize', $assistant);
+
+        $check = $this->assistantService->checkCanAnonymize($assistant);
+
+        if (! $check['can_anonymize']) {
+            return response()->json([
+                'message' => $check['reason'],
+                'can_anonymize' => false,
+                'has_future_schedules' => $check['has_future_schedules'],
+                'future_schedules_count' => $check['future_schedules_count'],
+            ], 422);
+        }
+
+        $anonymized = $this->assistantService->anonymize($assistant);
+
+        return response()->json([
+            'message' => 'Dados do assistente anonimizados com sucesso. O histórico de escalas passadas foi preservado.',
+            'assistant' => [
+                'id' => $anonymized->id,
+                'name' => 'Assistente Anonimizado',
+                'is_active' => false,
+                'is_anonymized' => true,
+            ],
+        ], 200);
+    }
 }

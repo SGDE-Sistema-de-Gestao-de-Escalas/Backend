@@ -73,6 +73,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
+        Route::get('/assistants/{assistant}/can-anonymize', [AssistantController::class, 'canAnonymize'])
+            ->withTrashed()
+            ->name('assistants.can-anonymize');
+        Route::post('/assistants/{assistant}/anonymize', [AssistantController::class, 'anonymize'])
+            ->withTrashed()
+            ->name('assistants.anonymize');
         Route::apiResource('absence-types', AbsenceTypeController::class);
     });
 });

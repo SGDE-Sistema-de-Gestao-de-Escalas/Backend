@@ -15,8 +15,9 @@ class AssistantResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $firstName = $this->user?->first_name;
-        $lastName = $this->user?->last_name;
+        $isAnonymized = (bool) ($this->is_anonymized ?? false);
+        $firstName = $isAnonymized ? 'Assistente' : $this->user?->first_name;
+        $lastName = $isAnonymized ? 'Anonimizado' : $this->user?->last_name;
 
         return [
             'id' => $this->id,
@@ -25,9 +26,10 @@ class AssistantResource extends JsonResource
 
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'name' => $this->user?->name,
-            'initials' => Str::upper(Str::substr((string) $firstName, 0, 1).Str::substr((string) $lastName, 0, 1)),
-            'is_active' => (bool) ($this->user?->is_active ?? false) && ! $this->trashed(),
+            'name' => $isAnonymized ? 'Assistente Anonimizado' : $this->user?->name,
+            'initials' => $isAnonymized ? 'AA' : Str::upper(Str::substr((string) $firstName, 0, 1).Str::substr((string) $lastName, 0, 1)),
+            'is_active' => (bool) ($this->user?->is_active ?? false) && ! $this->trashed() && ! $isAnonymized,
+            'is_anonymized' => $isAnonymized,
 
             'internal_number' => $this->internal_number,
             'email' => $this->user?->email,

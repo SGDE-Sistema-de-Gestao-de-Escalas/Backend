@@ -63,4 +63,12 @@ class AssistantPolicy
     {
         return $user->isAdmin();
     }
+
+    /**
+     * Determine whether the user can anonymize the assistant.
+     */
+    public function anonymize(User $user, Assistant $assistant): bool
+    {
+        return $user->isAdmin();
+    }
 }
