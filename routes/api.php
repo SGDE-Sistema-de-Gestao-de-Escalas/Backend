@@ -36,7 +36,8 @@ Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthCon
     ->name('oauth.callback');
 
 // Exige autenticação e uma conta ativa em todas as rotas deste grupo.
-Route::middleware(['auth:sanctum','active'])->group(function () {
+// O school.context lê o cabeçalho opcional X-School-ID (ver SetSchoolContext).
+Route::middleware(['auth:sanctum','active','school.context'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
