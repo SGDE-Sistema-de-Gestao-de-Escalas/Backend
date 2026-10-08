@@ -26,10 +26,12 @@ Route::post('/login', [AuthController::class, 'login'])
     ->name('auth.login');
 
 Route::post('/password/forgot', [AuthController::class, 'requestPasswordReset'])
+    ->middleware('throttle:5,1')
     ->name('password.email');
 
 // Repor Password (utilizado após receber o email)
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:5,1')
     ->name('password.update');
 
 // Rotas OAuth

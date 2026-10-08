@@ -15,10 +15,11 @@ class AuthService
     {
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
-        if (!$user 
-            || !Hash::check($credentials['password'], $user->password)
-            || !$user->is_active
-            ) {
+        $passwordMatches = $user 
+            ? Hash::check($credentials['password'], $user->password)
+            : Hash::check($credentials['password'], '$2y$12$e80y6mX1vL8rJ0dZbKvZ0eHj2b0D9yG0C1W9H2b0D9yG0C1W9H2b0');
+
+        if (!$user || !$passwordMatches || !$user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['As credenciais estão incorretas.'],
             ]);
@@ -39,6 +40,8 @@ class AuthService
         $user->update([
             'password' => Hash::make($newPassword),
         ]);
+
+        $user->tokens()->delete();
     }
 
     public function logout(User $user): void
@@ -60,10 +63,25 @@ class AuthService
             ]);
         }
         
-        //Se o utilizador existe, verificamos se a sua conta esta ativa
+        // Se o utilizador existe, verificamos se a sua conta está ativa
         if (!$user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['Não foi possível iniciar sessão com esta conta.'],
+            ]);
+        }
+
+        // Se o utilizador já tem um provider_id registado para outro provedor ou ID diferente, rejeita
+        if ($user->provider_id && ($user->provider !== $provider || $user->provider_id !== $socialUser->getId())) {
+            throw ValidationException::withMessages([
+                'email' => ['Esta conta já se encontra associada a outro método de autenticação.'],
+            ]);
+        }
+
+        // Se ainda não tem provider associado, associa agora
+        if (!$user->provider_id) {
+            $user->update([
+                'provider' => $provider,
+                'provider_id' => $socialUser->getId(),
             ]);
         }
 
@@ -102,6 +120,8 @@ class AuthService
                 ])->setRememberToken(\Illuminate\Support\Str::random(60));
 
                 $user->save();
+
+                $user->tokens()->delete();
             }
         );
 
