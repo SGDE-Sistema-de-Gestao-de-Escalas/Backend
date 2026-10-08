@@ -21,12 +21,15 @@ class UserSeeder extends Seeder
 
 
 
+        $adminPassword = env('SEED_ADMIN_PASSWORD');
+        $staffPassword = env('SEED_STAFF_PASSWORD');
+
         User::firstOrCreate(
             ['email' => 'admin@sgde.pt'],
             [
                 'first_name' => 'Miguel',
                 'last_name' => 'Silva',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make($adminPassword),
                 'role_id' => $adminRole->id,
             ]
         );
@@ -36,7 +39,7 @@ class UserSeeder extends Seeder
             [
                 'first_name' => 'Ana',
                 'last_name' => 'Costa',
-                'password' => Hash::make('staff123'),
+                'password' => Hash::make($staffPassword),
                 'role_id' => $staffRole->id,
             ]
         );
