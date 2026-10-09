@@ -48,7 +48,7 @@ class OAuthController extends Controller
                 minutes: 60 * 24 * 30, // 30 dias
                 path: '/',
                 domain: null,
-                secure: config('app.env') === 'production',
+                secure: config('app.env') === 'production' || $request->isSecure(),
                 httpOnly: true,
                 raw: false,
                 sameSite: 'Lax'
@@ -57,8 +57,15 @@ class OAuthController extends Controller
             $frontendUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback';
             return redirect()->away($frontendUrl)->withCookie($cookie);
             
-        } catch (\Exception $e) {
-            $frontendErrorUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback?error=' . urlencode($e->getMessage());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errorMessage = $e->validator->errors()->first() ?: 'Falha na validação do utilizador.';
+            $frontendErrorUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback?error=' . urlencode($errorMessage);
+            return redirect()->away($frontendErrorUrl);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Erro na autenticação OAuth (' . $provider . '): ' . $e->getMessage(), [
+                'exception' => $e
+            ]);
+            $frontendErrorUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/callback?error=' . urlencode('Ocorreu um erro ao processar a autenticação externa. Por favor tente novamente.');
             return redirect()->away($frontendErrorUrl);
         }
     }

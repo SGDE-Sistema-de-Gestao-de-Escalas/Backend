@@ -14,9 +14,19 @@ class AssistantException extends Model
 
     protected $fillable = [
         'assistant_id',
-        'start_date',
-        'end_date',
-        'reason',
+        'type',
+        'description',
+        'valid_from',
+        'valid_until',
+        'start_time',
+        'end_time',
+    ];
+
+    protected $casts = [
+        'valid_from' => 'date',
+        'valid_until' => 'date',
+        'start_time' => 'datetime:H:i',
+        'end_time' => 'datetime:H:i',
     ];
 
     public function assistant()

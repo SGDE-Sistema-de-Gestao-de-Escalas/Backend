@@ -18,7 +18,11 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
+            SchoolSeeder::class,
             AbsenceTypeSeeder::class,
+            // Depois das escolas: cria as atividades predefinidas em cada uma.
+            ActivityTypeSeeder::class,
+            AssistantSeeder::class,
         ]);
     }
 }

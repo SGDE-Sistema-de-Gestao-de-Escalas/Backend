@@ -22,7 +22,10 @@ return new class extends Migration
             $table->string('provider')->nullable();
             $table->string('provider_id')->nullable();
             $table->rememberToken()->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('anonymized_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

@@ -6,8 +6,10 @@ use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
+use App\Http\Controllers\API\System\ActivityTypeController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Assistants\AssistantExceptionController;
 use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
@@ -26,10 +28,12 @@ Route::post('/login', [AuthController::class, 'login'])
     ->name('auth.login');
 
 Route::post('/password/forgot', [AuthController::class, 'requestPasswordReset'])
+    ->middleware('throttle:5,1')
     ->name('password.email');
 
 // Repor Password (utilizado após receber o email)
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:5,1')
     ->name('password.update');
 
 // Rotas OAuth
@@ -39,8 +43,9 @@ Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthCon
     ->name('oauth.callback');
 
 // Exige autenticação e uma conta ativa em todas as rotas deste grupo.
-// O school.context lê o cabeçalho opcional X-School-ID (ver SetSchoolContext).
-Route::middleware(['auth:sanctum','active','school.context'])->group(function () {
+// Estas rotas são globais (não dependem de uma escola) e NÃO usam o
+// school.context: um X-School-ID antigo ou inválido não as pode bloquear.
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
@@ -75,9 +80,27 @@ Route::middleware(['auth:sanctum','active','school.context'])->group(function ()
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
-        Route::apiResource('assistants', AssistantController::class);
-        Route::apiResource('absences', AbsenceController::class);
+        Route::get('/assistants/{assistant}/can-anonymize', [AssistantController::class, 'canAnonymize'])
+            ->withTrashed()
+            ->name('assistants.can-anonymize');
+        Route::post('/assistants/{assistant}/anonymize', [AssistantController::class, 'anonymize'])
+            ->withTrashed()
+            ->name('assistants.anonymize');
         Route::apiResource('absence-types', AbsenceTypeController::class);
+    });
+});
+
+// Rotas que dependem de uma escola. O school.context lê o cabeçalho opcional
+// X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
+Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
+
+    // Restringe a gestão destes recursos aos administradores.
+    Route::middleware('can:manage-system')->group(function () {
+        Route::apiResource('assistants', AssistantController::class)
+            ->withTrashed(['show', 'update', 'destroy']);
+        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
+        Route::apiResource('absences', AbsenceController::class);
+        Route::apiResource('activity-types', ActivityTypeController::class);
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
