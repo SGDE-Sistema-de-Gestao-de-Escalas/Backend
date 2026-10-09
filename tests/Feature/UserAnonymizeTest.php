@@ -262,7 +262,8 @@ class UserAnonymizeTest extends TestCase
         $this->assertDatabaseHas('schools', ['id' => $schoolId]);
 
         $this->getJson("/api/users/{$staff->id}")
-            ->assertNotFound();
+            ->assertOk()
+            ->assertJsonPath('data.email', 'anon_' . $staff->id . '@deleted.local');
 
         $this->patchJson("/api/users/{$staff->id}", [
             'is_active' => true,
@@ -271,7 +272,7 @@ class UserAnonymizeTest extends TestCase
         $this->getJson('/api/users')
             ->assertOk()
             ->assertJsonMissing(['id' => $staff->id])
-            ->assertJsonFragment(['id' => $admin->id]);
+            ->assertJsonMissing(['id' => $admin->id]);
     }
 
     public function test_anonymization_removes_criminal_record_file(): void

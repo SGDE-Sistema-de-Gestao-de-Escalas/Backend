@@ -71,7 +71,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Gestão de utilizadores (autorização granular via UserPolicy e FormRequests)
     Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])
         ->name('users.deactivate');
-    Route::apiResource('users', UserController::class);
+    Route::apiResource('users', UserController::class)->withTrashed(['show', 'destroy', 'update']);
 
     // Feriados globais: permissões via HolidayPolicy e FormRequests.
     Route::apiResource('holidays', HolidayController::class);
