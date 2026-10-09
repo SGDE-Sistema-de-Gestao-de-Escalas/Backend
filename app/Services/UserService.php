@@ -93,7 +93,7 @@ class UserService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $target = User::whereKey($target->getKey())
+            $target = User::withTrashed()->whereKey($target->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -141,7 +141,7 @@ class UserService
         DB::transaction(function () use ($actor, $target) {
             $this->deactivate($actor, $target, 'delete');
 
-            $target->refresh();
+            $target = User::withTrashed()->whereKey($target->getKey())->firstOrFail();
 
             $assistants = Assistant::withTrashed()
                 ->where('user_id', $target->id)
@@ -239,7 +239,7 @@ class UserService
         return DB::transaction(function () use ($actor, $target) {
             $this->deactivate($actor, $target, 'delete');
 
-            $target->refresh();
+            $target = User::withTrashed()->whereKey($target->getKey())->firstOrFail();
 
             if ($this->deleteAction($target) === 'anonymize') {
                 $this->anonymize($actor, $target);
