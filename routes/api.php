@@ -91,6 +91,7 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class)
             ->withTrashed(['show', 'update', 'destroy']);
+        Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
     });
