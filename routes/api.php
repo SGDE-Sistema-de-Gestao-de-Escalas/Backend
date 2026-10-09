@@ -89,7 +89,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
-        Route::apiResource('assistants', AssistantController::class);
+        Route::apiResource('assistants', AssistantController::class)
+            ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
     });

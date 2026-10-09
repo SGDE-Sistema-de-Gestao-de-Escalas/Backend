@@ -100,7 +100,7 @@ class AssistantController extends Controller
 
         $this->assistantService->delete($assistant);
 
-        return response()->json(['message' => 'Assistente removido com sucesso.']);
+        return response()->json(['message' => 'Assistente inativado com sucesso.']);
     }
 
     /**

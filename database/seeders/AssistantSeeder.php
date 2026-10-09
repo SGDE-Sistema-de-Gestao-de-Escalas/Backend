@@ -13,10 +13,21 @@ class AssistantSeeder extends Seeder
     public function run(): void
     {
         $staffRole = \App\Models\Auth\Role::where('slug', 'staff')->first();
+        if (! $staffRole) {
+            $this->call(RoleSeeder::class);
+            $staffRole = \App\Models\Auth\Role::where('slug', 'staff')->first();
+        }
+
         $school = \App\Models\Schools\School::where('acronym', 'ESPL')->first()
             ?? \App\Models\Schools\School::first();
+        if (! $school) {
+            $this->call(SchoolSeeder::class);
+            $school = \App\Models\Schools\School::where('acronym', 'ESPL')->first()
+                ?? \App\Models\Schools\School::first();
+        }
 
         if (! $staffRole || ! $school) {
+            $this->command->error('Não foi possível encontrar a Role "staff" ou uma Escola. Execute primeiro o RoleSeeder e SchoolSeeder.');
             return;
         }
 
@@ -38,7 +49,7 @@ class AssistantSeeder extends Seeder
                 'user_id' => $user1->id,
                 'school_id' => $school->id,
                 'phone' => '+351 912 345 601',
-                'nif' => '234 567 801',
+                'nif' => '234567801',
                 'social_security_number' => '12345678901',
                 'birth_date' => '1992-03-15',
                 'admission_date' => '2022-09-01',
@@ -71,7 +82,7 @@ class AssistantSeeder extends Seeder
                 'user_id' => $user2->id,
                 'school_id' => $school->id,
                 'phone' => '+351 912 345 602',
-                'nif' => '234 567 802',
+                'nif' => '234567802',
                 'social_security_number' => '12345678902',
                 'birth_date' => '1988-07-22',
                 'admission_date' => '2021-01-15',
@@ -109,7 +120,7 @@ class AssistantSeeder extends Seeder
                 'user_id' => $user3->id,
                 'school_id' => $school->id,
                 'phone' => '+351 912 345 603',
-                'nif' => '234 567 803',
+                'nif' => '234567803',
                 'social_security_number' => '12345678903',
                 'birth_date' => '1995-11-30',
                 'admission_date' => '2023-03-01',
