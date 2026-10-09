@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
+use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
@@ -93,6 +94,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 // Rotas que dependem de uma escola. O school.context lê o cabeçalho opcional
 // X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
 Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
+
+    // Horário de funcionamento da escola: o administrador gere, os assistentes
+    // só consultam. As permissões vêm da SchoolOperatingRulePolicy e das
+    // FormRequests (por isso sem o can:manage-system).
+    Route::apiResource('operating-rules', SchoolOperatingRuleController::class)
+        ->parameters(['operating-rules' => 'operating_rule']);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
