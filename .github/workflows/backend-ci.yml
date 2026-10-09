@@ -23,7 +23,7 @@ jobs:
       - name: Configurar PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2' # confirmar com `php -v`
+          php-version: '8.3'
           extensions: mbstring, pdo, pdo_sqlite, bcmath
           coverage: none
 
