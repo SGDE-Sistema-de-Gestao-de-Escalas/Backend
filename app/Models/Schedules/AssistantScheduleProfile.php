@@ -13,16 +13,25 @@ class AssistantScheduleProfile extends Model
 
     protected $fillable = [
         'assistant_id',
-        'name',
-        'description',
+        'type',
+        'rotation_period',
+        'starts_with',
+        'valid_from',
+        'valid_until',
     ];
+
 
     public function assistant()
     {
-        return $this->belongsTo(Assistant::class);
+        return $this->belongsTo(\App\Models\Assistants\Assistant::class);
     }
 
     public function assistantScheduleShifts()
+    {
+        return $this->hasMany(AssistantScheduleShift::class);
+    }
+
+    public function shifts()
     {
         return $this->hasMany(AssistantScheduleShift::class);
     }
