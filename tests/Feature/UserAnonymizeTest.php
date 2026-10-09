@@ -268,10 +268,16 @@ class UserAnonymizeTest extends TestCase
             'is_active' => true,
         ])->assertNotFound();
 
+        $otherUser = User::factory()->create([
+            'role_id' => $staffRole->id,
+            'is_active' => true,
+        ]);
+
         $this->getJson('/api/users')
             ->assertOk()
             ->assertJsonMissing(['id' => $staff->id])
-            ->assertJsonFragment(['id' => $admin->id]);
+            ->assertJsonMissing(['id' => $admin->id])
+            ->assertJsonFragment(['id' => $otherUser->id]);
     }
 
     public function test_anonymization_removes_criminal_record_file(): void
