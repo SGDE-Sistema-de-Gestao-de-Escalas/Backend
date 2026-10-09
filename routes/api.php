@@ -3,6 +3,7 @@ use App\Http\Controllers\API\Absences\AbsenceController;
 use App\Http\Controllers\API\Absences\AbsenceTypeController;
 use App\Http\Controllers\API\Assistants\AssistantController;
 use App\Http\Controllers\API\Auth\RoleController;
+use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\System\ActivityTypeController;
@@ -72,7 +73,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->name('users.deactivate');
     Route::apiResource('users', UserController::class);
 
-    // Parametrização global da plataforma: só administradores.
+    // Feriados globais: permissões via HolidayPolicy e FormRequests.
+    Route::apiResource('holidays', HolidayController::class);
+
+    // Restringe as restantes operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
         Route::apiResource('schools', SchoolController::class);
