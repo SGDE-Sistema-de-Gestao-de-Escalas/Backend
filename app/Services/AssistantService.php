@@ -77,8 +77,8 @@ class AssistantService
     }
 
     /**
-     * Soft delete do assistente e da respetiva conta, e revoga as sessões
-     * abertas para que deixe de ter acesso imediatamente.
+     * Soft delete (inativação) do assistente e da respetiva conta,
+     * e revoga as sessões abertas para que deixe de ter acesso imediatamente.
      */
     public function delete(Assistant $assistant): void
     {
@@ -89,6 +89,7 @@ class AssistantService
 
             if ($user && ! $user->trashed()) {
                 $user->tokens()->delete();
+                $user->update(['is_active' => false]);
                 $user->delete();
             }
         });
