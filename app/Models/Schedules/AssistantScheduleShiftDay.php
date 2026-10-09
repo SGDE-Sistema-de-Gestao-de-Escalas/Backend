@@ -14,9 +14,8 @@ class AssistantScheduleShiftDay extends Model
     protected $fillable = [
         'assistant_schedule_shift_id',
         'day_of_week',
-        'start_time',
-        'end_time',
     ];
+
 
     public function assistantScheduleShift()
     {

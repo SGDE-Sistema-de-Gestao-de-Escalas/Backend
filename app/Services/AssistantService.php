@@ -43,14 +43,16 @@ class AssistantService
                 'password' => Hash::make(Str::random(64)),
             ]);
 
-            return $user->assistant()->create(
-                Arr::except($data, self::USER_FIELDS)
-            );
+            $assistantData = Arr::except($data, self::USER_FIELDS);
+
+            $assistant = $user->assistant()->create($assistantData);
+
+            return $assistant;
         });
 
         $this->sendAccessEmail($assistant->user);
 
-        return $assistant->load(['user', 'school']);
+        return $assistant->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
     }
 
     public function update(Assistant $assistant, array $data): Assistant
@@ -72,12 +74,12 @@ class AssistantService
             $assistantData = Arr::except($data, ['first_name', 'last_name']);
             $assistant->update($assistantData);
 
-            return $assistant->refresh()->load(['user', 'school']);
+            return $assistant->refresh()->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
         });
     }
 
     /**
-     * Soft delete (inativação) do assistente e da respetiva conta,
+     * Soft delete (eliminação) do assistente e da respetiva conta,
      * e revoga as sessões abertas para que deixe de ter acesso imediatamente.
      */
     public function delete(Assistant $assistant): void

@@ -13,10 +13,15 @@ class AssistantScheduleShift extends Model
 
     protected $fillable = [
         'assistant_schedule_profile_id',
-        'day_of_week',
-        'start_time',
-        'end_time',
+        'shift_label',
+        'entry_time',
+        'exit_time',
+        'lunch_enabled',
+        'lunch_start',
+        'lunch_end',
+        'lunch_duration_minutes',
     ];
+
 
     public function assistantScheduleProfile()
     {
@@ -24,6 +29,11 @@ class AssistantScheduleShift extends Model
     }
 
     public function assistantScheduleShiftDays()
+    {
+        return $this->hasMany(AssistantScheduleShiftDay::class);
+    }
+
+    public function shiftDays()
     {
         return $this->hasMany(AssistantScheduleShiftDay::class);
     }
