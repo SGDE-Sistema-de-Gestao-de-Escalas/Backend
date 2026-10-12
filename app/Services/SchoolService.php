@@ -25,7 +25,8 @@ class SchoolService
      * Os horários de funcionamento (`schoolOperatingRules`) não bloqueiam: são
      * configuração da própria escola e, se mais nada a bloqueia, são removidos
      * com ela (sem isto, uma regra já em vigor, que não se pode apagar, tornava
-     * a escola impossível de eliminar).
+     * a escola impossível de eliminar). O mesmo vale para as exceções ao
+     * horário fixo (`schoolOperatingExceptions`).
      */
     private const BLOCKING_RELATIONS = [
         'assistants',
@@ -84,10 +85,11 @@ class SchoolService
                 throw new SchoolDeletionConflictException($blockReason);
             }
 
-            // As atividades (sem uso em horários) e os horários de
-            // funcionamento acompanham a escola.
+            // As atividades (sem uso em horários), os horários de
+            // funcionamento e as suas exceções acompanham a escola.
             $lockedSchool->activityTypes()->delete();
             $this->operatingRuleService->deleteAllForSchool($lockedSchool);
+            $lockedSchool->schoolOperatingExceptions()->delete();
 
             $lockedSchool->delete();
         });

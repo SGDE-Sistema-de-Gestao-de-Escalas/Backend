@@ -51,6 +51,11 @@ class School extends Model
         return $this->hasMany(SchoolOperatingRule::class);
     }
 
+    public function schoolOperatingExceptions()
+    {
+        return $this->hasMany(SchoolOperatingException::class);
+    }
+
     public function schedules()
     {
         return $this->hasMany(Schedule::class);
