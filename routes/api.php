@@ -101,13 +101,18 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('operating-rules', SchoolOperatingRuleController::class)
         ->parameters(['operating-rules' => 'operating_rule']);
 
+    // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
+    // Permissões via AbsencePolicy e FormRequests.
+    Route::get('/absences/{absence}/document', [AbsenceController::class, 'downloadDocument'])
+        ->name('absences.document');
+    Route::apiResource('absences', AbsenceController::class);
+
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class)
             ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
-        Route::apiResource('absences', AbsenceController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);
     });
 
