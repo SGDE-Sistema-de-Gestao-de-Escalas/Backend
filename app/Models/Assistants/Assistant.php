@@ -6,6 +6,7 @@ use App\Models\Absences\Absence;
 use App\Models\Auth\User;
 use App\Models\Schedules\AssistantScheduleProfile;
 use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use Database\Factories\AssistantFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -89,6 +90,12 @@ class Assistant extends Model
     public function schedules()
     {
         return $this->hasMany(Schedule::class);
+    }
+
+    public function scheduleRules()
+    {
+        return $this->belongsToMany(ScheduleRule::class, 'schedule_rule_assistant')
+            ->withPivot('priority');
     }
 
     public function absences()
