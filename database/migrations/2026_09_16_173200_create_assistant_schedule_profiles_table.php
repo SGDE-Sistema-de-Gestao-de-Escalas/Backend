@@ -17,8 +17,8 @@ return new class extends Migration
             $table->enum('type', ['fixo', 'rotativo']);
             $table->enum('rotation_period', ['weekly', 'biweekly', 'monthly'])->nullable();
             $table->enum('starts_with', ['A', 'B'])->nullable();
-            $table->time('valid_from');
-            $table->time('valid_until')->nullable();
+            $table->date('valid_from');
+            $table->date('valid_until')->nullable();
             $table->timestamps();
         });
     }

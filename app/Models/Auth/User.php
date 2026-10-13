@@ -34,6 +34,8 @@ class User extends Authenticatable
         'password',
         'provider',
         'provider_id',
+        'is_active',
+        'anonymized_at',
     ];
 
     /**

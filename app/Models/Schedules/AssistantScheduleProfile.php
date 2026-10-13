@@ -7,6 +7,11 @@ use Database\Factories\AssistantScheduleProfileFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssistantScheduleProfile extends Model
 {
@@ -35,7 +40,12 @@ class AssistantScheduleProfile extends Model
         return $this->belongsTo(Assistant::class);
     }
 
-    public function assistantScheduleShifts()
+    public function assistantScheduleShifts(): HasMany
+    {
+        return $this->hasMany(AssistantScheduleShift::class);
+    }
+
+    public function shifts(): HasMany
     {
         return $this->hasMany(AssistantScheduleShift::class);
     }

@@ -21,12 +21,17 @@ class SchoolService
      * Exceção: as atividades (`activityTypes`) só bloqueiam se já estiverem
      * a ser usadas em entradas de horário. As predefinidas existem em todas
      * as escolas desde a criação e são removidas com a escola.
+     *
+     * Os horários de funcionamento (`schoolOperatingRules`) não bloqueiam: são
+     * configuração da própria escola e, se mais nada a bloqueia, são removidos
+     * com ela (sem isto, uma regra já em vigor, que não se pode apagar, tornava
+     * a escola impossível de eliminar). O mesmo vale para as exceções ao
+     * horário fixo (`schoolOperatingExceptions`).
      */
     private const BLOCKING_RELATIONS = [
         'assistants',
         'schedules',
         'activityTypes',
-        'schoolOperatingRules',
         'outgoingTemporaryAssignments',
         'incomingTemporaryAssignments',
     ];
@@ -34,7 +39,8 @@ class SchoolService
     private const BLOCK_MESSAGE = 'Esta escola tem registos associados e não pode ser eliminada.';
 
     public function __construct(
-        private readonly ActivityTypeService $activityTypeService
+        private readonly ActivityTypeService $activityTypeService,
+        private readonly SchoolOperatingRuleService $operatingRuleService
     ) {}
 
     /**
@@ -79,8 +85,11 @@ class SchoolService
                 throw new SchoolDeletionConflictException($blockReason);
             }
 
-            // As atividades (sem uso em horários) acompanham a escola.
+            // As atividades (sem uso em horários), os horários de
+            // funcionamento e as suas exceções acompanham a escola.
             $lockedSchool->activityTypes()->delete();
+            $this->operatingRuleService->deleteAllForSchool($lockedSchool);
+            $lockedSchool->schoolOperatingExceptions()->delete();
 
             $lockedSchool->delete();
         });

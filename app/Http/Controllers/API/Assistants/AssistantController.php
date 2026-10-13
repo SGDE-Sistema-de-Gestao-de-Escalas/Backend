@@ -39,7 +39,9 @@ class AssistantController extends Controller
 
         $assistants = Assistant::query()
             ->with(['user', 'school'])
-            ->when($status === 'inactive', fn ($query) => $query->onlyTrashed())
+            ->when($status === 'inactive', fn ($query) => $query->whereHas('user', fn ($uq) => $uq->where('is_active', false)))
+            ->when($status === 'active', fn ($query) => $query->whereHas('user', fn ($uq) => $uq->where('is_active', true)))
+            ->when($status === 'trashed', fn ($query) => $query->onlyTrashed())
             ->when($status === 'all', fn ($query) => $query->withTrashed())
             ->when($schoolId, fn ($query) => $query->where('school_id', $schoolId))
             ->when($search !== '', function ($query) use ($search) {
@@ -78,7 +80,7 @@ class AssistantController extends Controller
     {
         Gate::authorize('view', $assistant);
 
-        return new AssistantResource($assistant->load(['user', 'school']));
+        return new AssistantResource($assistant->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']));
     }
 
     /**
@@ -91,6 +93,7 @@ class AssistantController extends Controller
         return new AssistantResource($updatedAssistant);
     }
 
+
     /**
      * Remove the specified resource from storage.
      */
@@ -100,7 +103,7 @@ class AssistantController extends Controller
 
         $this->assistantService->delete($assistant);
 
-        return response()->json(['message' => 'Assistente inativado com sucesso.']);
+        return response()->json(['message' => 'Assistente eliminado com sucesso.']);
     }
 
     /**

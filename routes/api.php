@@ -7,6 +7,9 @@ use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schedules\ScheduleRuleController;
 use App\Http\Controllers\API\Schools\SchoolController;
+use App\Http\Controllers\API\Schools\OperatingCalendarController;
+use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
+use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
@@ -95,10 +98,24 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 // X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
 Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
 
+    // Horário de funcionamento da escola: o administrador gere, os assistentes
+    // só consultam. As permissões vêm da SchoolOperatingRulePolicy e das
+    // FormRequests (por isso sem o can:manage-system).
+    Route::apiResource('operating-rules', SchoolOperatingRuleController::class)
+        ->parameters(['operating-rules' => 'operating_rule']);
+
+    // Exceções ao horário fixo (períodos em que a escola fecha ou muda de
+    // horas) e o calendário que combina feriados, exceções e horário fixo.
+    Route::apiResource('operating-exceptions', SchoolOperatingExceptionController::class)
+        ->parameters(['operating-exceptions' => 'operating_exception']);
+    Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
+        ->name('operating-calendar.index');
+
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('assistants', AssistantController::class)
             ->withTrashed(['show', 'update', 'destroy']);
+        Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('absences', AbsenceController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);

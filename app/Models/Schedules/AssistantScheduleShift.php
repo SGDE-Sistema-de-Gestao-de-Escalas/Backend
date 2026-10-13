@@ -40,4 +40,9 @@ class AssistantScheduleShift extends Model
     {
         return $this->hasMany(AssistantScheduleShiftDay::class);
     }
+
+    public function shiftDays()
+    {
+        return $this->hasMany(AssistantScheduleShiftDay::class);
+    }
 }
