@@ -2,21 +2,34 @@
 
 namespace App\Models\Schedules;
 
+use Database\Factories\AssistantScheduleShiftFactory;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class AssistantScheduleShift extends Model
 {
-    /** @use HasFactory<\Database\Factories\AssistantScheduleShiftFactory> */
+    /** @use HasFactory<AssistantScheduleShiftFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
         'assistant_schedule_profile_id',
-        'day_of_week',
-        'start_time',
-        'end_time',
+        'shift_label',
+        'entry_time',
+        'exit_time',
+        'lunch_enabled',
+        'lunch_start',
+        'lunch_end',
+        'lunch_duration_minutes',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'lunch_enabled' => 'boolean',
+            'lunch_duration_minutes' => 'integer',
+        ];
+    }
 
     public function assistantScheduleProfile()
     {
@@ -28,4 +41,3 @@ class AssistantScheduleShift extends Model
         return $this->hasMany(AssistantScheduleShiftDay::class);
     }
 }
-
