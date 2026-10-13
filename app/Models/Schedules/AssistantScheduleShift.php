@@ -22,6 +22,11 @@ class AssistantScheduleShift extends Model
         'lunch_duration_minutes',
     ];
 
+    protected $casts = [
+        'lunch_enabled' => 'boolean',
+        'lunch_duration_minutes' => 'integer',
+    ];
+
 
     public function assistantScheduleProfile()
     {
