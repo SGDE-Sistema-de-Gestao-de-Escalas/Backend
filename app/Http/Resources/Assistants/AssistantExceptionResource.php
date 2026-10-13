@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Assistants;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,15 +15,54 @@ class AssistantExceptionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $today = Carbon::today();
+        $validFrom = $this->valid_from ? Carbon::parse($this->valid_from)->startOfDay() : null;
+        $validUntil = $this->valid_until ? Carbon::parse($this->valid_until)->startOfDay() : null;
+
+        if ($validFrom && $validFrom->isAfter($today)) {
+            $status = 'upcoming';
+            $canEdit = true;
+            $canChangeEndDate = true;
+            $canDelete = true;
+            $cannotEditReason = null;
+            $cannotDeleteReason = null;
+        } elseif ($validUntil && $validUntil->isBefore($today)) {
+            $status = 'superseded';
+            $canEdit = false;
+            $canChangeEndDate = false;
+            $canDelete = false;
+            $cannotEditReason = 'Não é possível editar uma exceção cuja vigência já terminou no passado.';
+            $cannotDeleteReason = 'Não é possível eliminar uma exceção cuja vigência já terminou no passado.';
+        } else {
+            $status = 'current';
+            $canEdit = false;
+            $canChangeEndDate = true;
+            $canDelete = false;
+            $cannotEditReason = 'Não é possível alterar os dados base ou data de início de uma exceção em vigor; apenas a data de fim pode ser ajustada.';
+            $cannotDeleteReason = 'Não é possível eliminar uma exceção em vigor.';
+        }
+
         return [
             'id' => (string) $this->id,
             'assistant_id' => (string) $this->assistant_id,
             'type' => $this->type,
             'description' => $this->description,
-            'valid_from' => $this->valid_from ? $this->valid_from->format('Y-m-d') : null,
-            'valid_until' => $this->valid_until ? $this->valid_until->format('Y-m-d') : null,
-            'start_time' => $this->start_time ? $this->start_time->format('H:i') : null,
-            'end_time' => $this->end_time ? $this->end_time->format('H:i') : null,
+            'valid_from' => $this->valid_from ? Carbon::parse($this->valid_from)->format('Y-m-d') : null,
+            'valid_until' => $this->valid_until ? Carbon::parse($this->valid_until)->format('Y-m-d') : null,
+            'start_time' => $this->start_time ? Carbon::parse($this->start_time)->format('H:i') : null,
+            'end_time' => $this->end_time ? Carbon::parse($this->end_time)->format('H:i') : null,
+            'days' => $this->days ? array_values(array_map('intval', $this->days)) : [],
+            'lunch_enabled' => (bool) $this->lunch_enabled,
+            'lunch_start' => $this->lunch_start ? Carbon::parse($this->lunch_start)->format('H:i') : null,
+            'lunch_end' => $this->lunch_end ? Carbon::parse($this->lunch_end)->format('H:i') : null,
+            'lunch_duration_minutes' => $this->lunch_duration_minutes !== null ? (int) $this->lunch_duration_minutes : null,
+            'status' => $status,
+            'can_edit' => $canEdit,
+            'can_change_end_date' => $canChangeEndDate,
+            'can_delete' => $canDelete,
+            'cannot_edit_reason' => $cannotEditReason,
+            'cannot_delete_reason' => $cannotDeleteReason,
+            'assistant' => $this->whenLoaded('assistant'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

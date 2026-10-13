@@ -80,7 +80,7 @@ class OperatingHoursResolver
 
         foreach (CarbonPeriod::create($from, $to) as $day) {
             $date = $day->toDateString();
-            $weekday = $day->dayOfWeekIso;
+            $weekday = $day->dayOfWeekIso - 1; // 0 = Segunda-feira ... 6 = Domingo
 
             $holiday = $holidays->get($date);
 

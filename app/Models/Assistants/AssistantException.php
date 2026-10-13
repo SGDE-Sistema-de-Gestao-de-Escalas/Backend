@@ -20,6 +20,11 @@ class AssistantException extends Model
         'valid_until',
         'start_time',
         'end_time',
+        'days',
+        'lunch_enabled',
+        'lunch_start',
+        'lunch_end',
+        'lunch_duration_minutes',
     ];
 
     protected $casts = [
@@ -27,6 +32,11 @@ class AssistantException extends Model
         'valid_until' => 'date',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
+        'days' => 'array',
+        'lunch_enabled' => 'boolean',
+        'lunch_start' => 'datetime:H:i',
+        'lunch_end' => 'datetime:H:i',
+        'lunch_duration_minutes' => 'integer',
     ];
 
     public function assistant()
