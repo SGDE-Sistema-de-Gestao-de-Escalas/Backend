@@ -5,7 +5,10 @@ use App\Http\Controllers\API\Assistants\AssistantController;
 use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
+use App\Http\Controllers\API\Schedules\ScheduleRuleController;
 use App\Http\Controllers\API\Schools\SchoolController;
+use App\Http\Controllers\API\Schools\OperatingCalendarController;
+use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
 use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
 use App\Http\Controllers\API\Auth\AuthController;
@@ -114,6 +117,7 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);
+        Route::apiResource('schedule-rules', ScheduleRuleController::class);
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.

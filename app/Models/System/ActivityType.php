@@ -3,6 +3,7 @@
 namespace App\Models\System;
 
 use App\Models\Schedules\ScheduleEntry;
+use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -42,5 +43,10 @@ class ActivityType extends Model
     public function scheduleEntries()
     {
         return $this->hasMany(ScheduleEntry::class);
+    }
+
+    public function scheduleRules()
+    {
+        return $this->hasMany(ScheduleRule::class);
     }
 }

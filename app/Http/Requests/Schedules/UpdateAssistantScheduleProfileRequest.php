@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -37,8 +38,28 @@ class UpdateAssistantScheduleProfileRequest extends FormRequest
             'shifts.*.lunch_end' => ['nullable', 'date_format:H:i'],
             'shifts.*.lunch_duration_minutes' => ['nullable', 'integer', 'min:0'],
             'shifts.*.days' => ['required', 'array', 'min:1'],
-            'shifts.*.days.*' => ['integer', 'between:1,7'],
+            'shifts.*.days.*' => ['integer', 'between:0,6'],
         ];
+    }
+
+    /**
+     * Configure the validator instance.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $profile = $this->route('assistant_schedule_profile');
+            if (! $profile) {
+                return;
+            }
+
+            $today = Carbon::today();
+            $validFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : null;
+
+            if (! $validFrom || ! $validFrom->isAfter($today)) {
+                $validator->errors()->add('profile', 'Não é possível editar um horário em vigor ou que já regeu escalas passadas.');
+            }
+        });
     }
 
     /**
@@ -67,7 +88,7 @@ class UpdateAssistantScheduleProfileRequest extends FormRequest
             'shifts.*.exit_time.date_format' => 'A hora de saída deve ter o formato HH:mm.',
             'shifts.*.days.required' => 'Selecione pelo menos um dia da semana para o turno.',
             'shifts.*.days.min' => 'Selecione pelo menos um dia da semana para o turno.',
-            'shifts.*.days.*.between' => 'O dia da semana selecionado é inválido (deve ser entre 1 e 7).',
+            'shifts.*.days.*.between' => 'O dia da semana selecionado é inválido (deve ser entre 0 e 6).',
         ];
     }
 }

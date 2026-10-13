@@ -38,7 +38,7 @@ class StoreAssistantScheduleProfileRequest extends FormRequest
             'shifts.*.lunch_end' => ['nullable', 'date_format:H:i'],
             'shifts.*.lunch_duration_minutes' => ['nullable', 'integer', 'min:0'],
             'shifts.*.days' => ['required', 'array', 'min:1'],
-            'shifts.*.days.*' => ['integer', 'between:1,7'],
+            'shifts.*.days.*' => ['integer', 'between:0,6'],
         ];
     }
 
@@ -71,7 +71,7 @@ class StoreAssistantScheduleProfileRequest extends FormRequest
             'shifts.*.exit_time.date_format' => 'A hora de saída deve ter o formato HH:mm.',
             'shifts.*.days.required' => 'Selecione pelo menos um dia da semana para o turno.',
             'shifts.*.days.min' => 'Selecione pelo menos um dia da semana para o turno.',
-            'shifts.*.days.*.between' => 'O dia da semana selecionado é inválido (deve ser entre 1 e 7).',
+            'shifts.*.days.*.between' => 'O dia da semana selecionado é inválido (deve ser entre 0 e 6).',
         ];
     }
 }

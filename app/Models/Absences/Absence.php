@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Absence extends Model
 {
-    /** @use HasFactory<\Database\Factories\AbsenceFactory> */
+    /** @use HasFactory<AbsenceFactory> */
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
@@ -60,4 +60,3 @@ class Absence extends Model
         return $this->belongsTo(User::class, 'justified_by_user_id');
     }
 }
-
