@@ -19,10 +19,12 @@ return new class extends Migration
             $table->foreignUuid('justified_by_user_id')->nullable()->constrained('users');
             $table->date('valid_from');
             $table->date('valid_until')->nullable();
-            $table->unsignedSmallInteger('total_days');
+            $table->time('start_time')->nullable();
+            $table->time('end_time')->nullable();
+            $table->unsignedSmallInteger('total_days')->default(1);
             $table->text('justification')->nullable();
             $table->string('document_path')->nullable();
-            $table->enum('status', ['justified', 'unjustified', 'waiting_for_document'])->default('unjustified');
+            $table->enum('status', ['pending', 'justified', 'unjustified'])->default('pending');
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

@@ -104,12 +104,11 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('operating-rules', SchoolOperatingRuleController::class)
         ->parameters(['operating-rules' => 'operating_rule']);
 
-    // Exceções ao horário fixo (períodos em que a escola fecha ou muda de
-    // horas) e o calendário que combina feriados, exceções e horário fixo.
-    Route::apiResource('operating-exceptions', SchoolOperatingExceptionController::class)
-        ->parameters(['operating-exceptions' => 'operating_exception']);
-    Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
-        ->name('operating-calendar.index');
+    // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
+    // Permissões via AbsencePolicy e FormRequests.
+    Route::get('/absences/{absence}/document', [AbsenceController::class, 'downloadDocument'])
+        ->name('absences.document');
+    Route::apiResource('absences', AbsenceController::class);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
@@ -117,7 +116,6 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
-        Route::apiResource('absences', AbsenceController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);
         Route::apiResource('schedule-rules', ScheduleRuleController::class);
     });
