@@ -2,6 +2,7 @@
 use App\Http\Controllers\API\Absences\AbsenceController;
 use App\Http\Controllers\API\Absences\AbsenceTypeController;
 use App\Http\Controllers\API\Assistants\AssistantController;
+use App\Http\Controllers\API\Assistants\AssistantCsvController;
 use App\Http\Controllers\API\Auth\RoleController;
 use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
@@ -104,6 +105,13 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('operating-rules', SchoolOperatingRuleController::class)
         ->parameters(['operating-rules' => 'operating_rule']);
 
+    // Exceções ao horário fixo (períodos em que a escola fecha ou muda de
+    // horas) e o calendário que combina feriados, exceções e horário fixo.
+    Route::apiResource('operating-exceptions', SchoolOperatingExceptionController::class)
+        ->parameters(['operating-exceptions' => 'operating_exception']);
+    Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
+        ->name('operating-calendar.index');
+
     // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
     // Permissões via AbsencePolicy e FormRequests.
     Route::get('/absences/{absence}/document', [AbsenceController::class, 'downloadDocument'])
@@ -112,6 +120,12 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
+        // Importação e exportação em CSV. Têm de vir antes do apiResource,
+        // senão "export" seria lido como o id de um assistente.
+        Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
+            ->name('assistants.export');
+        Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
+            ->name('assistants.import');
         Route::apiResource('assistants', AssistantController::class)
             ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
