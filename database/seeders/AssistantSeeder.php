@@ -2,134 +2,95 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Assistants\Assistant;
+use App\Models\Auth\Role;
+use App\Models\Auth\User;
+use App\Models\Schools\School;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
+/**
+ * Assistentes reais das duas escolas (folha "Escalas").
+ *
+ *  - ESPL  → 1.º ciclo
+ *  - EB23S → pré-escolar
+ *
+ * Os horários de cada um estão em AssistantScheduleProfileSeeder (ligados
+ * pelo número mecanográfico). Os nomes da folha são só primeiros nomes, por
+ * isso o apelido é provisório ("Assistente") até haver os reais.
+ *
+ * Pode correr várias vezes: atualiza pelo número mecanográfico, não duplica.
+ * Não apaga assistentes que já existam na base de dados.
+ */
 class AssistantSeeder extends Seeder
 {
+    /** Apelido provisório enquanto não houver os reais. */
+    private const PLACEHOLDER_LAST_NAME = 'Assistente';
+
     /**
-     * Run the database seeds.
+     * internal_number => [escola, primeiro nome, email]
+     *
+     * @var array<string, array{0: string, 1: string, 2: string}>
      */
+    public const ROSTER = [
+        // 1.º ciclo (ESPL)
+        'ME-2001' => ['ESPL', 'Patrícia', 'patricia@sgde.pt'],
+        'ME-2002' => ['ESPL', 'Anabela', 'anabela@sgde.pt'],
+        'ME-2003' => ['ESPL', 'Joana', 'joana@sgde.pt'],
+        'ME-2004' => ['ESPL', 'MJB', 'mjb@sgde.pt'],
+        'ME-2005' => ['ESPL', 'Marta', 'marta@sgde.pt'],
+        'ME-2006' => ['ESPL', 'Sandra', 'sandra@sgde.pt'],
+
+        // Pré-escolar (EB23S)
+        'ME-3001' => ['EB23S', 'Jacinta', 'jacinta@sgde.pt'],
+        'ME-3002' => ['EB23S', 'Carla', 'carla@sgde.pt'],
+        'ME-3003' => ['EB23S', 'Filipa', 'filipa@sgde.pt'],
+        'ME-3004' => ['EB23S', 'Diana', 'diana@sgde.pt'],
+    ];
+
     public function run(): void
     {
-        $staffRole = \App\Models\Auth\Role::where('slug', 'staff')->first();
+        $staffRole = Role::where('slug', 'staff')->first();
         if (! $staffRole) {
             $this->call(RoleSeeder::class);
-            $staffRole = \App\Models\Auth\Role::where('slug', 'staff')->first();
+            $staffRole = Role::where('slug', 'staff')->first();
         }
 
-        $school = \App\Models\Schools\School::where('acronym', 'ESPL')->first()
-            ?? \App\Models\Schools\School::first();
-        if (! $school) {
+        if (! School::query()->whereIn('acronym', ['ESPL', 'EB23S'])->exists()) {
             $this->call(SchoolSeeder::class);
-            $school = \App\Models\Schools\School::where('acronym', 'ESPL')->first()
-                ?? \App\Models\Schools\School::first();
         }
 
-        if (! $staffRole || ! $school) {
-            $this->command->error('Não foi possível encontrar a Role "staff" ou uma Escola. Execute primeiro o RoleSeeder e SchoolSeeder.');
+        $schools = School::query()->pluck('id', 'acronym');
+
+        if (! $staffRole || ! isset($schools['ESPL'], $schools['EB23S'])) {
+            $this->command?->error('Faltam a Role "staff" ou as escolas ESPL / EB23S. Corre primeiro o RoleSeeder e o SchoolSeeder.');
+
             return;
         }
 
-        // 1. Assistente Ativo Normal (para testar bloqueio 'deve ser inativado previamente')
-        $user1 = \App\Models\Auth\User::firstOrCreate(
-            ['email' => 'maria.santos@sgde.pt'],
-            [
-                'first_name' => 'Maria',
-                'last_name' => 'Santos',
-                'password' => \Illuminate\Support\Facades\Hash::make('staff123'),
-                'role_id' => $staffRole->id,
-                'is_active' => true,
-            ]
-        );
+        $password = Hash::make(env('SEED_STAFF_PASSWORD') ?: 'staff123');
 
-        \App\Models\Assistants\Assistant::firstOrCreate(
-            ['internal_number' => 'ME-1001'],
-            [
-                'user_id' => $user1->id,
-                'school_id' => $school->id,
-                'phone' => '+351 912 345 601',
-                'nif' => '234567801',
-                'social_security_number' => '12345678901',
-                'birth_date' => '1992-03-15',
-                'admission_date' => '2022-09-01',
-                'address_street' => 'Rua das Flores, 12',
-                'address_zip_code' => '4000-001',
-                'address_city' => 'Porto',
-                'emergency_contact_name' => 'Carlos Santos',
-                'emergency_contact_phone' => '+351 910 000 001',
-                'emergency_contact_kinship' => 'Cônjuge',
-                'available_for_transfer' => true,
-                'is_anonymized' => false,
-            ]
-        );
+        foreach (self::ROSTER as $internalNumber => [$acronym, $firstName, $email]) {
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'first_name' => $firstName,
+                    'last_name' => self::PLACEHOLDER_LAST_NAME,
+                    'password' => $password,
+                    'role_id' => $staffRole->id,
+                    'is_active' => true,
+                ]
+            );
 
-        // 2. Assistente Inativo / Arquivado (Elegível para Anonimização)
-        $user2 = \App\Models\Auth\User::firstOrCreate(
-            ['email' => 'joao.pereira@sgde.pt'],
-            [
-                'first_name' => 'João',
-                'last_name' => 'Pereira',
-                'password' => \Illuminate\Support\Facades\Hash::make('staff123'),
-                'role_id' => $staffRole->id,
-                'is_active' => false,
-            ]
-        );
-
-        $assistant2 = \App\Models\Assistants\Assistant::withTrashed()->firstOrCreate(
-            ['internal_number' => 'ME-1002'],
-            [
-                'user_id' => $user2->id,
-                'school_id' => $school->id,
-                'phone' => '+351 912 345 602',
-                'nif' => '234567802',
-                'social_security_number' => '12345678902',
-                'birth_date' => '1988-07-22',
-                'admission_date' => '2021-01-15',
-                'address_street' => 'Avenida Central, 80',
-                'address_zip_code' => '4100-100',
-                'address_city' => 'Porto',
-                'emergency_contact_name' => 'Teresa Pereira',
-                'emergency_contact_phone' => '+351 910 000 002',
-                'emergency_contact_kinship' => 'Irmã',
-                'available_for_transfer' => false,
-                'is_anonymized' => false,
-            ]
-        );
-
-        // Se o assistente 2 ainda não estiver em soft-delete, coloca-o
-        if (! $assistant2->trashed()) {
-            $assistant2->delete();
+            Assistant::withTrashed()->firstOrCreate(
+                ['internal_number' => $internalNumber],
+                [
+                    'user_id' => $user->id,
+                    'school_id' => $schools[$acronym],
+                    'available_for_transfer' => false,
+                    'is_anonymized' => false,
+                ]
+            );
         }
-
-        // 3. Assistente Ativo Disponível para transferências
-        $user3 = \App\Models\Auth\User::firstOrCreate(
-            ['email' => 'antonio.silva@sgde.pt'],
-            [
-                'first_name' => 'António',
-                'last_name' => 'Silva',
-                'password' => \Illuminate\Support\Facades\Hash::make('staff123'),
-                'role_id' => $staffRole->id,
-                'is_active' => true,
-            ]
-        );
-
-        \App\Models\Assistants\Assistant::firstOrCreate(
-            ['internal_number' => 'ME-1003'],
-            [
-                'user_id' => $user3->id,
-                'school_id' => $school->id,
-                'phone' => '+351 912 345 603',
-                'nif' => '234567803',
-                'social_security_number' => '12345678903',
-                'birth_date' => '1995-11-30',
-                'admission_date' => '2023-03-01',
-                'address_street' => 'Praceta da Liberdade, 5',
-                'address_zip_code' => '4200-200',
-                'address_city' => 'Porto',
-                'available_for_transfer' => true,
-                'is_anonymized' => false,
-            ]
-        );
     }
 }
