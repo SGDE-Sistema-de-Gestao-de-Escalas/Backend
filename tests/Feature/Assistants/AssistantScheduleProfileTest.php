@@ -258,7 +258,7 @@ class AssistantScheduleProfileTest extends TestCase
 
         // Horário anterior agora termina em D - 1 dia
         $expectedPreviousEnd = $futureDate->copy()->subDay()->format('Y-m-d');
-        $this->assertEquals($expectedPreviousEnd, $currentProfile->fresh()->valid_until);
+        $this->assertSame($expectedPreviousEnd, $currentProfile->fresh()->valid_until->format('Y-m-d'));
     }
 
     public function test_updating_upcoming_start_date_adjusts_previous_profile_valid_until(): void
@@ -292,7 +292,7 @@ class AssistantScheduleProfileTest extends TestCase
 
         // Horário anterior sincroniza automaticamente para D_nova - 1 dia
         $expectedPreviousEnd = $newFutureDate->copy()->subDay()->format('Y-m-d');
-        $this->assertEquals($expectedPreviousEnd, $currentProfile->fresh()->valid_until);
+        $this->assertSame($expectedPreviousEnd, $currentProfile->fresh()->valid_until->format('Y-m-d'));
     }
 
     public function test_deleting_upcoming_schedule_profile_reopens_previous_profile(): void
