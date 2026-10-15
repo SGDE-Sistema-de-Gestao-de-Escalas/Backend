@@ -4,7 +4,6 @@ namespace App\Policies\Absences;
 
 use App\Models\Absences\Absence;
 use App\Models\Auth\User;
-use Illuminate\Auth\Access\Response;
 
 class AbsencePolicy
 {
@@ -13,7 +12,7 @@ class AbsencePolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -21,31 +20,34 @@ class AbsencePolicy
      */
     public function view(User $user, Absence $absence): bool
     {
-        return false;
+        return $user->isAdmin() || $absence->assistant?->user_id === $user->id;
     }
 
     /**
      * Determine whether the user can create models.
+     * Apenas os administradores podem criar ausências.
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can update the model.
+     * O administrador pode atualizar todas; o assistente apenas a sua própria (para anexar documento ou notas).
      */
     public function update(User $user, Absence $absence): bool
     {
-        return false;
+        return $user->isAdmin() || $absence->assistant?->user_id === $user->id;
     }
 
     /**
      * Determine whether the user can delete the model.
+     * Apenas os administradores podem eliminar ausências.
      */
     public function delete(User $user, Absence $absence): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -53,7 +55,7 @@ class AbsencePolicy
      */
     public function restore(User $user, Absence $absence): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -61,6 +63,6 @@ class AbsencePolicy
      */
     public function forceDelete(User $user, Absence $absence): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 }

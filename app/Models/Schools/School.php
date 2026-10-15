@@ -5,6 +5,7 @@ namespace App\Models\Schools;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleRule;
 use App\Models\System\ActivityType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,6 +60,11 @@ class School extends Model
     public function schedules()
     {
         return $this->hasMany(Schedule::class);
+    }
+
+    public function scheduleRules()
+    {
+        return $this->hasMany(ScheduleRule::class);
     }
 
     public function outgoingTemporaryAssignments()

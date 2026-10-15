@@ -22,7 +22,11 @@ class DatabaseSeeder extends Seeder
             AbsenceTypeSeeder::class,
             // Depois das escolas: cria as atividades predefinidas em cada uma.
             ActivityTypeSeeder::class,
+            // Horário de funcionamento das escolas, depois das escolas.
+            SchoolOperatingRuleSeeder::class,
+            // Assistentes e respetivos horários (dependem das escolas).
             AssistantSeeder::class,
+            AssistantScheduleProfileSeeder::class,
         ]);
     }
 }

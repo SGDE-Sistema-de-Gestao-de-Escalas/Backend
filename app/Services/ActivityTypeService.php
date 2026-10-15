@@ -113,6 +113,7 @@ class ActivityTypeService
     {
         return [
             'scheduleEntries as blocking_schedule_entries_count' => fn ($query) => $query,
+            'scheduleRules as blocking_schedule_rules_count' => fn ($query) => $query,
         ];
     }
 
@@ -129,6 +130,13 @@ class ActivityTypeService
 
         $count = $activityType->blocking_schedule_entries_count
             ?? $activityType->scheduleEntries()->count();
+
+        $ruleCount = $activityType->blocking_schedule_rules_count
+            ?? $activityType->scheduleRules()->count();
+
+        if ($ruleCount > 0) {
+            return 'Esta atividade está a ser usada em regras de escala e não pode ser eliminada. Pode desativá-la.';
+        }
 
         return $count > 0 ? self::IN_USE_BLOCK_MESSAGE : null;
     }
