@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AssistantController extends Controller
 {
@@ -66,7 +68,8 @@ class AssistantController extends Controller
      */
     public function store(StoreAssistantRequest $request): JsonResponse
     {
-        $assistant = $this->assistantService->create($request->validated());
+        $file = $request->file('criminal_record') ?? $request->file('criminal_record_file');
+        $assistant = $this->assistantService->create($request->validated(), $file);
 
         return (new AssistantResource($assistant))
             ->response()
@@ -88,9 +91,30 @@ class AssistantController extends Controller
      */
     public function update(UpdateAssistantRequest $request, Assistant $assistant): AssistantResource
     {
-        $updatedAssistant = $this->assistantService->update($assistant, $request->validated());
+        $file = $request->file('criminal_record') ?? $request->file('criminal_record_file');
+        $updatedAssistant = $this->assistantService->update($assistant, $request->validated(), $file);
 
         return new AssistantResource($updatedAssistant);
+    }
+
+    /**
+     * Download or view the criminal record document.
+     */
+    public function downloadCriminalRecord(Assistant $assistant): StreamedResponse
+    {
+        Gate::authorize('view', $assistant);
+
+        if (! $assistant->criminal_record_path) {
+            abort(404, 'Registo criminal não encontrado.');
+        }
+
+        $disk = config('filesystems.documents_disk');
+
+        if (! Storage::disk($disk)->exists($assistant->criminal_record_path)) {
+            abort(404, 'Ficheiro do registo criminal não encontrado no servidor.');
+        }
+
+        return Storage::disk($disk)->response($assistant->criminal_record_path);
     }
 
 

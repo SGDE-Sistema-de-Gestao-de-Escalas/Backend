@@ -78,8 +78,9 @@ class AssistantAnonymizeFeatureTest extends TestCase
 
     public function test_admin_can_anonymize_inactive_assistant(): void
     {
-        Storage::fake('local');
-        Storage::disk('local')->put('criminal_records/doc.pdf', 'fake-content');
+        $disk = config('filesystems.documents_disk');
+        Storage::fake($disk);
+        Storage::disk($disk)->put('criminal_records/doc.pdf', 'fake-content');
 
         $assistant = $this->createInactiveAssistant();
         $assistant->update(['criminal_record_path' => 'criminal_records/doc.pdf']);
@@ -93,10 +94,17 @@ class AssistantAnonymizeFeatureTest extends TestCase
 
         $assistant->refresh();
         $this->assertTrue((bool) $assistant->is_anonymized);
+        $this->assertSame('anon_' . $assistant->id, $assistant->internal_number);
         $this->assertNull($assistant->phone);
         $this->assertNull($assistant->nif);
         $this->assertNull($assistant->criminal_record_path);
-        Storage::disk('local')->assertMissing('criminal_records/doc.pdf');
+        Storage::disk($disk)->assertMissing('criminal_records/doc.pdf');
+
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson("/api/assistants/{$assistant->id}")
+            ->assertOk()
+            ->assertJsonPath('data.internal_number', '---');
     }
 }
 
