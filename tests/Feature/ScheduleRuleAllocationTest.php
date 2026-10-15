@@ -34,7 +34,7 @@ class ScheduleRuleAllocationTest extends TestCase
         $this->rule = ScheduleRule::create([
             'school_id' => $school->id, 'activity_type_id' => $activity->id,
             'period_start' => '08:00', 'period_end' => '12:00', 'min' => 2,
-            'type' => 'mandatory', 'start' => '2026-11-01',
+            'type' => 'mandatory', 'valid_from' => '2026-11-01',
             'days_of_week' => [0, 1, 2, 3, 4, 5, 6],
         ]);
         $role = Role::create(['name' => 'Assistant', 'slug' => 'assistant']);
@@ -189,6 +189,24 @@ class ScheduleRuleAllocationTest extends TestCase
         $this->assertSame('unresolved_exception', $this->allocate()['skipped'][0]['reason']);
         $exception->delete();
         $this->assertSame($this->ids[0], $this->allocate()['assistant_ids'][0]);
+    }
+
+    public function test_validity_boundaries_are_inclusive_and_null_end_is_unlimited(): void
+    {
+        $this->rule->update(['valid_until' => '2026-11-02']);
+        $service = app(ScheduleRuleAllocationService::class);
+        foreach (['2026-11-01', '2026-11-02'] as $date) {
+            $this->assertTrue($service->allocate($this->rule, $date, $this->periods)['complete']);
+        }
+        $this->rule->update(['valid_until' => null]);
+        $this->assertTrue($service->allocate($this->rule, '2027-11-01', $this->periods)['complete']);
+    }
+
+    public function test_rule_after_end_is_rejected_even_with_stale_model(): void
+    {
+        DB::table('schedule_rules')->where('id', $this->rule->id)->update(['valid_until' => '2026-11-01']);
+        $this->expectException(ValidationException::class);
+        $this->allocate();
     }
 
     public function test_rule_before_start_is_rejected(): void

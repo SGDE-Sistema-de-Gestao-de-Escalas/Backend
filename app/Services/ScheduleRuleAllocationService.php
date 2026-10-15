@@ -44,8 +44,12 @@ class ScheduleRuleAllocationService
         if (! in_array($weekday, $rule->days_of_week ?? [], true)) {
             throw ValidationException::withMessages(['days_of_week' => 'A regra não se aplica a este dia da semana.']);
         }
-        if ($rule->type !== 'mandatory' || $date < $rule->start->format('Y-m-d')) {
+        if ($rule->type !== 'mandatory') {
             throw ValidationException::withMessages(['rule' => 'A regra não se aplica à data ou ao tipo pedido.']);
+        }
+        if ($date < $rule->valid_from->format('Y-m-d')
+            || ($rule->valid_until !== null && $date > $rule->valid_until->format('Y-m-d'))) {
+            throw ValidationException::withMessages(['rule' => 'A regra não se encontra em vigor nesta data.']);
         }
         if (! $rule->activityType?->active || $rule->activityType->school_id !== $rule->school_id) {
             throw ValidationException::withMessages(['activity_type_id' => 'A atividade não está disponível nesta escola.']);

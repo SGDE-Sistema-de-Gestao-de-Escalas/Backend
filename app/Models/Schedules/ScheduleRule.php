@@ -21,7 +21,8 @@ class ScheduleRule extends Model
         'period_end',
         'min',
         'type',
-        'start',
+        'valid_from',
+        'valid_until',
         'days_of_week',
     ];
 
@@ -29,7 +30,8 @@ class ScheduleRule extends Model
     {
         return [
             'min' => 'integer',
-            'start' => 'date:Y-m-d',
+            'valid_from' => 'date:Y-m-d',
+            'valid_until' => 'date:Y-m-d',
             'days_of_week' => 'array',
         ];
     }

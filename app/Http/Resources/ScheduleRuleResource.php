@@ -17,7 +17,8 @@ class ScheduleRuleResource extends JsonResource
             'period_end' => substr($this->period_end, 0, 5),
             'min' => $this->min,
             'type' => $this->type,
-            'start' => $this->start->format('Y-m-d'),
+            'valid_from' => $this->valid_from->format('Y-m-d'),
+            'valid_until' => $this->valid_until?->format('Y-m-d'),
             'days_of_week' => $this->days_of_week ?? [],
             'assistant_ids' => $this->assistants->modelKeys(),
             'assistants' => $this->assistants->map(fn ($assistant) => [

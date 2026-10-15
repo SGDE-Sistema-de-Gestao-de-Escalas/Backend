@@ -15,6 +15,7 @@ class ScheduleRuleService
 
         return DB::transaction(function () use ($data, $schoolId) {
             $this->validateSelection($data['type'], (int) $data['min'], $data['assistant_ids']);
+            $this->validateValidity($data['valid_from'], $data['valid_until'] ?? null);
             $rule = ScheduleRule::create(Arr::except($data, ['assistant_ids', 'school_id']) + ['school_id' => $schoolId]);
             $this->syncAssistants($rule, $data['assistant_ids']);
 
@@ -35,6 +36,7 @@ class ScheduleRuleService
             if (substr($rule->period_end, 0, 5) <= substr($rule->period_start, 0, 5)) {
                 throw ValidationException::withMessages(['period_end' => 'O fim do período deve ser posterior ao início.']);
             }
+            $this->validateValidity($rule->valid_from->format('Y-m-d'), $rule->valid_until?->format('Y-m-d'));
             $rule->save();
             if (array_key_exists('assistant_ids', $data)) {
                 $this->syncAssistants($rule, $data['assistant_ids']);
@@ -42,6 +44,13 @@ class ScheduleRuleService
 
             return $rule->load('assistants.user');
         });
+    }
+
+    private function validateValidity(string $from, ?string $until): void
+    {
+        if ($until !== null && $until < $from) {
+            throw ValidationException::withMessages(['valid_until' => 'A data de fim deve ser igual ou posterior à data de início.']);
+        }
     }
 
     private function normalizeDays(array $data): array
