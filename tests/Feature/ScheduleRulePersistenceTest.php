@@ -32,7 +32,7 @@ class ScheduleRulePersistenceTest extends TestCase
             'period_end' => '12:00',
             'min' => 2,
             'type' => 'mandatory',
-            'start' => '2026-11-01',
+            'valid_from' => '2026-11-01',
         ]);
     }
 
@@ -63,7 +63,7 @@ class ScheduleRulePersistenceTest extends TestCase
         $this->assertTrue($rule->school->scheduleRules->contains($rule));
         $this->assertTrue($rule->activityType->scheduleRules->contains($rule));
         $this->assertTrue($first->scheduleRules->contains($rule));
-        $this->assertSame('2026-11-01', $rule->fresh()->start->format('Y-m-d'));
+        $this->assertSame('2026-11-01', $rule->fresh()->valid_from->format('Y-m-d'));
 
         $rule->assistants()->sync([
             $first->id => ['priority' => 1],

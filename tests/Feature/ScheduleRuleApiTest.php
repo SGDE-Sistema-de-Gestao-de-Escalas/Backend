@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
+use App\Services\ScheduleRuleService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -41,7 +44,7 @@ class ScheduleRuleApiTest extends TestCase
         $this->substituteId = array_pop($ids);
         $this->payload = [
             'activity_type_id' => $activity->id, 'period_start' => '08:00', 'period_end' => '12:00',
-            'min' => 2, 'type' => 'mandatory', 'start' => '2026-11-01', 'assistant_ids' => array_slice($ids, 0, 2),
+            'min' => 2, 'type' => 'mandatory', 'valid_from' => '2026-11-01', 'assistant_ids' => array_slice($ids, 0, 2),
             'days_of_week' => [1, 3, 5],
         ];
         $this->withHeader('X-School-ID', $this->school->id);
@@ -54,6 +57,67 @@ class ScheduleRuleApiTest extends TestCase
         }
 
         return $this->postJson('/api/schedule-rules', $this->payload)->assertCreated()->json('data.id');
+    }
+
+    public function test_validity_dates_can_be_created_updated_preserved_and_cleared(): void
+    {
+        $id = $this->createRule();
+        $url = '/api/schedule-rules/'.$id;
+        $this->getJson($url)->assertOk()->assertJsonPath('data.valid_from', '2026-11-01')
+            ->assertJsonPath('data.valid_until', null)->assertJsonMissingPath('data.start');
+        $this->patchJson($url, ['valid_until' => '2026-11-01'])->assertOk()
+            ->assertJsonPath('data.valid_until', '2026-11-01');
+        $this->patchJson($url, ['period_end' => '13:00'])->assertOk()
+            ->assertJsonPath('data.valid_until', '2026-11-01');
+        $this->patchJson($url, ['valid_from' => '2026-11-02'])->assertUnprocessable()->assertJsonValidationErrors('valid_until');
+        $this->patchJson($url, ['valid_until' => '2026-10-31'])->assertUnprocessable()->assertJsonValidationErrors('valid_until');
+        $this->patchJson($url, ['valid_from' => '2026-11-02', 'valid_until' => null])->assertOk()
+            ->assertJsonPath('data.valid_from', '2026-11-02')->assertJsonPath('data.valid_until', null);
+        $this->postJson('/api/schedule-rules', $this->payload + ['valid_until' => '2026-11-01'])
+            ->assertCreated()->assertJsonPath('data.valid_until', '2026-11-01');
+        $this->getJson('/api/schedule-rules')->assertOk()->assertJsonPath('data.0.valid_from', '2026-11-01');
+    }
+
+    public function test_invalid_validity_dates_are_rejected(): void
+    {
+        $id = $this->createRule();
+        foreach (['2026-10-31', '2026-02-30', '01/11/2026'] as $until) {
+            $this->postJson('/api/schedule-rules', $this->payload + ['valid_until' => $until])
+                ->assertUnprocessable()->assertJsonValidationErrors('valid_until');
+            $this->patchJson('/api/schedule-rules/'.$id, ['valid_until' => $until])
+                ->assertUnprocessable()->assertJsonValidationErrors('valid_until');
+        }
+        $payload = $this->payload;
+        unset($payload['valid_from']);
+        $this->postJson('/api/schedule-rules', $payload)->assertUnprocessable()->assertJsonValidationErrors('valid_from');
+        $this->patchJson('/api/schedule-rules/'.$id, ['valid_from' => null])->assertUnprocessable();
+        $this->patchJson('/api/schedule-rules/'.$id, ['start' => '2026-11-02'])->assertUnprocessable()->assertJsonValidationErrors('start');
+    }
+
+    public function test_validity_migration_preserves_existing_dates_and_assistants(): void
+    {
+        $id = $this->createRule();
+        $migration = require database_path('migrations/2026_10_15_000000_add_schedule_rule_validity_dates.php');
+        $migration->down();
+        $this->assertDatabaseHas('schedule_rules', ['id' => $id, 'start' => '2026-11-01']);
+        $migration->up();
+        $this->getJson('/api/schedule-rules/'.$id)->assertOk()
+            ->assertJsonPath('data.valid_from', '2026-11-01')->assertJsonPath('data.valid_until', null)
+            ->assertJsonPath('data.assistant_ids', $this->payload['assistant_ids']);
+    }
+
+    public function test_service_rechecks_validity_against_current_persisted_dates(): void
+    {
+        $id = $this->createRule();
+        $stale = ScheduleRule::findOrFail($id);
+        DB::table('schedule_rules')->where('id', $id)->update(['valid_until' => '2026-11-02']);
+        try {
+            app(ScheduleRuleService::class)->update($stale, ['valid_from' => '2026-11-03']);
+            $this->fail('Invalid interval was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('valid_until', $exception->errors());
+        }
+        $this->getJson('/api/schedule-rules/'.$id)->assertOk()->assertJsonPath('data.valid_from', '2026-11-01');
     }
 
     public function test_both_rule_types_can_be_created_read_updated_and_deleted(): void
@@ -168,7 +232,7 @@ class ScheduleRuleApiTest extends TestCase
             ['assistant_ids' => ['key' => $this->payload['assistant_ids'][0]]],
             ['assistant_ids' => ['invalid']],
             ['min' => 4], ['min' => 0], ['type' => 'unknown'],
-            ['period_end' => '07:00'], ['period_start' => '25:00'], ['start' => '2026-02-30'],
+            ['period_end' => '07:00'], ['period_start' => '25:00'], ['valid_from' => '2026-02-30'],
         ];
         foreach ($cases as $changes) {
             $this->postJson('/api/schedule-rules', array_replace($this->payload, $changes))->assertUnprocessable();

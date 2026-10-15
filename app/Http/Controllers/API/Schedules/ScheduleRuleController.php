@@ -20,7 +20,7 @@ class ScheduleRuleController extends Controller
     {
         return ScheduleRuleResource::collection(
             ScheduleRule::where('school_id', $request->attributes->get('school_id'))
-                ->with('assistants.user')->orderBy('start')->orderBy('id')->get()
+                ->with('assistants.user')->orderBy('valid_from')->orderBy('id')->get()
         );
     }
 
