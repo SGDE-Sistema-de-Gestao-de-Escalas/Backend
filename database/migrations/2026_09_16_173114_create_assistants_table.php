@@ -23,6 +23,7 @@ return new class extends Migration
             $table->date('birth_date')->nullable();
             $table->date('admission_date')->nullable();
 
+            $table->string('criminal_record_name')->nullable();
             $table->string('criminal_record_path')->nullable();
             $table->date('criminal_record_expiry')->nullable();
 

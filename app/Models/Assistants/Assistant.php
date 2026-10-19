@@ -30,6 +30,7 @@ class Assistant extends Model
         'social_security_number',
         'birth_date',
         'admission_date',
+        'criminal_record_name',
         'criminal_record_path',
         'criminal_record_expiry',
         'address_street',
