@@ -68,7 +68,7 @@ class AssistantController extends Controller
      */
     public function store(StoreAssistantRequest $request): JsonResponse
     {
-        $file = $request->file('criminal_record') ?? $request->file('criminal_record_file');
+        $file = $request->file('criminal_record');
         $assistant = $this->assistantService->create($request->validated(), $file);
 
         return (new AssistantResource($assistant))
@@ -91,7 +91,7 @@ class AssistantController extends Controller
      */
     public function update(UpdateAssistantRequest $request, Assistant $assistant): AssistantResource
     {
-        $file = $request->file('criminal_record') ?? $request->file('criminal_record_file');
+        $file = $request->file('criminal_record');
         $updatedAssistant = $this->assistantService->update($assistant, $request->validated(), $file);
 
         return new AssistantResource($updatedAssistant);

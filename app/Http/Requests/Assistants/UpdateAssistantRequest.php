@@ -70,7 +70,6 @@ class UpdateAssistantRequest extends FormRequest
             'admission_date' => ['nullable', 'date'],
             'criminal_record_expiry' => ['nullable', 'date'],
             'criminal_record' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'criminal_record_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'remove_criminal_record' => ['sometimes', 'boolean'],
 
             'address_street' => ['nullable', 'string', 'max:255'],
@@ -118,9 +117,6 @@ class UpdateAssistantRequest extends FormRequest
             'criminal_record.file' => 'O registo criminal tem de ser um ficheiro válido.',
             'criminal_record.mimes' => 'O registo criminal deve ser um ficheiro do tipo: pdf, jpg, jpeg ou png.',
             'criminal_record.max' => 'O registo criminal não pode exceder 5MB.',
-            'criminal_record_file.file' => 'O registo criminal tem de ser um ficheiro válido.',
-            'criminal_record_file.mimes' => 'O registo criminal deve ser um ficheiro do tipo: pdf, jpg, jpeg ou png.',
-            'criminal_record_file.max' => 'O registo criminal não pode exceder 5MB.',
             'address_street.max' => 'A morada não pode ter mais de 255 carateres.',
             'address_zip_code.regex' => 'O código postal tem de seguir o formato 0000-000.',
             'address_city.max' => 'A localidade não pode ter mais de 100 carateres.',
