@@ -29,60 +29,112 @@ class AbsenceController extends Controller
         Gate::authorize('viewAny', Absence::class);
 
         $user = $request->user();
-        $schoolId = $request->header('X-School-ID');
-        $status = $request->query('status');
-        $assistantId = $request->query('assistant_id');
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
-        $search = trim((string) $request->query('search', ''));
-        $perPage = $request->query('per_page');
+        $schoolId = $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $user?->school_id
+            ?? $user?->assistant?->school_id;
 
-        $query = Absence::query()
-            ->with(['assistant.user', 'absenceType', 'createdByUser', 'justifiedByUser']);
+        $baseQuery = Absence::query();
 
         // Se for assistente (não-admin), só lista as suas próprias ausências
         if ($user && ! $user->isAdmin()) {
             $assistant = $user->assistant;
-            $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
-        } else {
-            $query->when($schoolId, function ($q) use ($schoolId) {
-                $q->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId));
-            })
-            ->when($assistantId, function ($q) use ($assistantId) {
-                $q->where('assistant_id', $assistantId);
+            $baseQuery->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($schoolId) {
+            $baseQuery->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId));
+        }
+
+        // Contadores globais para as Tabs (rápidos via SQL, respeitando o contexto da escola/utilizador)
+        $counts = [
+            'all' => (clone $baseQuery)->count(),
+            'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'justified' => (clone $baseQuery)->where('status', 'justified')->count(),
+            'unjustified' => (clone $baseQuery)->where('status', 'unjustified')->count(),
+        ];
+
+        $query = (clone $baseQuery)
+            ->with(['assistant.user', 'absenceType', 'createdByUser', 'justifiedByUser']);
+
+        // 1. Filtro por Assistente
+        if ($user && $user->isAdmin() && $request->filled('assistant_id') && $request->input('assistant_id') !== 'all') {
+            $query->where('assistant_id', $request->input('assistant_id'));
+        }
+
+        // 2. Filtro por Estado (pending, justified, unjustified)
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $status = $request->input('status');
+            if (in_array($status, ['pending', 'justified', 'unjustified'], true)) {
+                $query->where('status', $status);
+            }
+        }
+
+        // 3. Filtro por Datas (Lógica de sobreposição de intervalos)
+        if ($request->filled('start_date') || $request->filled('valid_from')) {
+            $startDate = $request->input('start_date', $request->input('valid_from'));
+            $query->where(function ($q) use ($startDate) {
+                $q->whereDate('valid_until', '>=', $startDate)
+                    ->orWhere(function ($sub) use ($startDate) {
+                        $sub->whereNull('valid_until')->whereDate('valid_from', '>=', $startDate);
+                    });
             });
         }
 
-        $query->when($status && in_array($status, ['pending', 'justified', 'unjustified'], true), function ($q) use ($status) {
-            $q->where('status', $status);
-        })
-        ->when($startDate, function ($q) use ($startDate) {
-            $q->whereDate('valid_from', '>=', $startDate);
-        })
-        ->when($endDate, function ($q) use ($endDate) {
-            $q->whereDate('valid_until', '<=', $endDate);
-        })
-        ->when($search !== '', function ($q) use ($search) {
-            $q->where(function ($subQ) use ($search) {
+        if ($request->filled('end_date') || $request->filled('valid_until')) {
+            $endDate = $request->input('end_date', $request->input('valid_until'));
+            $query->whereDate('valid_from', '<=', $endDate);
+        }
+
+        // 4. Pesquisa Textual
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $query->where(function ($subQ) use ($search) {
                 $subQ->whereHas('assistant.user', function ($uq) use ($search) {
                     $uq->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%");
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
                 })
+                ->orWhereHas('assistant', fn ($aq) => $aq->where('internal_number', 'like', "%{$search}%"))
                 ->orWhereHas('absenceType', fn ($tq) => $tq->where('name', 'like', "%{$search}%"))
                 ->orWhere('justification', 'like', "%{$search}%")
                 ->orWhere('notes', 'like', "%{$search}%");
             });
-        })
-        ->orderByDesc('valid_from')
-        ->orderByDesc('created_at');
-
-        if ($perPage === 'all') {
-            return AbsenceResource::collection($query->get());
         }
 
-        $perPageInt = min(max((int) ($perPage ?: 20), 1), 100);
+        // 5. Ordenação (mais recentes primeiro por defeito)
+        $allowedSorts = ['valid_from', 'valid_until', 'total_days', 'status', 'created_at'];
+        $sortBy = in_array($request->input('sort_by'), $allowedSorts, true) ? $request->input('sort_by') : 'valid_from';
+        $sortDir = strtolower((string) $request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        return AbsenceResource::collection($query->paginate($perPageInt)->withQueryString());
+        $query->orderBy($sortBy, $sortDir)->orderByDesc('created_at');
+
+        // 6. Suporte para devolver todos sem paginação (per_page = -1 ou 'all')
+        $perPageInput = $request->input('per_page', 8);
+        if ($perPageInput === 'all' || (int) $perPageInput === -1) {
+            $absences = $query->get();
+            $total = $absences->count();
+
+            return AbsenceResource::collection($absences)->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => $total,
+                    'total' => $total,
+                    'counts' => $counts,
+                ],
+                'counts' => $counts,
+            ]);
+        }
+
+        // 7. Paginação Normal (default 8)
+        $perPage = min(max((int) $perPageInput ?: 8, 1), 100);
+        $absences = $query->paginate($perPage)->withQueryString();
+
+        return AbsenceResource::collection($absences)->additional([
+            'meta' => [
+                'counts' => $counts,
+            ],
+            'counts' => $counts,
+        ]);
     }
 
     /**
@@ -97,7 +149,20 @@ class AbsenceController extends Controller
 
         $absence = $this->absenceService->create($validated, $document, $request->user());
 
-        return (new AbsenceResource($absence))->response()->setStatusCode(201);
+        $missingDocument = (bool) ($absence->absenceType?->requires_document ?? false) && empty($absence->document_path);
+        $warning = $missingDocument
+            ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
+            : null;
+
+        return (new AbsenceResource($absence))
+            ->additional([
+                'message' => $missingDocument
+                    ? 'Ausência registada com sucesso. Atenção: falta anexar o documento comprovativo.'
+                    : 'Ausência registada com sucesso.',
+                'warning' => $warning,
+            ])
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
@@ -124,7 +189,18 @@ class AbsenceController extends Controller
 
         $updated = $this->absenceService->update($absence, $validated, $document, $request->user());
 
-        return new AbsenceResource($updated);
+        $missingDocument = (bool) ($updated->absenceType?->requires_document ?? false) && empty($updated->document_path);
+        $warning = $missingDocument
+            ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
+            : null;
+
+        return (new AbsenceResource($updated))
+            ->additional([
+                'message' => $missingDocument
+                    ? 'Ausência atualizada com sucesso. Atenção: falta anexar o documento comprovativo.'
+                    : 'Ausência atualizada com sucesso.',
+                'warning' => $warning,
+            ]);
     }
 
     /**
@@ -148,10 +224,16 @@ class AbsenceController extends Controller
     {
         Gate::authorize('view', $absence);
 
-        if (! $absence->document_path || ! Storage::disk('local')->exists($absence->document_path)) {
+        if (! $absence->document_path) {
             abort(404, 'Documento comprovativo não encontrado.');
         }
 
-        return Storage::disk('local')->response($absence->document_path);
+        $disk = config('filesystems.documents_disk');
+
+        if (! Storage::disk($disk)->exists($absence->document_path)) {
+            abort(404, 'Ficheiro do documento comprovativo não encontrado no servidor.');
+        }
+
+        return Storage::disk($disk)->response($absence->document_path);
     }
 }

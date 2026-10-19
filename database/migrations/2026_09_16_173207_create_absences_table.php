@@ -23,6 +23,7 @@ return new class extends Migration
             $table->time('end_time')->nullable();
             $table->unsignedSmallInteger('total_days')->default(1);
             $table->text('justification')->nullable();
+            $table->string('document_name')->nullable();
             $table->string('document_path')->nullable();
             $table->enum('status', ['pending', 'justified', 'unjustified'])->default('pending');
             $table->text('notes')->nullable();

@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Absences;
 
-use App\Models\Absences\AbsenceType;
+use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateAbsenceRequest extends FormRequest
@@ -58,10 +59,20 @@ class UpdateAbsenceRequest extends FormRequest
         $validator->after(function ($validator) {
             $user = $this->user();
             $schoolId = $this->header('X-School-ID');
+            /** @var Absence|null $absence */
             $absence = $this->route('absence');
 
-            // Assistente só pode enviar documento, remove_document, notas ou justificativa
+            // Assistente só pode enviar documento, remove_document, notas ou justificativa enquanto estiver Pendente
             if ($user && ! $user->isAdmin()) {
+                if ($absence && $absence->status !== 'pending') {
+                    $msg = $absence->status === 'justified'
+                        ? 'A falta já se encontra aprovada. Contacte a direção para alterações.'
+                        : 'Faltas injustificadas não podem ser alteradas ou eliminadas.';
+                    $validator->errors()->add('absence', $msg);
+
+                    return;
+                }
+
                 $forbiddenFields = [
                     'status' => 'Apenas os administradores podem alterar o estado da ausência.',
                     'assistant_id' => 'Não tem permissão para alterar o assistente da ausência.',
@@ -74,8 +85,38 @@ class UpdateAbsenceRequest extends FormRequest
                 ];
 
                 foreach ($forbiddenFields as $field => $errorMessage) {
-                    if ($this->has($field)) {
+                    if ($this->has($field) && (! $absence || $this->hasFieldChanged($absence, $field))) {
                         $validator->errors()->add($field, $errorMessage);
+                    }
+                }
+            }
+
+            // Se a ausência já passou (valid_until < hoje) E já está concluída (justified ou unjustified),
+            // o Admin apenas pode editar documento, estado de justificação ou notas (dados base ficam bloqueados)
+            if ($absence && $user && $user->isAdmin()) {
+                $today = Carbon::today();
+                $validFrom = $absence->valid_from ? Carbon::parse($absence->valid_from)->startOfDay() : null;
+                $validUntil = $absence->valid_until ? Carbon::parse($absence->valid_until)->startOfDay() : $validFrom;
+                $isPast = $validUntil && $validUntil->isBefore($today);
+
+                if ($isPast && $absence->status !== 'pending') {
+                    $pastImmutableFields = [
+                        'assistant_id',
+                        'absence_type_id',
+                        'valid_from',
+                        'valid_until',
+                        'start_time',
+                        'end_time',
+                        'total_days',
+                    ];
+
+                    foreach ($pastImmutableFields as $field) {
+                        if ($this->has($field) && $this->hasFieldChanged($absence, $field)) {
+                            $validator->errors()->add(
+                                $field,
+                                'Esta falta já foi validada e encerrada pela direção.'
+                            );
+                        }
                     }
                 }
             }
@@ -86,23 +127,37 @@ class UpdateAbsenceRequest extends FormRequest
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');
                 }
             }
-
-            $typeId = $this->input('absence_type_id', $absence?->absence_type_id);
-
-            if ($typeId) {
-                $absenceType = AbsenceType::find($typeId);
-                $targetStatus = $this->input('status', $absence?->status);
-
-                if ($absenceType && $absenceType->requires_document && $targetStatus === 'justified') {
-                    $hasExistingDoc = $absence?->document_path && ! $this->boolean('remove_document');
-                    $hasNewDoc = $this->hasFile('document');
-
-                    if (! $hasExistingDoc && ! $hasNewDoc) {
-                        $validator->errors()->add('document', 'Este tipo de ausência exige a apresentação de documento comprovativo para ser justificada.');
-                    }
-                }
-            }
         });
+    }
+
+    /**
+     * Verifica se o campo enviado difere do valor atual da ausência.
+     */
+    private function hasFieldChanged(Absence $absence, string $field): bool
+    {
+        $incoming = $this->input($field);
+
+        if (in_array($field, ['valid_from', 'valid_until'], true)) {
+            $currentDate = $field === 'valid_until'
+                ? ($absence->valid_until ?? $absence->valid_from)?->format('Y-m-d')
+                : $absence->valid_from?->format('Y-m-d');
+            $incomingDate = $incoming ? substr((string) $incoming, 0, 10) : null;
+
+            return $incomingDate !== $currentDate;
+        }
+
+        if (in_array($field, ['start_time', 'end_time'], true)) {
+            $currentTime = $absence->{$field} ? substr((string) $absence->{$field}, 0, 5) : null;
+            $incomingTime = $incoming ? substr((string) $incoming, 0, 5) : null;
+
+            return $incomingTime !== $currentTime;
+        }
+
+        if ($field === 'total_days') {
+            return (int) $incoming !== (int) $absence->total_days;
+        }
+
+        return (string) $incoming !== (string) ($absence->{$field} ?? '');
     }
 
     /**

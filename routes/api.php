@@ -116,6 +116,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     // Permissões via AbsencePolicy e FormRequests.
     Route::get('/absences/{absence}/document', [AbsenceController::class, 'downloadDocument'])
         ->name('absences.document');
+    Route::post('/absences/{absence}/document', [AbsenceController::class, 'update'])
+        ->name('absences.document.upload');
     Route::apiResource('absences', AbsenceController::class);
 
     // Restringe a gestão destes recursos aos administradores.

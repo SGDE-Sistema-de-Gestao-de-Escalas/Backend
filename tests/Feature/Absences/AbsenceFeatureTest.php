@@ -28,7 +28,7 @@ class AbsenceFeatureTest extends TestCase
     {
         parent::setUp();
 
-        Storage::fake('local');
+        Storage::fake(config('filesystems.documents_disk'));
 
         $adminRole = Role::firstOrCreate(['slug' => 'admin'], ['name' => 'Administrador']);
         $staffRole = Role::firstOrCreate(['slug' => 'staff'], ['name' => 'Assistente']);
@@ -129,6 +129,7 @@ class AbsenceFeatureTest extends TestCase
 
     public function test_admin_can_create_absence_with_document_and_download_it(): void
     {
+        $disk = config('filesystems.documents_disk');
         $file = UploadedFile::fake()->create('atestado.pdf', 200, 'application/pdf');
 
         $payload = [
@@ -147,13 +148,15 @@ class AbsenceFeatureTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('data.status', 'justified')
             ->assertJsonPath('data.total_days', 1)
+            ->assertJsonPath('data.document_name', 'atestado.pdf')
             ->assertJsonPath('data.justified_by_user_id', (string) $this->admin->id);
 
         $absenceId = $response->json('data.id');
         $absence = Absence::findOrFail($absenceId);
 
         $this->assertNotNull($absence->document_path);
-        Storage::disk('local')->assertExists($absence->document_path);
+        $this->assertStringStartsWith('maria_santos_ast_001/absences_files/ausencia_', $absence->document_path);
+        Storage::disk($disk)->assertExists($absence->document_path);
 
         // Download document pelo admin
         $this->actingAs($this->admin)
@@ -164,8 +167,9 @@ class AbsenceFeatureTest extends TestCase
 
     public function test_staff_can_view_own_absences_and_download_own_document(): void
     {
+        $disk = config('filesystems.documents_disk');
         $file = UploadedFile::fake()->create('comprovativo.pdf', 150, 'application/pdf');
-        $filePath = Storage::disk('local')->putFile('absences', $file);
+        $filePath = Storage::disk($disk)->putFile('maria_santos_ast_001/absences_files', $file);
 
         $ownAbsence = Absence::create([
             'assistant_id' => $this->assistant->id,
@@ -174,6 +178,7 @@ class AbsenceFeatureTest extends TestCase
             'valid_until' => '2026-10-10',
             'total_days' => 1,
             'status' => 'pending',
+            'document_name' => 'comprovativo.pdf',
             'document_path' => $filePath,
         ]);
 
@@ -190,7 +195,7 @@ class AbsenceFeatureTest extends TestCase
             'internal_number' => 'AST-002',
         ]);
         $otherFile = UploadedFile::fake()->create('outro_doc.pdf', 150, 'application/pdf');
-        $otherFilePath = Storage::disk('local')->putFile('absences', $otherFile);
+        $otherFilePath = Storage::disk($disk)->putFile('joao_silva_ast_002/absences_files', $otherFile);
         $otherAbsence = Absence::create([
             'assistant_id' => $otherAssistant->id,
             'absence_type_id' => $this->absenceType->id,
@@ -198,6 +203,7 @@ class AbsenceFeatureTest extends TestCase
             'valid_until' => '2026-10-12',
             'total_days' => 1,
             'status' => 'pending',
+            'document_name' => 'outro_doc.pdf',
             'document_path' => $otherFilePath,
         ]);
 
@@ -236,6 +242,8 @@ class AbsenceFeatureTest extends TestCase
 
     public function test_staff_can_attach_document_and_notes_to_own_absence(): void
     {
+        $disk = config('filesystems.documents_disk');
+
         $absence = Absence::create([
             'assistant_id' => $this->assistant->id,
             'absence_type_id' => $this->absenceType->id,
@@ -248,10 +256,10 @@ class AbsenceFeatureTest extends TestCase
 
         $file = UploadedFile::fake()->create('comprovativo.pdf', 100, 'application/pdf');
 
-        // Assistente anexa o documento e notas à sua falta
+        // Assistente anexa o documento e notas à sua falta (via PUT ou POST /document)
         $response = $this->actingAs($this->staff)
             ->withHeader('X-School-ID', (string) $this->school->id)
-            ->putJson("/api/absences/{$absence->id}", [
+            ->postJson("/api/absences/{$absence->id}/document", [
                 'document' => $file,
                 'justification' => 'Consulta no centro de saúde.',
                 'notes' => 'Comprovativo anexado pelo assistente.',
@@ -259,9 +267,13 @@ class AbsenceFeatureTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.justification', 'Consulta no centro de saúde.')
-            ->assertJsonPath('data.notes', 'Comprovativo anexado pelo assistente.');
+            ->assertJsonPath('data.notes', 'Comprovativo anexado pelo assistente.')
+            ->assertJsonPath('data.document_name', 'comprovativo.pdf');
 
-        $this->assertNotNull($response->json('data.document_path'));
+        $docPath = $response->json('data.document_path');
+        $this->assertNotNull($docPath);
+        $this->assertStringStartsWith('maria_santos_ast_001/absences_files/ausencia_', $docPath);
+        Storage::disk($disk)->assertExists($docPath);
 
         // O estado permanece pending
         $this->assertEquals('pending', $absence->fresh()->status);
@@ -303,7 +315,7 @@ class AbsenceFeatureTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_validation_requires_document_when_type_requires_it_and_status_is_justified(): void
+    public function test_absence_requiring_document_can_be_created_without_document_and_returns_warning(): void
     {
         $payload = [
             'assistant_id' => $this->assistant->id,
@@ -317,16 +329,24 @@ class AbsenceFeatureTest extends TestCase
             ->withHeader('X-School-ID', (string) $this->school->id)
             ->postJson('/api/absences', $payload);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['document']);
+        $response->assertCreated()
+            ->assertJsonPath('data.status', 'justified')
+            ->assertJsonPath('data.requires_document', true)
+            ->assertJsonPath('data.has_document', false)
+            ->assertJsonPath('data.missing_document', true)
+            ->assertJsonPath('data.warning', 'Este tipo de ausência requer a apresentação de documento comprovativo.')
+            ->assertJsonPath('warning', 'Este tipo de ausência requer a apresentação de documento comprovativo.');
 
-        // Se estiver como pending, não falha mesmo sem documento
+        // Também ao criar como pending sem documento
         $payload['status'] = 'pending';
         $responsePending = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', (string) $this->school->id)
             ->postJson('/api/absences', $payload);
 
-        $responsePending->assertCreated();
+        $responsePending->assertCreated()
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.missing_document', true)
+            ->assertJsonPath('warning', 'Este tipo de ausência requer a apresentação de documento comprovativo.');
     }
 
     public function test_validation_fails_if_assistant_belongs_to_another_school(): void
@@ -380,7 +400,16 @@ class AbsenceFeatureTest extends TestCase
             ->getJson('/api/absences?status=pending')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.status', 'pending');
+            ->assertJsonPath('data.0.status', 'pending')
+            ->assertJsonPath('meta.per_page', 8)
+            ->assertJsonPath('meta.counts.all', 2)
+            ->assertJsonPath('meta.counts.pending', 1)
+            ->assertJsonPath('meta.counts.justified', 1)
+            ->assertJsonPath('meta.counts.unjustified', 0)
+            ->assertJsonPath('counts.all', 2)
+            ->assertJsonPath('counts.pending', 1)
+            ->assertJsonPath('counts.justified', 1)
+            ->assertJsonPath('counts.unjustified', 0);
 
         // Filter status=justified
         $this->actingAs($this->admin)
@@ -388,20 +417,32 @@ class AbsenceFeatureTest extends TestCase
             ->getJson('/api/absences?status=justified')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.status', 'justified');
+            ->assertJsonPath('data.0.status', 'justified')
+            ->assertJsonPath('counts.all', 2);
 
-        // Filter status=all
+        // Filter status=all and per_page=-1
         $this->actingAs($this->admin)
             ->withHeader('X-School-ID', (string) $this->school->id)
-            ->getJson('/api/absences?status=all')
+            ->getJson('/api/absences?status=all&per_page=-1')
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('counts.all', 2);
+
+        // Filter by date overlap
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->getJson('/api/absences?start_date=2026-10-11&end_date=2026-10-13')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.valid_from', '2026-10-12');
     }
 
     public function test_admin_can_update_absence_status_and_remove_document(): void
     {
+        $disk = config('filesystems.documents_disk');
         $file = UploadedFile::fake()->create('atestado.pdf', 100, 'application/pdf');
-        $filePath = Storage::disk('local')->putFile('absences', $file);
+        $filePath = Storage::disk($disk)->putFile('maria_santos_ast_001/absences_files', $file);
 
         $absence = Absence::create([
             'assistant_id' => $this->assistant->id,
@@ -410,10 +451,11 @@ class AbsenceFeatureTest extends TestCase
             'valid_until' => '2026-10-10',
             'total_days' => 1,
             'status' => 'pending',
+            'document_name' => 'atestado.pdf',
             'document_path' => $filePath,
         ]);
 
-        Storage::disk('local')->assertExists($filePath);
+        Storage::disk($disk)->assertExists($filePath);
 
         $response = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', (string) $this->school->id)
@@ -425,19 +467,108 @@ class AbsenceFeatureTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.status', 'justified')
+            ->assertJsonPath('data.document_name', null)
             ->assertJsonPath('data.document_path', null)
             ->assertJsonPath('data.justified_by_user_id', (string) $this->admin->id);
 
-        Storage::disk('local')->assertMissing($filePath);
+        Storage::disk($disk)->assertMissing($filePath);
+    }
+
+    public function test_past_absence_permissions_and_restrictions(): void
+    {
+        $pastDate = now()->subDays(5)->format('Y-m-d');
+        $futureDate = now()->addDays(5)->format('Y-m-d');
+
+        $pastPendingAbsence = Absence::create([
+            'assistant_id' => $this->assistant->id,
+            'absence_type_id' => $this->absenceType->id,
+            'valid_from' => $pastDate,
+            'valid_until' => $pastDate,
+            'total_days' => 1,
+            'status' => 'pending',
+        ]);
+
+        $pastFinalizedAbsence = Absence::create([
+            'assistant_id' => $this->assistant->id,
+            'absence_type_id' => $this->absenceType->id,
+            'valid_from' => $pastDate,
+            'valid_until' => $pastDate,
+            'total_days' => 1,
+            'status' => 'unjustified',
+        ]);
+
+        $futureAbsence = Absence::create([
+            'assistant_id' => $this->assistant->id,
+            'absence_type_id' => $this->absenceType->id,
+            'valid_from' => $futureDate,
+            'valid_until' => $futureDate,
+            'total_days' => 1,
+            'status' => 'justified',
+        ]);
+
+        // 1. Falta pendente no passado: Admin pode editar e eliminar totalmente (can_edit=true, can_delete=true)
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->getJson("/api/absences/{$pastPendingAbsence->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_edit', true)
+            ->assertJsonPath('data.can_delete', true);
+
+        // 2. Falta já concluída (unjustified/justified) no passado: Admin vê can_edit=false e can_delete=false, mas can_justify=true e can_attach_document=true
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->getJson("/api/absences/{$pastFinalizedAbsence->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_edit', false)
+            ->assertJsonPath('data.can_delete', false)
+            ->assertJsonPath('data.cannot_edit_reason', 'Esta falta já foi validada e encerrada pela direção.')
+            ->assertJsonPath('data.cannot_delete_reason', 'Não é possível eliminar uma falta passada já registada no histórico.')
+            ->assertJsonPath('data.can_justify', true)
+            ->assertJsonPath('data.can_attach_document', true);
+
+        // 3. Falta futura (mesmo já justificada): Admin vê can_edit=true e can_delete=true
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->getJson("/api/absences/{$futureAbsence->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_edit', true)
+            ->assertJsonPath('data.can_delete', true);
+
+        // 4. Admin não pode alterar datas numa falta passada já validada/injustificada
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->putJson("/api/absences/{$pastFinalizedAbsence->id}", [
+                'valid_from' => $futureDate,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['valid_from']);
+
+        // 5. Admin não pode eliminar uma falta passada já validada/injustificada
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->deleteJson("/api/absences/{$pastFinalizedAbsence->id}")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['absence']);
+
+        // 6. Staff não pode anexar documento/notas numa falta já aprovada (justified)
+        $this->actingAs($this->staff)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->putJson("/api/absences/{$futureAbsence->id}", [
+                'notes' => 'Tentativa após aprovação',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['absence']);
     }
 
     public function test_admin_can_delete_absence(): void
     {
+        $futureDate = now()->addDays(3)->format('Y-m-d');
+
         $absence = Absence::create([
             'assistant_id' => $this->assistant->id,
             'absence_type_id' => $this->absenceType->id,
-            'valid_from' => '2026-10-10',
-            'valid_until' => '2026-10-10',
+            'valid_from' => $futureDate,
+            'valid_until' => $futureDate,
             'total_days' => 1,
             'status' => 'pending',
         ]);
