@@ -44,7 +44,7 @@ class AssistantService
                 'password' => Hash::make(Str::random(64)),
             ]);
 
-            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record', 'criminal_record_file']));
+            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record']));
 
             if ($criminalRecordFile) {
                 $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
@@ -83,7 +83,7 @@ class AssistantService
                 $user->save();
             }
 
-            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['first_name', 'last_name', 'criminal_record', 'criminal_record_file', 'remove_criminal_record']));
+            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['first_name', 'last_name', 'criminal_record', 'remove_criminal_record']));
 
             if (! empty($data['remove_criminal_record'])) {
                 $this->deleteCriminalRecordFile($assistant->criminal_record_path);
