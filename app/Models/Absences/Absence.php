@@ -26,6 +26,7 @@ class Absence extends Model
         'end_time',
         'total_days',
         'justification',
+        'document_name',
         'document_path',
         'status',
         'notes',

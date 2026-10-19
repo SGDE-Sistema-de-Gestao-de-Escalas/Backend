@@ -53,15 +53,6 @@ class StoreAbsenceRequest extends FormRequest
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');
                 }
             }
-
-            if ($this->filled('absence_type_id')) {
-                $absenceType = AbsenceType::find($this->absence_type_id);
-                if ($absenceType && $absenceType->requires_document) {
-                    if (! $this->hasFile('document') && $this->input('status') === 'justified') {
-                        $validator->errors()->add('document', 'Este tipo de ausência exige a apresentação de documento comprovativo para ser justificada.');
-                    }
-                }
-            }
         });
     }
 
