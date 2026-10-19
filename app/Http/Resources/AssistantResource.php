@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AssistantResource extends JsonResource
@@ -33,7 +34,7 @@ class AssistantResource extends JsonResource
             'is_anonymized' => (bool) ($this->is_anonymized || ($this->user?->anonymized_at !== null)),
             'anonymized_at' => $this->user?->anonymized_at?->toIso8601String(),
 
-            'internal_number' => $this->internal_number ?? '',
+            'internal_number' => $isAnonymized ? '---' : ($this->internal_number ?? ''),
             'email' => $isAnonymized ? 'anonimizado@sistema.local' : ($this->user?->email ?? ''),
             'phone' => $isAnonymized ? '-' : ($this->phone ?? '-'),
             'nif' => $isAnonymized ? '---------' : ($this->nif ?? '-'),
@@ -42,6 +43,11 @@ class AssistantResource extends JsonResource
             'admission_date' => $this->admission_date?->format('Y-m-d') ?? '',
 
             'has_criminal_record' => ! $isAnonymized && $this->criminal_record_path !== null,
+            'criminal_record_name' => (! $isAnonymized) ? $this->criminal_record_name : null,
+            'criminal_record_path' => (! $isAnonymized) ? $this->criminal_record_path : null,
+            'criminal_record_url' => (! $isAnonymized && $this->criminal_record_path)
+                ? $this->getCriminalRecordUrl($this->criminal_record_path)
+                : null,
             'criminal_record_expiry' => $isAnonymized ? null : $this->criminal_record_expiry?->format('Y-m-d'),
 
             'address_street' => $isAnonymized ? '-' : ($this->address_street ?? '-'),
@@ -84,5 +90,16 @@ class AssistantResource extends JsonResource
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
         ];
+    }
+
+    private function getCriminalRecordUrl(string $path): string
+    {
+        $disk = config('filesystems.documents_disk');
+
+        try {
+            return Storage::disk($disk)->url($path);
+        } catch (\Throwable) {
+            return route('assistants.criminal-record', ['assistant' => $this->id]);
+        }
     }
 }

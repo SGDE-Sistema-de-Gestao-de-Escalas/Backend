@@ -163,6 +163,8 @@ class UserService
                 if (array_key_exists('email', $assistant->getAttributes())) {
                     $assistant->email = null;
                 }
+                $assistant->internal_number = 'anon_' . $assistant->id;
+                $assistant->is_anonymized = true;
                 $assistant->phone = null;
                 $assistant->nif = null;
                 $assistant->social_security_number = null;
@@ -174,6 +176,7 @@ class UserService
                 $assistant->emergency_contact_kinship = null;
                 $assistant->available_for_transfer = false;
                 $assistant->criminal_record_expiry = null;
+                $assistant->criminal_record_name = null;
                  
                 $assistant->save();
 
@@ -183,7 +186,9 @@ class UserService
 
                 if ($criminalRecordPath !== null && $criminalRecordPath !== '') {
                     DB::afterCommit(function () use ($criminalRecordPath, $assistantId) {
-                        if (! Storage::disk('local')->delete($criminalRecordPath)) {
+                        $configuredDisk = config('filesystems.documents_disk');
+                        $disk = str_contains($criminalRecordPath, 'criminal_record') ? $configuredDisk : 'local';
+                        if (! Storage::disk($disk)->delete($criminalRecordPath)) {
                             throw new RuntimeException(
                                 'Não foi possível remover o ficheiro do registo criminal.'
                             );

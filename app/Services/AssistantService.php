@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -29,9 +30,9 @@ class AssistantService
      * criados, ou nenhum. O email para definir a password só é enviado
      * depois do commit, para nunca mandar emails de contas que não existem.
      */
-    public function create(array $data): Assistant
+    public function create(array $data, ?UploadedFile $criminalRecordFile = null): Assistant
     {
-        $assistant = DB::transaction(function () use ($data) {
+        $assistant = DB::transaction(function () use ($data, $criminalRecordFile) {
             $staffRole = Role::where('slug', 'staff')->firstOrFail();
 
             $user = User::create([
@@ -43,7 +44,17 @@ class AssistantService
                 'password' => Hash::make(Str::random(64)),
             ]);
 
-            $assistantData = Arr::except($data, self::USER_FIELDS);
+            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record', 'criminal_record_file']));
+
+            if ($criminalRecordFile) {
+                $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
+                $assistantData['criminal_record_path'] = $this->storeCriminalRecordFile(
+                    $criminalRecordFile,
+                    $data['first_name'],
+                    $data['last_name'],
+                    $data['internal_number']
+                );
+            }
 
             $assistant = $user->assistant()->create($assistantData);
 
@@ -55,9 +66,10 @@ class AssistantService
         return $assistant->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
     }
 
-    public function update(Assistant $assistant, array $data): Assistant
+    public function update(Assistant $assistant, array $data, ?UploadedFile $criminalRecordFile = null): Assistant
     {
-        return DB::transaction(function () use ($assistant, $data) {
+        return DB::transaction(function () use ($assistant, $data, $criminalRecordFile) {
+            $assistant->loadMissing('user');
             $userData = Arr::only($data, self::USER_FIELDS);
 
             if ($userData !== []) {
@@ -71,11 +83,90 @@ class AssistantService
                 $user->save();
             }
 
-            $assistantData = Arr::except($data, ['first_name', 'last_name']);
+            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['first_name', 'last_name', 'criminal_record', 'criminal_record_file', 'remove_criminal_record']));
+
+            if (! empty($data['remove_criminal_record'])) {
+                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
+                $assistantData['criminal_record_name'] = null;
+                $assistantData['criminal_record_path'] = null;
+                $assistantData['criminal_record_expiry'] = null;
+            } elseif ($criminalRecordFile) {
+                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
+
+                $firstName = $data['first_name'] ?? $assistant->user?->first_name ?? 'assistente';
+                $lastName = $data['last_name'] ?? $assistant->user?->last_name ?? '';
+                $internalNumber = $data['internal_number'] ?? $assistant->internal_number ?? $assistant->id;
+
+                $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
+                $assistantData['criminal_record_path'] = $this->storeCriminalRecordFile(
+                    $criminalRecordFile,
+                    $firstName,
+                    $lastName,
+                    $internalNumber
+                );
+            }
+
             $assistant->update($assistantData);
 
             return $assistant->refresh()->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
         });
+    }
+
+    /**
+     * Obtém o disco configurado para documentos (ex: 'public' ou 'r2').
+     */
+    public function getDocumentDisk(): string
+    {
+        return config('filesystems.documents_disk');
+    }
+
+    /**
+     * Gera o caminho da pasta para o registo criminal do assistente:
+     * {nome_assistente}_{nr_interno}/criminal_record
+     *
+     * Sanitiza carateres especiais (acentos, cedilhas, barras, símbolos)
+     * para segurança em qualquer sistema de ficheiros (Windows/Linux) ou S3/R2.
+     */
+    public function getAssistantCriminalRecordDirectory(string $firstName, string $lastName, string $internalNumber): string
+    {
+        // Converte separadores como barras, hífens e pontos em espaços antes de normalizar
+        $normalizedName = preg_replace('/[\/\\\_\-\.]+/', ' ', trim("{$firstName} {$lastName}"));
+        $normalizedInternal = preg_replace('/[\/\\\_\-\.]+/', ' ', trim($internalNumber));
+
+        $safeName = Str::slug($normalizedName, '_') ?: 'assistente';
+        $safeInternal = Str::slug($normalizedInternal, '_') ?: 'sem_numero';
+
+        return "{$safeName}_{$safeInternal}/criminal_record";
+    }
+
+    /**
+     * Guarda o ficheiro de registo criminal no disco configurado (public ou r2) na pasta do assistente.
+     * Gera um nome padronizado no disco: registo_criminal_{timestamp}_{random}.{ext}
+     */
+    public function storeCriminalRecordFile(UploadedFile $file, string $firstName, string $lastName, string $internalNumber): string
+    {
+        $folder = $this->getAssistantCriminalRecordDirectory($firstName, $lastName, $internalNumber);
+        $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'pdf';
+        $filename = "registo_criminal_" . time() . '_' . Str::random(6) . ".{$extension}";
+
+        $disk = $this->getDocumentDisk();
+
+        return $file->storeAs($folder, $filename, $disk);
+    }
+
+    /**
+     * Remove o ficheiro de registo criminal do disco configurado.
+     */
+    public function deleteCriminalRecordFile(?string $path): void
+    {
+        if ($path) {
+            $disk = $this->getDocumentDisk();
+
+            try {
+                Storage::disk($disk)->delete($path);
+            } catch (\Throwable) {
+            }
+        }
     }
 
     /**
@@ -194,9 +285,10 @@ class AssistantService
 
             // Remove documento do registo criminal do disco
             if ($assistant->criminal_record_path) {
-                Storage::disk('local')->delete($assistant->criminal_record_path);
+                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
                 $assistant->criminal_record_path = null;
             }
+            $assistant->criminal_record_name = null;
 
             $assistant->save();
 

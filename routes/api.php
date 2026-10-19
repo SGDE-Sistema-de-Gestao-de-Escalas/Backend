@@ -126,6 +126,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('assistants.export');
         Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
             ->name('assistants.import');
+        Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
+            ->name('assistants.criminal-record');
         Route::apiResource('assistants', AssistantController::class)
             ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);

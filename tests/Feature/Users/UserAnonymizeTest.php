@@ -237,7 +237,8 @@ class UserAnonymizeTest extends TestCase
         $this->assertNotNull($assistant);
         $this->assertSame($staff->id, $assistant->user_id);
         $this->assertSame($schoolId, $assistant->school_id);
-        $this->assertSame('TEST-001', $assistant->internal_number);
+        $this->assertSame('anon_' . $assistant->id, $assistant->internal_number);
+        $this->assertTrue((bool) $assistant->is_anonymized);
         $this->assertSame('2025-01-01', $assistant->admission_date);
         $this->assertNotNull($assistant->deleted_at);
         $this->assertFalse((bool) $assistant->available_for_transfer);

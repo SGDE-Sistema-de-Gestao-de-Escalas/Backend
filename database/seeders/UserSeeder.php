@@ -21,8 +21,8 @@ class UserSeeder extends Seeder
 
 
 
-        $adminPassword = env('SEED_ADMIN_PASSWORD');
-        $staffPassword = env('SEED_STAFF_PASSWORD');
+        $adminPassword = env('SEED_ADMIN_PASSWORD') ?: 'Password123!';
+        $staffPassword = env('SEED_STAFF_PASSWORD') ?: 'Password123!';
 
         User::firstOrCreate(
             ['email' => 'admin@sgde.pt'],
