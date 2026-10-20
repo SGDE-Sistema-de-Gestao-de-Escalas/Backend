@@ -15,7 +15,7 @@ class SchoolSeeder extends Seeder
         \App\Models\Schools\School::firstOrCreate(
             ['acronym' => 'ESPL'],
             [
-                'name' => 'Escola Secundária Padre Luís',
+                'name' => 'EB1 Miosótis',
                 'address' => 'Rua das Escolas, 123',
                 'phone' => '210000001',
                 'email' => 'espl@sgde.pt',
@@ -26,7 +26,7 @@ class SchoolSeeder extends Seeder
         \App\Models\Schools\School::firstOrCreate(
             ['acronym' => 'EB23S'],
             [
-                'name' => 'Escola Básica 2,3 de São João',
+                'name' => 'JI Miosótis',
                 'address' => 'Avenida Central, 45',
                 'phone' => '210000002',
                 'email' => 'eb23s@sgde.pt',
