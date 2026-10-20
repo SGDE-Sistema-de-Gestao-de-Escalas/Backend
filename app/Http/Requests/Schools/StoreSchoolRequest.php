@@ -25,7 +25,7 @@ class StoreSchoolRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'acronym' => ['required', 'string', 'max:20', 'unique:schools,acronym'],
+            'acronym' => ['nullable', 'string', 'max:20', 'unique:schools,acronym'],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', 'unique:schools,email'],
