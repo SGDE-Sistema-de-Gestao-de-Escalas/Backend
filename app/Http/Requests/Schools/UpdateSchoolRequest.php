@@ -27,7 +27,7 @@ class UpdateSchoolRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'acronym' => ['sometimes', 'required', 'string', 'max:20', Rule::unique('schools', 'acronym')->ignore($school)],
+            'acronym' => ['sometimes', 'nullable', 'string', 'max:20', Rule::unique('schools', 'acronym')->ignore($school)],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('schools', 'email')->ignore($school)],

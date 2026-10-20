@@ -92,5 +92,42 @@ class SchoolCrudFeatureTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.name', 'Escola Básica 1 Atualizada');
     }
-}
 
+    public function test_school_acronym_is_optional_on_create(): void
+    {
+        $this->actingAs($this->admin)
+            ->postJson('/api/schools', ['name' => 'Escola Sem Sigla'])
+            ->assertCreated()
+            ->assertJsonPath('data.acronym', null);
+
+        // Uma sigla vazia é tratada como "sem sigla" e várias escolas podem não ter sigla.
+        $this->actingAs($this->admin)
+            ->postJson('/api/schools', ['name' => 'Outra Escola Sem Sigla', 'acronym' => ''])
+            ->assertCreated()
+            ->assertJsonPath('data.acronym', null);
+
+        $this->assertSame(2, School::whereNull('acronym')->count());
+    }
+
+    public function test_school_acronym_must_still_be_unique_when_provided(): void
+    {
+        School::create(['name' => 'Escola A', 'acronym' => 'ESA', 'active' => true]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/schools', ['name' => 'Escola B', 'acronym' => 'ESA'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('acronym');
+    }
+
+    public function test_school_acronym_can_be_removed_on_update(): void
+    {
+        $school = School::create(['name' => 'Escola Com Sigla', 'acronym' => 'ECS', 'active' => true]);
+
+        $this->actingAs($this->admin)
+            ->putJson("/api/schools/{$school->id}", ['acronym' => null])
+            ->assertOk()
+            ->assertJsonPath('data.acronym', null);
+
+        $this->assertNull($school->fresh()->acronym);
+    }
+}
