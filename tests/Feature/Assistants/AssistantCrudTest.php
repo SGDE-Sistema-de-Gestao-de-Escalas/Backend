@@ -332,5 +332,102 @@ class AssistantCrudTest extends TestCase
             ->get("/api/assistants/{$data['id']}/criminal-record")
             ->assertOk();
     }
+
+    public function test_assistants_index_supports_pagination_counts_sorting_and_unpaginated_dropdown(): void
+    {
+        $staffRole = Role::where('slug', 'staff')->first();
+
+        $userZ = User::factory()->create([
+            'role_id' => $staffRole->id,
+            'first_name' => 'Zulmira',
+            'last_name' => 'Costa',
+            'email' => 'zulmira@escola.pt',
+            'is_active' => true,
+        ]);
+        Assistant::create([
+            'user_id' => $userZ->id,
+            'school_id' => $this->school->id,
+            'internal_number' => 'AO-001',
+        ]);
+
+        $userA = User::factory()->create([
+            'role_id' => $staffRole->id,
+            'first_name' => 'Ana',
+            'last_name' => 'Silva',
+            'email' => 'ana.silva@escola.pt',
+            'is_active' => true,
+        ]);
+        Assistant::create([
+            'user_id' => $userA->id,
+            'school_id' => $this->school->id,
+            'internal_number' => 'AO-002',
+        ]);
+
+        $userInactive = User::factory()->create([
+            'role_id' => $staffRole->id,
+            'first_name' => 'Bruno',
+            'last_name' => 'Ferreira',
+            'email' => 'bruno@escola.pt',
+            'is_active' => false,
+        ]);
+        $inactiveAssistant = Assistant::create([
+            'user_id' => $userInactive->id,
+            'school_id' => $this->school->id,
+            'internal_number' => 'AO-003',
+        ]);
+        $inactiveAssistant->delete();
+
+        // 1. Default: status=active, per_page=10, sort_by=name asc
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson('/api/assistants')
+            ->assertOk();
+
+        $response->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.per_page', 10)
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('counts.all', 3)
+            ->assertJsonPath('counts.active', 2)
+            ->assertJsonPath('counts.inactive', 1)
+            ->assertJsonPath('data.0.first_name', 'Ana')
+            ->assertJsonPath('data.0.active', true)
+            ->assertJsonPath('data.0.can_delete', true)
+            ->assertJsonPath('data.0.cannot_delete_reason', null)
+            ->assertJsonPath('data.1.first_name', 'Zulmira');
+
+        // 2. Ordenação por internal_number asc
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson('/api/assistants?sort_by=internal_number&sort_direction=asc')
+            ->assertOk()
+            ->assertJsonPath('data.0.internal_number', 'AO-001')
+            ->assertJsonPath('data.1.internal_number', 'AO-002');
+
+        // 3. Filtro status=inactive
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson('/api/assistants?status=inactive')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.internal_number', 'AO-003')
+            ->assertJsonPath('data.0.active', false)
+            ->assertJsonPath('data.0.can_delete', false);
+
+        // 4. Pesquisa por nome completo ("Ana Silva")
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson('/api/assistants?search=Ana%20Silva')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.internal_number', 'AO-002');
+
+        // 5. per_page=-1 (devolve todos sem paginação)
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->getJson('/api/assistants?status=all&per_page=-1')
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('counts.all', 3);
+    }
 }
 

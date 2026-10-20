@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\Assistants;
 
 use App\Models\Assistants\Assistant;
+use App\Models\Auth\User;
 use App\Http\Requests\Assistants\StoreAssistantRequest;
 use App\Http\Requests\Assistants\UpdateAssistantRequest;
 use App\Http\Controllers\Controller;
@@ -25,42 +26,124 @@ class AssistantController extends Controller
      * Display a listing of the resource.
      *
      * Filtros (query string):
-     *  - status: "active" (default) | "inactive" (apagados) | "all"
-     *  - search: nome, apelido, email ou nº mecanográfico
-     *  - per_page: default 20, máx. 100
-     * A escola vem do header X-School-ID; sem header lista todas.
+     *  - page: integer (default 1)
+     *  - per_page: integer (default 10; -1 devolve todos sem paginação)
+     *  - status: "active" (default) | "inactive" | "all"
+     *  - search: name, first_name, last_name, email ou internal_number
+     *  - sort_by: "name" (default) | "internal_number"
+     *  - sort_direction: "asc" (default) | "desc"
+     * A escola vem do header X-School-ID.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', Assistant::class);
 
-        $schoolId = $request->header('X-School-ID');
-        $search = trim((string) $request->query('search', ''));
-        $status = $request->query('status', 'active');
-        $perPage = min(max((int) $request->query('per_page', 20), 1), 100);
+        $schoolId = $request->header('X-School-ID') ?? $request->query('school_id');
 
-        $assistants = Assistant::query()
+        $query = Assistant::withTrashed()
             ->with(['user', 'school'])
-            ->when($status === 'inactive', fn ($query) => $query->whereHas('user', fn ($uq) => $uq->where('is_active', false)))
-            ->when($status === 'active', fn ($query) => $query->whereHas('user', fn ($uq) => $uq->where('is_active', true)))
-            ->when($status === 'trashed', fn ($query) => $query->onlyTrashed())
-            ->when($status === 'all', fn ($query) => $query->withTrashed())
-            ->when($schoolId, fn ($query) => $query->where('school_id', $schoolId))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('internal_number', 'like', "%{$search}%")
-                        ->orWhereHas('user', fn ($userQuery) => $userQuery
-                            ->withTrashed()
-                            ->where('email', 'like', "%{$search}%")
-                            ->orWhere('first_name', 'like', "%{$search}%")
-                            ->orWhere('last_name', 'like', "%{$search}%"));
-                });
-            })
-            ->orderBy('internal_number')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
 
-        return AssistantResource::collection($assistants);
+        // 1. Contadores para as Tabs (rápidos e sem paginação)
+        $countsQuery = clone $query;
+        $counts = [
+            'all' => (clone $countsQuery)->count(),
+            'active' => (clone $countsQuery)
+                ->whereNull('assistants.deleted_at')
+                ->where(fn ($q) => $q->where('is_anonymized', false)->orWhereNull('is_anonymized'))
+                ->whereHas('user', fn ($uq) => $uq->whereNull('deleted_at')->where('is_active', true))
+                ->count(),
+            'inactive' => (clone $countsQuery)
+                ->where(function ($q) {
+                    $q->whereNotNull('assistants.deleted_at')
+                        ->orWhere('is_anonymized', true)
+                        ->orWhereDoesntHave('user', fn ($uq) => $uq->whereNull('deleted_at')->where('is_active', true));
+                })
+                ->count(),
+        ];
+
+        // 2. Filtro de Estado
+        $status = $request->input('status', 'active');
+        if ($status === 'active') {
+            $query->whereNull('assistants.deleted_at')
+                ->where(fn ($q) => $q->where('is_anonymized', false)->orWhereNull('is_anonymized'))
+                ->whereHas('user', fn ($uq) => $uq->whereNull('deleted_at')->where('is_active', true));
+        } elseif ($status === 'inactive') {
+            $query->where(function ($q) {
+                $q->whereNotNull('assistants.deleted_at')
+                    ->orWhere('is_anonymized', true)
+                    ->orWhereDoesntHave('user', fn ($uq) => $uq->whereNull('deleted_at')->where('is_active', true));
+            });
+        } elseif ($status === 'trashed') {
+            $query->onlyTrashed();
+        }
+
+        // 3. Pesquisa Textual (name, first_name, last_name, email, internal_number)
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $words = array_values(array_filter(preg_split('/\s+/', $search) ?: []));
+
+            $query->where(function ($q) use ($search, $words) {
+                $q->where('internal_number', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search, $words) {
+                        $uq->withTrashed()->where(function ($sub) use ($search, $words) {
+                            $sub->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+
+                            if (count($words) > 1) {
+                                $sub->orWhere(function ($nameQuery) use ($words) {
+                                    foreach ($words as $word) {
+                                        $nameQuery->where(function ($wq) use ($word) {
+                                            $wq->where('first_name', 'like', "%{$word}%")
+                                                ->orWhere('last_name', 'like', "%{$word}%");
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    });
+            });
+        }
+
+        // 4. Ordenação
+        $sortBy = $request->input('sort_by', 'name');
+        $sortDir = strtolower((string) $request->input('sort_direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'internal_number') {
+            $query->orderBy('assistants.internal_number', $sortDir);
+        } else {
+            $query->orderBy(
+                User::withTrashed()
+                    ->select('first_name')
+                    ->whereColumn('users.id', 'assistants.user_id')
+                    ->limit(1),
+                $sortDir
+            )->orderBy(
+                User::withTrashed()
+                    ->select('last_name')
+                    ->whereColumn('users.id', 'assistants.user_id')
+                    ->limit(1),
+                $sortDir
+            );
+        }
+
+        // 5. Suporte para devolver todos nos dropdowns (per_page = -1)
+        if ((int) $request->input('per_page', 10) === -1) {
+            $assistants = $query->get();
+
+            return AssistantResource::collection($assistants)->additional([
+                'counts' => $counts,
+            ]);
+        }
+
+        // 6. Paginação Normal
+        $perPage = max((int) $request->input('per_page', 10), 1);
+        $assistants = $query->paginate($perPage)->withQueryString();
+
+        return AssistantResource::collection($assistants)->additional([
+            'counts' => $counts,
+        ]);
     }
 
     /**
