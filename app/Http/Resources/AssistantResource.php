@@ -16,10 +16,15 @@ class AssistantResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $isAnonymized = (bool) ($this->is_anonymized ?? false);
+        $isAnonymized = (bool) ($this->is_anonymized || ($this->user?->anonymized_at !== null));
         $firstName = $isAnonymized ? 'Assistente' : ($this->user?->first_name ?? '');
         $lastName = $isAnonymized ? 'Anonimizado' : ($this->user?->last_name ?? '');
         $name = $isAnonymized ? 'Assistente Anonimizado' : ($this->user?->name ?? trim("{$firstName} {$lastName}") ?: 'Assistente');
+        $isActive = (bool) ($this->user?->is_active ?? false) && ! $this->trashed() && ! $isAnonymized;
+        $canDelete = ! $isAnonymized && ! $this->trashed();
+        $cannotDeleteReason = $isAnonymized
+            ? 'Este assistente já se encontra anonimizado.'
+            : ($this->trashed() ? 'Este assistente já se encontra desativado/eliminado.' : null);
 
         return [
             'id' => $this->id,
@@ -30,9 +35,12 @@ class AssistantResource extends JsonResource
             'last_name' => $lastName,
             'name' => $name,
             'initials' => $isAnonymized ? 'AA' : (Str::upper(Str::substr((string) $firstName, 0, 1).Str::substr((string) $lastName, 0, 1)) ?: 'AS'),
-            'is_active' => (bool) ($this->user?->is_active ?? false) && ! $this->trashed() && ! $isAnonymized,
-            'is_anonymized' => (bool) ($this->is_anonymized || ($this->user?->anonymized_at !== null)),
+            'is_active' => $isActive,
+            'active' => $isActive,
+            'is_anonymized' => $isAnonymized,
             'anonymized_at' => $this->user?->anonymized_at?->toIso8601String(),
+            'can_delete' => $canDelete,
+            'cannot_delete_reason' => $cannotDeleteReason,
 
             'internal_number' => $isAnonymized ? '---' : ($this->internal_number ?? ''),
             'email' => $isAnonymized ? 'anonimizado@sistema.local' : ($this->user?->email ?? ''),
