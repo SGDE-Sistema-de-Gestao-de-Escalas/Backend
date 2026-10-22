@@ -23,6 +23,7 @@ class ActivityTypeFactory extends Factory
             'name' => fake()->unique()->words(2, true),
             'color' => '#6B7280',
             'is_system' => false,
+            'is_fallback' => false,
             'active' => true,
         ];
     }

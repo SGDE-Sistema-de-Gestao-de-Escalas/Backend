@@ -23,6 +23,7 @@ class ActivityTypeResource extends JsonResource
             'name' => $this->name,
             'color' => $this->color,
             'is_system' => $this->is_system,
+            'is_fallback' => (bool) $this->is_fallback,
             'active' => $this->active,
             'status_message' => $this->active ? 'Atividade ativa' : 'Atividade inativa',
             'can_delete' => $deletionBlockReason === null,

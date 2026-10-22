@@ -13,7 +13,16 @@ class StoreScheduleRuleRequest extends ScheduleRuleRequest
         $schoolId = $this->attributes->get('school_id');
 
         $rules = [
-            'activity_type_id' => ['required', 'uuid', Rule::exists('activity_types', 'id')->where('school_id', $schoolId)->where('active', true)],
+            'activity_type_id' => [
+                'required',
+                'uuid',
+                Rule::exists('activity_types', 'id')
+                    ->where('school_id', $schoolId)
+                    ->where('active', true)
+                    ->where(function ($query) {
+                        $query->where('is_fallback', false)->orWhereNull('is_fallback');
+                    }),
+            ],
             'period_start' => ['required', 'date_format:H:i'],
             'period_end' => ['required', 'date_format:H:i'],
             'min' => ['required', 'integer', 'min:1', 'max:4294967295'],

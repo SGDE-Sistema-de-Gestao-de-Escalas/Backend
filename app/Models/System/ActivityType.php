@@ -19,6 +19,7 @@ class ActivityType extends Model
         'name',
         'color',
         'is_system',
+        'is_fallback',
         'active',
     ];
 
@@ -31,6 +32,7 @@ class ActivityType extends Model
     {
         return [
             'is_system' => 'boolean',
+            'is_fallback' => 'boolean',
             'active' => 'boolean',
         ];
     }

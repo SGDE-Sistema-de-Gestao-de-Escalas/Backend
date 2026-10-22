@@ -54,6 +54,9 @@ class ScheduleRuleAllocationService
         if (! $rule->activityType?->active || $rule->activityType->school_id !== $rule->school_id) {
             throw ValidationException::withMessages(['activity_type_id' => 'A atividade não está disponível nesta escola.']);
         }
+        if ($rule->activityType->is_fallback) {
+            throw ValidationException::withMessages(['activity_type_id' => 'A atividade base de preenchimento automático não pode ser usada em regras de horário.']);
+        }
         $start = substr($rule->period_start, 0, 5);
         $end = substr($rule->period_end, 0, 5);
         if ($rule->min < 1 || $end <= $start) {
