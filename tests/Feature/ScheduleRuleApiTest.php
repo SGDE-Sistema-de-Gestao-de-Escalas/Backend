@@ -342,4 +342,38 @@ class ScheduleRuleApiTest extends TestCase
             ->assertJsonPath('data.days_of_week', $this->payload['days_of_week'])
             ->assertJsonMissingPath('data.substitute_assistant_id');
     }
+
+    public function test_fallback_activity_type_cannot_be_used_in_schedule_rules_or_deactivated(): void
+    {
+        $fallback = ActivityType::create([
+            'school_id' => $this->school->id,
+            'name' => 'Apoio Escola',
+            'color' => '#6366F1',
+            'is_system' => true,
+            'is_fallback' => true,
+            'active' => true,
+        ]);
+
+        $this->postJson('/api/schedule-rules', array_replace($this->payload, [
+            'activity_type_id' => $fallback->id,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('activity_type_id');
+
+        $ruleId = $this->createRule();
+        $this->patchJson('/api/schedule-rules/'.$ruleId, [
+            'activity_type_id' => $fallback->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors('activity_type_id');
+
+        $this->putJson('/api/activity-types/'.$fallback->id, [
+            'active' => false,
+        ])->assertUnprocessable()->assertJsonValidationErrors('active');
+
+        $this->putJson('/api/activity-types/'.$fallback->id, [
+            'name' => 'Apoio Geral Escola',
+            'color' => '#3B82F6',
+        ])->assertOk()
+            ->assertJsonPath('data.name', 'Apoio Geral Escola')
+            ->assertJsonPath('data.is_fallback', true)
+            ->assertJsonPath('data.active', true)
+            ->assertJsonPath('data.can_delete', false);
+    }
 }

@@ -46,4 +46,17 @@ class UpdateActivityTypeRequest extends FormRequest
             'color.regex' => 'A cor deve estar no formato #RRGGBB.',
         ];
     }
+
+    public function after(): array
+    {
+        return [function ($validator) {
+            $activityType = $this->route('activity_type');
+            if ($activityType?->is_fallback && $this->has('active') && ! $this->boolean('active')) {
+                $validator->errors()->add(
+                    'active',
+                    'A atividade base de preenchimento automático tem de permanecer sempre ativa.'
+                );
+            }
+        }];
+    }
 }

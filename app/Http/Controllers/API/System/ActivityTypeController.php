@@ -32,6 +32,7 @@ class ActivityTypeController extends Controller
 
         $activityTypes = ActivityType::withCount(ActivityTypeService::blockingCounts())
             ->when($schoolId, fn ($query) => $query->where('school_id', $schoolId))
+            ->orderByDesc('is_fallback')
             ->orderBy('name')
             ->get();
 

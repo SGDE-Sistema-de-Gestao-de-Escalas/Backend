@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Schedules\ScheduleRule;
+use App\Models\System\ActivityType;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,7 @@ class ScheduleRuleService
         $data = $this->normalizeDays($data);
 
         return DB::transaction(function () use ($data, $schoolId) {
+            $this->validateActivityType($data['activity_type_id'], $schoolId);
             $this->validateSelection($data['type'], (int) $data['min'], $data['assistant_ids']);
             $this->validateValidity($data['valid_from'], $data['valid_until'] ?? null);
             $rule = ScheduleRule::create(Arr::except($data, ['assistant_ids', 'school_id']) + ['school_id' => $schoolId]);
@@ -30,6 +32,7 @@ class ScheduleRuleService
         return DB::transaction(function () use ($rule, $data) {
             $rule = ScheduleRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
             $rule->fill(Arr::except($data, ['assistant_ids', 'school_id']));
+            $this->validateActivityType($rule->activity_type_id, $rule->school_id);
             // Recheck against the locked version when concurrent edits change the selection.
             $ids = $data['assistant_ids'] ?? $rule->assistants()->pluck('assistants.id')->all();
             $this->validateSelection($rule->type, $rule->min, $ids);
@@ -44,6 +47,20 @@ class ScheduleRuleService
 
             return $rule->load('assistants.user');
         });
+    }
+
+    private function validateActivityType(string $activityTypeId, string $schoolId): void
+    {
+        $activityType = ActivityType::whereKey($activityTypeId)
+            ->where('school_id', $schoolId)
+            ->where('active', true)
+            ->first();
+
+        if (! $activityType || $activityType->is_fallback) {
+            throw ValidationException::withMessages([
+                'activity_type_id' => 'A atividade base de preenchimento automático (ou inativa) não pode ser associada a regras de horário.',
+            ]);
+        }
     }
 
     private function validateValidity(string $from, ?string $until): void
