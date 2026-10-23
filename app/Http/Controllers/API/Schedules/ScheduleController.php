@@ -264,8 +264,10 @@ class ScheduleController extends Controller
         }
 
         $validated = $request->validate([
-            'start_date' => ['required', 'date_format:Y-m-d'],
+            'start_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+        ], [
+            'start_date.after_or_equal' => 'Não é permitido publicar escalas de dias passados.',
         ]);
 
         $count = $this->generationService->publish(
