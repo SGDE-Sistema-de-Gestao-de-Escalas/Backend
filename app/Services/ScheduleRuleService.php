@@ -84,9 +84,15 @@ class ScheduleRuleService
     {
         $required = $min;
 
-        return count($ids) === $required ? [] : [
-            'assistant_ids' => "Selecione exatamente {$required} assistentes para este tipo de regra e mínimo.",
-        ];
+        if (count($ids) < $required) {
+            $plural = $required === 1 ? 'assistente' : 'assistentes';
+
+            return [
+                'assistant_ids' => "Selecione pelo menos {$required} {$plural} para cumprir a dotação mínima da regra.",
+            ];
+        }
+
+        return [];
     }
 
     private function validateSelection(string $type, int $min, array $ids): void
