@@ -13,6 +13,8 @@ use App\Models\Schedules\Schedule;
 use App\Services\ScheduleGenerationService;
 use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
+use Carbon\CarbonImmutable;
+use App\Models\Schedules\ScheduleEntry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -142,6 +144,105 @@ class ScheduleController extends Controller
         );
 
         return response()->json($result, 200);
+    }
+
+    /**
+     * Guarda manualmente alterações ou criação de escalas diárias na base de dados.
+     * POST /api/schedules/save-days
+     */
+    public function saveDays(Request $request): JsonResponse
+    {
+        $schoolId = (string) ($request->attributes->get('currentSchoolId') ?? $request->header('X-School-ID'));
+        if ($schoolId === '') {
+            return response()->json([
+                'message' => 'O cabeçalho X-School-ID é obrigatório para guardar escalas.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'days' => ['required', 'array'],
+            'days.*.date' => ['required', 'date_format:Y-m-d'],
+            'days.*.entries' => ['present', 'array'],
+            'days.*.entries.*.assistant_id' => ['required'],
+            'days.*.entries.*.activity_type_id' => ['nullable'],
+            'days.*.entries.*.activity_name' => ['nullable', 'string', 'max:150'],
+            'days.*.entries.*.schedule_rule_id' => ['nullable'],
+            'days.*.entries.*.start_time' => ['required', 'string'],
+            'days.*.entries.*.end_time' => ['required', 'string'],
+            'days.*.entries.*.is_locked' => ['nullable', 'boolean'],
+        ]);
+
+        $now = now();
+        $savedDaysCount = 0;
+
+        foreach ($validated['days'] as $dayData) {
+            $date = $dayData['date'];
+            $carbonDate = CarbonImmutable::parse($date);
+            $weekStart = $carbonDate->startOfWeek()->toDateString();
+            $weekEnd = $carbonDate->endOfWeek()->toDateString();
+
+            // Agrupar entradas por assistente
+            $entriesByAssistant = [];
+            foreach ($dayData['entries'] as $entry) {
+                $aid = (string) $entry['assistant_id'];
+                $entriesByAssistant[$aid][] = $entry;
+            }
+
+            // Identificar todos os assistentes relevantes
+            $existingScheduleIds = Schedule::query()
+                ->where('school_id', $schoolId)
+                ->where('week_start', $weekStart)
+                ->pluck('id', 'assistant_id')
+                ->all();
+
+            $allAssistantIds = array_unique(array_merge(
+                array_keys($entriesByAssistant),
+                array_keys($existingScheduleIds)
+            ));
+
+            foreach ($allAssistantIds as $assistantId) {
+                $schedule = Schedule::firstOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'assistant_id' => $assistantId,
+                        'week_start' => $weekStart,
+                        'week_end' => $weekEnd,
+                    ],
+                    [
+                        'status' => 'draft',
+                        'generated_at' => $now,
+                    ]
+                );
+
+                // Remover entradas antigas desta data para este assistente
+                ScheduleEntry::where('schedule_id', $schedule->id)
+                    ->where('date', $date)
+                    ->delete();
+
+                // Inserir as novas entradas
+                if (! empty($entriesByAssistant[$assistantId])) {
+                    foreach ($entriesByAssistant[$assistantId] as $entry) {
+                        ScheduleEntry::create([
+                            'schedule_id' => $schedule->id,
+                            'activity_type_id' => $entry['activity_type_id'] ?? null,
+                            'activity_name' => $entry['activity_name'] ?? 'Atividade',
+                            'schedule_rule_id' => $entry['schedule_rule_id'] ?? null,
+                            'date' => $date,
+                            'start_time' => substr($entry['start_time'], 0, 5),
+                            'end_time' => substr($entry['end_time'], 0, 5),
+                            'is_locked' => (bool) ($entry['is_locked'] ?? false),
+                        ]);
+                    }
+                }
+            }
+
+            $savedDaysCount++;
+        }
+
+        return response()->json([
+            'message' => 'Escalas guardadas com sucesso na base de dados.',
+            'saved_days' => $savedDaysCount,
+        ], 200);
     }
 
     /**

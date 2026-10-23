@@ -141,6 +141,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('schedules.generate');
         Route::post('/schedules/publish', [ScheduleController::class, 'publish'])
             ->name('schedules.publish');
+        Route::post('/schedules/save-days', [ScheduleController::class, 'saveDays'])
+            ->name('schedules.save-days');
         Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
             ->name('schedules.pending-recalculations');
     });
