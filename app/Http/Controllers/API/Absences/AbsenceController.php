@@ -8,6 +8,7 @@ use App\Http\Requests\Absences\UpdateAbsenceRequest;
 use App\Http\Resources\AbsenceResource;
 use App\Models\Absences\Absence;
 use App\Services\AbsenceService;
+use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -18,7 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class AbsenceController extends Controller
 {
     public function __construct(
-        private readonly AbsenceService $absenceService
+        private readonly AbsenceService $absenceService,
+        private readonly ScheduleIntegrityService $scheduleIntegrityService,
     ) {}
 
     /**
@@ -149,18 +151,37 @@ class AbsenceController extends Controller
 
         $absence = $this->absenceService->create($validated, $document, $request->user());
 
+        $schoolId = $absence->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->user()?->school_id;
+
+        $impact = null;
+        if ($schoolId && $absence->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $absence->valid_from->format('Y-m-d'),
+                endDate: $absence->valid_until?->format('Y-m-d'),
+                eventType: 'absence',
+                assistantId: $absence->assistant_id
+            );
+        }
+
         $missingDocument = (bool) ($absence->absenceType?->requires_document ?? false) && empty($absence->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
             : null;
 
-        return (new AbsenceResource($absence))
+        $responseResource = (new AbsenceResource($absence))
             ->additional([
                 'message' => $missingDocument
                     ? 'Ausência registada com sucesso. Atenção: falta anexar o documento comprovativo.'
                     : 'Ausência registada com sucesso.',
                 'warning' => $warning,
-            ])
+                'impact' => $impact,
+            ]);
+
+        return $responseResource
             ->response()
             ->setStatusCode(201);
     }
@@ -189,6 +210,22 @@ class AbsenceController extends Controller
 
         $updated = $this->absenceService->update($absence, $validated, $document, $request->user());
 
+        $schoolId = $updated->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->user()?->school_id;
+
+        $impact = null;
+        if ($schoolId && $updated->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $updated->valid_from->format('Y-m-d'),
+                endDate: $updated->valid_until?->format('Y-m-d'),
+                eventType: 'absence',
+                assistantId: $updated->assistant_id
+            );
+        }
+
         $missingDocument = (bool) ($updated->absenceType?->requires_document ?? false) && empty($updated->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
@@ -200,6 +237,7 @@ class AbsenceController extends Controller
                     ? 'Ausência atualizada com sucesso. Atenção: falta anexar o documento comprovativo.'
                     : 'Ausência atualizada com sucesso.',
                 'warning' => $warning,
+                'impact' => $impact,
             ]);
     }
 

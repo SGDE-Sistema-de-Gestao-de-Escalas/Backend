@@ -140,6 +140,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('schedules.generate');
         Route::post('/schedules/publish', [ScheduleController::class, 'publish'])
             ->name('schedules.publish');
+        Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
+            ->name('schedules.pending-recalculations');
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.

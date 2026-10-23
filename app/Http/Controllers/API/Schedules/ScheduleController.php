@@ -11,6 +11,7 @@ use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
 use App\Services\ScheduleGenerationService;
+use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -19,6 +20,7 @@ class ScheduleController extends Controller
 {
     public function __construct(
         private readonly ScheduleGenerationService $generationService,
+        private readonly ScheduleIntegrityService $integrityService,
     ) {}
 
     /**
@@ -66,6 +68,33 @@ class ScheduleController extends Controller
         return ScheduleResource::collection(
             $query->orderBy('week_start')->paginate((int) $request->query('per_page', 50))
         );
+    }
+
+    /**
+     * Devolve dias com escalas geradas que têm quebra de integridade/regras e requerem recálculo.
+     */
+    public function pendingRecalculations(Request $request): JsonResponse
+    {
+        $schoolId = (string) (
+            $request->attributes->get('school_id')
+            ?? $request->attributes->get('currentSchoolId')
+            ?? $request->header('X-School-ID')
+            ?? $request->user()?->school_id
+            ?? $request->user()?->assistant?->school_id
+        );
+
+        if ($schoolId === '') {
+            return response()->json([
+                'has_pending' => false,
+                'affected_dates' => [],
+                'conflicts' => [],
+                'summary' => 'Nenhuma escola selecionada.',
+            ]);
+        }
+
+        $result = $this->integrityService->getPendingRecalculations($schoolId);
+
+        return response()->json($result);
     }
 
     /**
