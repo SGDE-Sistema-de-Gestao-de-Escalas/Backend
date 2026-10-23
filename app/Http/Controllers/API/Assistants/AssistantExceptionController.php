@@ -38,12 +38,18 @@ class AssistantExceptionController extends Controller
             $assistant = $user->assistant;
             $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
         } else {
-            $query->when($schoolId, function ($q) use ($schoolId) {
-                $q->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId));
-            })
-            ->when($assistantId, function ($q) use ($assistantId) {
-                $q->where('assistant_id', $assistantId);
-            });
+            $assistantIds = $request->query('assistant_ids');
+            if ($assistantId) {
+                $query->where('assistant_id', $assistantId);
+            } elseif ($assistantIds) {
+                $ids = is_array($assistantIds) ? $assistantIds : explode(',', (string) $assistantIds);
+                $query->whereIn('assistant_id', $ids);
+            } elseif ($schoolId) {
+                $query->where(function ($q) use ($schoolId) {
+                    $q->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId))
+                      ->orWhereHas('assistant.assistantTemporaryAssignments', fn ($tq) => $tq->where('destination_school_id', $schoolId));
+                });
+            }
         }
 
         $exceptions = $query->orderByDesc('valid_from')->get();

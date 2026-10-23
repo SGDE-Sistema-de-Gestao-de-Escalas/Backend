@@ -27,11 +27,12 @@ class ScheduleIntegrityService
     public function getPendingRecalculations(string $schoolId): array
     {
         $today = CarbonImmutable::today()->toDateString();
+        $horizon = CarbonImmutable::today()->addDays(30)->toDateString();
 
-        // 1. Obter todas as datas >= hoje que têm entradas de escala geradas para esta escola
+        // 1. Obter todas as datas futuras relevantes (horizonte de 30 dias) com entradas de escala geradas para esta escola
         $datesWithSchedules = ScheduleEntry::query()
             ->whereHas('schedule', fn ($q) => $q->where('school_id', $schoolId))
-            ->where('date', '>=', $today)
+            ->whereBetween('date', [$today, $horizon])
             ->distinct()
             ->orderBy('date')
             ->pluck('date')
