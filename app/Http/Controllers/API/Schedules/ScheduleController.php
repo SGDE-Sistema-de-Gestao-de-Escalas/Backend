@@ -214,6 +214,12 @@ class ScheduleController extends Controller
                     ]
                 );
 
+                // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
+                if ($schedule->status !== 'draft') {
+                    $schedule->status = 'draft';
+                    $schedule->save();
+                }
+
                 // Remover entradas antigas desta data para este assistente
                 ScheduleEntry::where('schedule_id', $schedule->id)
                     ->where('date', $date)
