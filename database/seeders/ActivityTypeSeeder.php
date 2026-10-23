@@ -21,7 +21,7 @@ class ActivityTypeSeeder extends Seeder
         ['name' => 'Acolhimento', 'color' => '#F59E0B', 'is_fallback' => false],
         ['name' => 'Apoio Turmas/escola', 'color' => '#3B82F6', 'is_fallback' => false],
         ['name' => 'Intervalo', 'color' => '#10B981', 'is_fallback' => false],
-        ['name' => 'Vigilância almoço', 'color' => '#EF4444', 'is_fallback' => false],
+        ['name' => 'Vigilância almoço', 'color' => '#A855F7', 'is_fallback' => false],
         ['name' => 'Limpeza', 'color' => '#8B5CF6', 'is_fallback' => false],
         ['name' => 'Entrega de alunos', 'color' => '#14B8A6', 'is_fallback' => false],
     ];

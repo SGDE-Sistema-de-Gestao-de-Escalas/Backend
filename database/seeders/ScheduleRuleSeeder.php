@@ -206,7 +206,7 @@ class ScheduleRuleSeeder extends Seeder
         $colors = [
             'Acolhimento' => '#F59E0B',
             'Intervalo' => '#10B981',
-            'Vigilância almoço' => '#EF4444',
+            'Vigilância almoço' => '#A855F7',
             'Limpeza' => '#8B5CF6',
             'Entrega de alunos' => '#14B8A6',
         ];
