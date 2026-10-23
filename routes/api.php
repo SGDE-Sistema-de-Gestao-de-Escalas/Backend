@@ -136,6 +136,10 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);
         Route::apiResource('schedule-rules', ScheduleRuleController::class);
+        Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
+            ->name('schedules.generate');
+        Route::post('/schedules/publish', [ScheduleController::class, 'publish'])
+            ->name('schedules.publish');
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
