@@ -134,6 +134,7 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->withTrashed(['show', 'update', 'destroy']);
         Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
         Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
+        Route::apiResource('assistant-temporary-assignments', \App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class);
         Route::apiResource('activity-types', ActivityTypeController::class);
         Route::apiResource('schedule-rules', ScheduleRuleController::class);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])

@@ -34,6 +34,7 @@ class ScheduleController extends Controller
         $query = Schedule::query()
             ->with([
                 'assistant.user',
+                'assistant.school',
                 'scheduleEntries.activityType',
                 'scheduleEntries.scheduleRule',
                 'scheduleEntries.replacedAssistant.user',
@@ -187,6 +188,7 @@ class ScheduleController extends Controller
     {
         $schedule->load([
             'assistant.user',
+            'assistant.school',
             'scheduleEntries.activityType',
             'scheduleEntries.scheduleRule',
             'scheduleEntries.replacedAssistant.user',
