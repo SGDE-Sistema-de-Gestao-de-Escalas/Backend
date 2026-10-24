@@ -46,6 +46,7 @@ class UserResource extends JsonResource
             },
             'assistant_id' => $this->assistant?->id,
             'school_id' => $this->assistant?->school_id,
+            'school_name' => $this->assistant?->school?->name,
             'role' => $this->whenLoaded('role', function () {
                 return $this->role->slug;
             }),
