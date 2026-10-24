@@ -15,9 +15,9 @@ class StoreAbsenceRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $user = $this->user();
-        if ($user && $user->isStaff() && empty($this->assistant_id)) {
+        if ($user && $user->isStaff()) {
             $this->merge([
-                "assistant_id" => $user->assistant?->id,
+                'assistant_id' => $user->assistant?->id ?? $this->assistant_id,
             ]);
         }
     }

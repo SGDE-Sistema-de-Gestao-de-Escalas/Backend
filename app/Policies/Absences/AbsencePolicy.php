@@ -20,8 +20,12 @@ class AbsencePolicy
      */
     public function view(User $user, Absence $absence): bool
     {
+        if ($user->isAdmin()) {
+            return true;
+        }
         $userAstId = $user->assistant?->id;
-        return $user->isAdmin() || ($absence->assistant?->user_id === $user->id) || ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
+        return ($absence->assistant?->user_id === $user->id) ||
+               ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
     }
 
     /**
@@ -39,7 +43,12 @@ class AbsencePolicy
      */
     public function update(User $user, Absence $absence): bool
     {
-        return $user->isAdmin() || $absence->assistant?->user_id === $user->id;
+        if ($user->isAdmin()) {
+            return true;
+        }
+        $userAstId = $user->assistant?->id;
+        return ($absence->assistant?->user_id === $user->id) ||
+               ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
     }
 
     /**
