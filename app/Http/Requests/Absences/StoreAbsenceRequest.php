@@ -14,7 +14,13 @@ class StoreAbsenceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() ?? false;
+        $user = $this->user();
+        if (! $user) return false;
+        if ($user->isAdmin()) return true;
+        if ($user->isStaff()) {
+            return (string) $this->assistant_id === (string) $user->assistant_id;
+        }
+        return false;
     }
 
     /**
