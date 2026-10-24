@@ -20,7 +20,8 @@ class AbsencePolicy
      */
     public function view(User $user, Absence $absence): bool
     {
-        return $user->isAdmin() || $absence->assistant?->user_id === $user->id;
+        $userAstId = $user->assistant?->id;
+        return $user->isAdmin() || ($absence->assistant?->user_id === $user->id) || ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
     }
 
     /**

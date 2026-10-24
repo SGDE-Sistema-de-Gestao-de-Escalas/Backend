@@ -25,7 +25,12 @@ class UpdateAbsenceRequest extends FormRequest
 
         $absence = $this->route('absence');
 
-        return $absence && $absence->assistant?->user_id === $user->id;
+        if (is_string($absence)) {
+            $absence = \App\Models\Absences\Absence::find($absence);
+        }
+        if (! $absence) return false;
+        $userAstId = $user->assistant?->id;
+        return ($absence->assistant?->user_id === $user->id) || ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
     }
 
     /**
