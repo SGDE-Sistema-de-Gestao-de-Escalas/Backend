@@ -121,6 +121,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         ->name('absences.document');
     Route::post('/absences/{absence}/document', [AbsenceController::class, 'update'])
         ->name('absences.document.upload');
+    Route::patch('/absences/{absence}/status', [AbsenceController::class, 'update'])
+        ->name('absences.status');
     Route::apiResource('absences', AbsenceController::class);
 
     // Recursos acessíveis para consulta de horários e assistência por Staff (com escrita restrita a Admin)
