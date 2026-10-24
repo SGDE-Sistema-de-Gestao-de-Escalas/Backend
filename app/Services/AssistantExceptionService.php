@@ -133,9 +133,10 @@ class AssistantExceptionService
         }
 
         $validFrom = Carbon::parse($data['valid_from'])->startOfDay();
-        $validUntil = ! empty($data['valid_until'])
+        $hasValidUntil = ! empty($data['valid_until']);
+        $validUntil = $hasValidUntil
             ? Carbon::parse($data['valid_until'])->startOfDay()
-            : $validFrom;
+            : $validFrom->copy()->addDays(60);
 
         // Limita a verificação a um intervalo de no máximo 366 dias para desempenho
         $checkUntil = $validUntil->diffInDays($validFrom) > 366
