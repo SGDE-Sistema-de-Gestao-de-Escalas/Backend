@@ -82,16 +82,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::apiResource('holidays', HolidayController::class);
 
     // Restringe as restantes operações de gestão aos administradores.
+    // Escolas e tipos de ausência (leitura permitida a Staff para o seu perfil e justificações)
+    Route::apiResource('schools', SchoolController::class);
+    Route::apiResource('absence-types', AbsenceTypeController::class);
+
+    // Restringe as restantes operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
-        Route::apiResource('schools', SchoolController::class);
         Route::get('/assistants/{assistant}/can-anonymize', [AssistantController::class, 'canAnonymize'])
             ->withTrashed()
             ->name('assistants.can-anonymize');
         Route::post('/assistants/{assistant}/anonymize', [AssistantController::class, 'anonymize'])
             ->withTrashed()
             ->name('assistants.anonymize');
-        Route::apiResource('absence-types', AbsenceTypeController::class);
     });
 });
 
@@ -120,6 +123,14 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         ->name('absences.document.upload');
     Route::apiResource('absences', AbsenceController::class);
 
+    // Recursos acessíveis para consulta de horários e assistência por Staff (com escrita restrita a Admin)
+    Route::apiResource('activity-types', ActivityTypeController::class);
+    Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
+    Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
+    Route::apiResource('schedule-rules', ScheduleRuleController::class);
+    Route::apiResource('assistants', AssistantController::class)
+        ->withTrashed(['show', 'update', 'destroy']);
+
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         // Importação e exportação em CSV. Têm de vir antes do apiResource,
@@ -130,13 +141,7 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('assistants.import');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
-        Route::apiResource('assistants', AssistantController::class)
-            ->withTrashed(['show', 'update', 'destroy']);
-        Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
-        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
         Route::apiResource('assistant-temporary-assignments', \App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class);
-        Route::apiResource('activity-types', ActivityTypeController::class);
-        Route::apiResource('schedule-rules', ScheduleRuleController::class);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
             ->name('schedules.generate');
         Route::post('/schedules/publish', [ScheduleController::class, 'publish'])

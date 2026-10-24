@@ -26,9 +26,13 @@ class AssistantScheduleProfileController extends Controller
         $schoolId = $request->header('X-School-ID') ?? $request->attributes->get('currentSchoolId');
         $assistantId = $request->query('assistant_id');
         $assistantIds = $request->query('assistant_ids');
+        $user = $request->user();
         $query = AssistantScheduleProfile::with(['shifts.shiftDays']);
 
-        if ($assistantId) {
+        if ($user && ! $user->isAdmin()) {
+            $assistant = $user->assistant;
+            $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($assistantId) {
             $query->where('assistant_id', $assistantId);
         } elseif ($assistantIds) {
             $ids = is_array($assistantIds) ? $assistantIds : explode(',', (string) $assistantIds);
