@@ -16,6 +16,7 @@ use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
 use App\Http\Controllers\API\Assistants\AssistantExceptionController;
 use App\Http\Controllers\API\Auth\PrivacyController;
+use App\Http\Controllers\API\Dashboard\DashboardBootstrapController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -114,6 +115,9 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         ->parameters(['operating-exceptions' => 'operating_exception']);
     Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
         ->name('operating-calendar.index');
+
+    Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
+        ->name('dashboard.bootstrap');
 
     // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
     // Permissões via AbsencePolicy e FormRequests.
