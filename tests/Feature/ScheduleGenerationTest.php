@@ -639,4 +639,229 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonPath('conflicts.0.transfer_candidates.0.causes_origin_shortfall', false)
             ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96);
     }
+
+    public function test_idempotency_key_reused_with_other_range_generates_fresh_schedule(): void
+    {
+        $this->createAssistantWithShift(
+            name: 'Assistente Alfa',
+            internalNumber: 'A100',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00'
+        );
+
+        $idempotencyKey = 'idemp-test-' . Str::random(10);
+
+        // 1. Pedido para 02 Nov
+        $resp1 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp1->assertStatus(200)
+            ->assertJsonPath('start_date', '2026-11-02')
+            ->assertJsonPath('end_date', '2026-11-02');
+
+        // 2. Pedido para 09 a 13 Nov com a MESMA chave de idempotência
+        $resp2 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-09',
+                'end_date' => '2026-11-13',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp2->assertStatus(200)
+            ->assertJsonPath('start_date', '2026-11-09')
+            ->assertJsonPath('end_date', '2026-11-13');
+    }
+
+    public function test_idempotency_key_does_not_hide_changed_data(): void
+    {
+        $a1 = $this->createAssistantWithShift(
+            name: 'Assistente Falta',
+            internalNumber: 'A200',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            lunchEnabled: false,
+            days: [0]
+        );
+
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id,
+            'activity_type_id' => $this->portaria->id,
+            'period_start' => '08:00',
+            'period_end' => '10:00',
+            'min' => 1,
+            'type' => 'mandatory',
+            'valid_from' => '2026-01-01',
+            'valid_until' => null,
+            'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach($a1->id, ['priority' => 1]);
+
+        $idempotencyKey = 'idemp-test-absence-' . Str::random(10);
+
+        // 1. Gerar escala sem faltas
+        $resp1 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp1->assertStatus(200)
+            ->assertJsonPath('entries_count', 2);
+
+        // 2. Registar uma falta para este assistente no mesmo dia
+        $absenceType = \App\Models\Absences\AbsenceType::firstOrCreate(
+            ['name' => 'Doença'],
+            ['code' => 'DOENCA', 'requires_document' => false, 'active' => true]
+        );
+
+        Absence::create([
+            'assistant_id' => $a1->id,
+            'absence_type_id' => $absenceType->id,
+            'valid_from' => '2026-11-02',
+            'valid_until' => '2026-11-02',
+            'status' => 'justified',
+            'total_days' => 1,
+        ]);
+
+        // 3. Voltar a gerar para o mesmo dia com a MESMA chave de idempotência
+        $resp2 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        // Sem o nosso fix, a cache devolvia a escala antiga (entries_count = 2).
+        // Com o fix, a versão dos dados mudou, logo calcula de fresco e entries_count é 0 (assistente faltou).
+        $resp2->assertStatus(200)
+            ->assertJsonPath('entries_count', 0);
+    }
+
+    public function test_idempotency_returns_cached_response_when_identical_retry(): void
+    {
+        $assistant = $this->createAssistantWithShift(
+            name: 'Assistente Idemp',
+            internalNumber: 'I100',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            days: [0]
+        );
+
+        $idempotencyKey = 'identical-retry-' . Str::random(10);
+
+        $resp1 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp1->assertStatus(200);
+
+        // Segundo pedido exatamente igual (retry legítimo)
+        $resp2 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp2->assertStatus(200);
+        $this->assertSame($resp1->json('generated_at'), $resp2->json('generated_at'));
+        $this->assertSame($resp1->json('entries_count'), $resp2->json('entries_count'));
+    }
+
+    public function test_idempotency_key_does_not_hide_changed_assistant_exception(): void
+    {
+        $assistant = $this->createAssistantWithShift(
+            name: 'Assistente Excecao',
+            internalNumber: 'E200',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            days: [0]
+        );
+
+        $idempotencyKey = 'idemp-exception-' . Str::random(10);
+
+        $resp1 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        $resp1->assertStatus(200);
+
+        // Criar uma exceção de horário que altera a entrada para as 09:00
+        \App\Models\Assistants\AssistantException::create([
+            'assistant_id' => $assistant->id,
+            'type' => 'specific_dates',
+            'valid_from' => '2026-11-02',
+            'valid_until' => '2026-11-02',
+            'entry_time' => '09:00:00',
+            'exit_time' => '16:00:00',
+        ]);
+
+        // Gerar de novo com a mesma chave: não deve devolver a cache de 08:00!
+        $resp2 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+        $resp2->assertStatus(200);
+        // O hash mudou, logo gerou uma nova resposta com timestamp diferente
+        $this->assertNotSame($resp1->json('generated_at'), $resp2->json('generated_at'));
+    }
+
+    public function test_idempotency_respects_preserve_locked_flag_change(): void
+    {
+        $assistant = $this->createAssistantWithShift(
+            name: 'Assistente Locked',
+            internalNumber: 'L300',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            days: [0]
+        );
+
+        $idempotencyKey = 'idemp-locked-' . Str::random(10);
+
+        // 1. Gerar com preserve_locked = true
+        $resp1 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'preserve_locked' => true,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        $resp1->assertStatus(200);
+
+        // 2. Gerar com a mesma chave mas preserve_locked = false
+        $resp2 = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'preserve_locked' => false,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        $resp2->assertStatus(200);
+
+        // Não deve devolver o cache do primeiro porque o preserve_locked é diferente
+        $this->assertNotSame($resp1->json('generated_at'), $resp2->json('generated_at'));
+    }
 }

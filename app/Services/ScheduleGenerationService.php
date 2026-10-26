@@ -38,8 +38,12 @@ class ScheduleGenerationService
         bool $preserveLocked = true,
         ?string $idempotencyKey = null
     ): array {
+        $cacheKey = null;
         if ($idempotencyKey !== null && $idempotencyKey !== '') {
-            $cacheKey = "schedule_gen:{$schoolId}:{$idempotencyKey}";
+            $versionHash = $this->computeVersionHash($schoolId, $startDate, $endDate, $preserveLocked);
+            $lockedFlag = $preserveLocked ? '1' : '0';
+            $payloadHash = hash('sha256', "{$idempotencyKey}:{$startDate}:{$endDate}:{$lockedFlag}:{$versionHash}");
+            $cacheKey = "schedule_gen:{$schoolId}:{$payloadHash}";
             if (Cache::has($cacheKey)) {
                 return Cache::get($cacheKey);
             }
@@ -598,6 +602,7 @@ class ScheduleGenerationService
             'school_id' => $schoolId,
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'generated_at' => now()->format('Y-m-d\TH:i:s.u\Z'),
             'days' => $daysSummary,
             'schedules_count' => count($persistedSchedules),
             'entries_count' => collect($plannedEntriesByDate)->flatten(1)->count(),
@@ -612,8 +617,8 @@ class ScheduleGenerationService
             'audit_log' => $auditLog,
         ];
 
-        if ($idempotencyKey !== null && $idempotencyKey !== '') {
-            Cache::put("schedule_gen:{$schoolId}:{$idempotencyKey}", $response, now()->addMinutes(10));
+        if ($cacheKey !== null) {
+            Cache::put($cacheKey, $response, now()->addMinutes(2));
         }
 
         return $response;
@@ -778,26 +783,83 @@ class ScheduleGenerationService
         ];
     }
 
-    private function computeVersionHash(string $schoolId, string $startDate, string $endDate): string
-    {
-        $maxRuleUpdate = (string) ScheduleRule::where('school_id', $schoolId)->max('updated_at');
-        $maxAbsenceUpdate = (string) Absence::whereHas('assistant', fn ($q) => $q->where('school_id', $schoolId))
+    public function computeVersionHash(
+        string $schoolId,
+        string $startDate,
+        string $endDate,
+        bool $preserveLocked = true
+    ): string {
+        $ruleData = ScheduleRule::where('school_id', $schoolId)
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $ruleSig = $ruleData ? "{$ruleData->total}:{$ruleData->max_up}" : '0:none';
+
+        $absenceData = Absence::withTrashed()
+            ->whereHas('assistant', fn ($q) => $q->withTrashed()->where('school_id', $schoolId))
             ->whereDate('valid_from', '<=', $endDate)
-            ->max('updated_at');
-        $maxExceptionUpdate = (string) AssistantException::whereHas('assistant', fn ($q) => $q->where('school_id', $schoolId))
+            ->where(function ($q) use ($startDate) {
+                $q->whereNull('valid_until')
+                    ->orWhereDate('valid_until', '>=', $startDate);
+            })
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $absenceSig = $absenceData ? "{$absenceData->total}:{$absenceData->max_up}" : '0:none';
+
+        $exceptionData = AssistantException::withTrashed()
+            ->whereHas('assistant', fn ($q) => $q->withTrashed()->where('school_id', $schoolId))
             ->whereDate('valid_from', '<=', $endDate)
-            ->max('updated_at');
-        $maxProfileUpdate = (string) AssistantScheduleProfile::whereHas('assistant', fn ($q) => $q->where('school_id', $schoolId))
-            ->max('updated_at');
+            ->where(function ($q) use ($startDate) {
+                $q->whereNull('valid_until')
+                    ->orWhereDate('valid_until', '>=', $startDate);
+            })
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $exceptionSig = $exceptionData ? "{$exceptionData->total}:{$exceptionData->max_up}" : '0:none';
+
+        $profileData = AssistantScheduleProfile::whereHas('assistant', fn ($q) => $q->withTrashed()->where('school_id', $schoolId))
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $profileSig = $profileData ? "{$profileData->total}:{$profileData->max_up}" : '0:none';
+
+        $assistantData = Assistant::withTrashed()
+            ->where('school_id', $schoolId)
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $assistantSig = $assistantData ? "{$assistantData->total}:{$assistantData->max_up}" : '0:none';
+
+        $transferData = AssistantTemporaryAssignments::where(function ($q) use ($schoolId) {
+                $q->where('destination_school_id', $schoolId)
+                    ->orWhere('origin_school_id', $schoolId);
+            })
+            ->whereDate('valid_from', '<=', $endDate)
+            ->whereDate('valid_until', '>=', $startDate)
+            ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+            ->first();
+        $transferSig = $transferData ? "{$transferData->total}:{$transferData->max_up}" : '0:none';
+
+        $lockedSig = '0';
+        if ($preserveLocked) {
+            $lockedData = ScheduleEntry::whereHas('schedule', fn ($q) => $q->where('school_id', $schoolId))
+                ->where('is_locked', true)
+                ->whereDate('date', '>=', $startDate)
+                ->whereDate('date', '<=', $endDate)
+                ->selectRaw('COUNT(*) as total, MAX(updated_at) as max_up')
+                ->first();
+            $lockedSig = $lockedData ? "{$lockedData->total}:{$lockedData->max_up}" : '0:none';
+        }
 
         return hash('sha256', implode('|', [
             $schoolId,
             $startDate,
             $endDate,
-            $maxRuleUpdate,
-            $maxAbsenceUpdate,
-            $maxExceptionUpdate,
-            $maxProfileUpdate,
+            $preserveLocked ? '1' : '0',
+            $ruleSig,
+            $absenceSig,
+            $exceptionSig,
+            $profileSig,
+            $assistantSig,
+            $transferSig,
+            $lockedSig,
         ]));
     }
 
