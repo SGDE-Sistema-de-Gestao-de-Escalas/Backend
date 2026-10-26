@@ -19,9 +19,9 @@ class ActivityTypeSeeder extends Seeder
     public const DEFAULTS = [
         ['name' => 'Apoio Escola', 'color' => '#6366F1', 'is_fallback' => true],
         ['name' => 'Acolhimento', 'color' => '#F59E0B', 'is_fallback' => false],
-        ['name' => 'Apoio Turmas', 'color' => '#3B82F6', 'is_fallback' => false],
+        ['name' => 'Apoio Turmas/escola', 'color' => '#3B82F6', 'is_fallback' => false],
         ['name' => 'Intervalo', 'color' => '#10B981', 'is_fallback' => false],
-        ['name' => 'Vigilância almoço', 'color' => '#EF4444', 'is_fallback' => false],
+        ['name' => 'Vigilância almoço', 'color' => '#A855F7', 'is_fallback' => false],
         ['name' => 'Limpeza', 'color' => '#8B5CF6', 'is_fallback' => false],
         ['name' => 'Entrega de alunos', 'color' => '#14B8A6', 'is_fallback' => false],
     ];
@@ -41,6 +41,11 @@ class ActivityTypeSeeder extends Seeder
     public function seedForSchool(School $school): void
     {
         DB::transaction(function () use ($school) {
+            // Atualizar "Apoio Turmas" para "Apoio Turmas/escola" se já existir
+            ActivityType::where('school_id', $school->getKey())
+                ->where('name', 'Apoio Turmas')
+                ->update(['name' => 'Apoio Turmas/escola']);
+
             $alreadySeeded = ActivityType::where('school_id', $school->getKey())
                 ->where('is_system', true)
                 ->exists();
@@ -69,6 +74,22 @@ class ActivityTypeSeeder extends Seeder
                             'active' => true,
                         ]);
                     }
+                }
+
+                // Garantir que todas as atividades predefinidas existem
+                foreach (self::DEFAULTS as $item) {
+                    ActivityType::firstOrCreate(
+                        [
+                            'school_id' => $school->getKey(),
+                            'name' => $item['name'],
+                        ],
+                        [
+                            'color' => $item['color'],
+                            'is_system' => true,
+                            'is_fallback' => $item['is_fallback'],
+                            'active' => true,
+                        ]
+                    );
                 }
 
                 return;

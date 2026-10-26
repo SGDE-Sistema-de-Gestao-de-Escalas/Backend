@@ -13,7 +13,7 @@ class AssistantScheduleProfilePolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -21,7 +21,13 @@ class AssistantScheduleProfilePolicy
      */
     public function view(User $user, AssistantScheduleProfile $assistantScheduleProfile): bool
     {
-        return false;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $userAstId = $user->assistant?->id;
+        return ($assistantScheduleProfile->assistant?->user_id === $user->id) ||
+               ($userAstId && (string) $assistantScheduleProfile->assistant_id === (string) $userAstId);
     }
 
     /**

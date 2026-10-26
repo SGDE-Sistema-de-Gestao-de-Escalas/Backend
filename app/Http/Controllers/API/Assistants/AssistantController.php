@@ -39,10 +39,17 @@ class AssistantController extends Controller
         Gate::authorize('viewAny', Assistant::class);
 
         $schoolId = $request->header('X-School-ID') ?? $request->query('school_id');
+        $user = $request->user();
 
         $query = Assistant::withTrashed()
-            ->with(['user', 'school'])
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+            ->with(['user', 'school']);
+
+        if ($user && ! $user->isAdmin()) {
+            $assistant = $user->assistant;
+            $query->where('assistants.id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
 
         // 1. Contadores para as Tabs (rápidos e sem paginação)
         $countsQuery = clone $query;

@@ -13,7 +13,7 @@ class SchoolPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -21,7 +21,7 @@ class SchoolPolicy
      */
     public function view(User $user, School $school): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**

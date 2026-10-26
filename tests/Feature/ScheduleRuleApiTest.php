@@ -287,18 +287,18 @@ class ScheduleRuleApiTest extends TestCase
         $this->assertDatabaseHas('activity_types', ['id' => $this->payload['activity_type_id']]);
     }
 
-    public function test_both_types_require_exactly_the_entered_minimum(): void
+    public function test_both_types_require_at_least_the_entered_minimum(): void
     {
-        foreach (['mandatory' => 2, 'optional' => 2] as $type => $expected) {
+        foreach (['mandatory' => 2, 'optional' => 2] as $type => $min) {
             foreach ([1, 2, 3, 4] as $count) {
                 $payload = array_replace($this->payload, [
                     'type' => $type,
                     'assistant_ids' => Assistant::orderBy('internal_number')->limit($count)->pluck('id')->all(),
                 ]);
                 $response = $this->postJson('/api/schedule-rules', $payload);
-                if ($count === $expected) {
+                if ($count >= $min) {
                     $response->assertCreated()->assertJsonPath('data.min', 2)
-                        ->assertJsonCount($expected, 'data.assistant_ids')->assertJsonMissingPath('data.substitute_assistant_id');
+                        ->assertJsonCount($count, 'data.assistant_ids')->assertJsonMissingPath('data.substitute_assistant_id');
                 } else {
                     $response->assertUnprocessable()->assertJsonValidationErrors('assistant_ids');
                 }
@@ -311,12 +311,13 @@ class ScheduleRuleApiTest extends TestCase
         $id = $this->createRule();
         $url = '/api/schedule-rules/'.$id;
         $this->patchJson($url, ['type' => 'optional'])->assertOk();
-        $this->patchJson($url, ['min' => 1])->assertUnprocessable();
+        $this->patchJson($url, ['min' => 1])->assertOk();
+        $this->patchJson($url, ['min' => 3])->assertUnprocessable()->assertJsonValidationErrors('assistant_ids');
         $this->patchJson($url, ['type' => 'optional', 'assistant_ids' => array_slice($this->payload['assistant_ids'], 0, 2)])
-            ->assertOk()->assertJsonPath('data.min', 2);
+            ->assertOk()->assertJsonPath('data.min', 1);
         $this->patchJson($url, ['type' => 'mandatory'])->assertOk();
         $this->patchJson($url, ['type' => 'mandatory', 'assistant_ids' => $this->payload['assistant_ids']])
-            ->assertOk()->assertJsonPath('data.min', 2);
+            ->assertOk()->assertJsonPath('data.min', 1);
         $this->patchJson($url, ['substitute_assistant_id' => $this->substituteId])->assertUnprocessable();
     }
 
