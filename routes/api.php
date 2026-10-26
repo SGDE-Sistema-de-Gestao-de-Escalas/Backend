@@ -141,6 +141,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::middleware('can:manage-system')->group(function () {
         // Importação e exportação em CSV. Têm de vir antes do apiResource,
         // senão "export" seria lido como o id de um assistente.
+        Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])
+            ->name('reports.index');
         Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
             ->name('assistants.export');
         Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
