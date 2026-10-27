@@ -10,6 +10,7 @@ use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Auth\User;
 use App\Models\Schedules\AssistantScheduleProfile;
 use App\Models\Schedules\ScheduleRule;
+use App\Models\Schools\SchoolOperatingException;
 use App\Models\System\Notification;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -27,6 +28,7 @@ use Throwable;
 class NotificationService
 {
     public const EXCEPTION_DAYS = 7;
+    public const OPERATING_EXCEPTION_DAYS = 7;
     public const PROFILE_DAYS = 14;
     public const RULE_DAYS = 14;
     public const TRANSFER_DAYS = 3;
@@ -253,6 +255,26 @@ class NotificationService
         );
     }
 
+    /**
+     * Exceção ao horário de funcionamento da escola (Motor > Funcionamento) a terminar:
+     * a escola volta ao horário fixo, por isso convém rever as escalas desse período.
+     */
+    public function operatingExceptionExpiring(SchoolOperatingException $exception): int
+    {
+        $until = CarbonImmutable::parse($exception->valid_until);
+        $days = $this->daysUntil($until);
+        $what = $exception->is_closed ? 'encerramento' : 'horário alterado';
+
+        return $this->notifyAdmins(
+            NotificationEvent::OperatingExceptionExpiring,
+            'Exceção de funcionamento a terminar',
+            "A exceção \"{$exception->name}\" ({$what}) termina {$this->inDays($days)} ({$this->fmt($until)}); a escola volta ao horário fixo.",
+            $exception->school_id,
+            ['operating_exception_id' => $exception->id, 'is_closed' => (bool) $exception->is_closed, 'valid_until' => $until->toDateString(), 'link' => '/config'],
+            dedupeKey: "operating-exception:{$exception->id}:{$until->toDateString()}",
+        );
+    }
+
     public function profileExpiring(AssistantScheduleProfile $profile): int
     {
         $profile->loadMissing('assistant.user');
@@ -397,7 +419,7 @@ class NotificationService
     public function runScheduledChecks(?CarbonImmutable $today = null): array
     {
         $today ??= CarbonImmutable::today();
-        $created = ['exceptions' => 0, 'profiles' => 0, 'rules' => 0, 'transfers' => 0, 'pending_absences' => 0];
+        $created = ['exceptions' => 0, 'operating_exceptions' => 0, 'profiles' => 0, 'rules' => 0, 'transfers' => 0, 'pending_absences' => 0];
 
         AssistantException::query()
             ->whereHas('assistant')
@@ -407,6 +429,17 @@ class NotificationService
             ->each(function ($e) use (&$created) {
                 try {
                     $created['exceptions'] += $this->exceptionExpiring($e);
+                } catch (Throwable $e2) {
+                    report($e2);
+                }
+            });
+
+        SchoolOperatingException::query()
+            ->whereBetween('valid_until', [$today->toDateString(), $today->addDays(self::OPERATING_EXCEPTION_DAYS)->toDateString()])
+            ->get()
+            ->each(function ($e) use (&$created) {
+                try {
+                    $created['operating_exceptions'] += $this->operatingExceptionExpiring($e);
                 } catch (Throwable $e2) {
                     report($e2);
                 }

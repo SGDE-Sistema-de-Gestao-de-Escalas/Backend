@@ -21,6 +21,7 @@ enum NotificationEvent: string
 
     // Vigências
     case ExceptionExpiring = 'exception.expiring';
+    case OperatingExceptionExpiring = 'operating_exception.expiring';
     case ProfileExpiring = 'profile.expiring';
     case RuleExpiring = 'rule.expiring';
     case TransferEnding = 'transfer.ending';
@@ -43,6 +44,7 @@ enum NotificationEvent: string
             self::AbsencesPendingReview => NotificationType::Absence,
 
             self::ExceptionExpiring,
+            self::OperatingExceptionExpiring,
             self::ProfileExpiring,
             self::RuleExpiring,
             self::TransferEnding => NotificationType::Expiry,
