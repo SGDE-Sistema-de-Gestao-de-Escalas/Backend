@@ -25,7 +25,11 @@ class AssistantTemporaryAssignmentsController extends Controller
                 'destinationSchool',
             ]);
 
-        if ($schoolId) {
+        $user = $request->user();
+        if ($user && ! $user->isAdmin()) {
+            $assistant = $user->assistant;
+            $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($schoolId) {
             $query->where(function ($q) use ($schoolId) {
                 $q->where('origin_school_id', $schoolId)
                     ->orWhere('destination_school_id', $schoolId);
@@ -53,8 +57,13 @@ class AssistantTemporaryAssignmentsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(AssistantTemporaryAssignments $assistantTemporaryAssignment): JsonResponse
+    public function show(Request $request, AssistantTemporaryAssignments $assistantTemporaryAssignment): JsonResponse
     {
+        $user = $request->user();
+        if ($user && ! $user->isAdmin() && $assistantTemporaryAssignment->assistant_id !== $user->assistant?->id) {
+            abort(403, 'Acesso não autorizado.');
+        }
+
         $assistantTemporaryAssignment->load(['assistant.user', 'originSchool', 'destinationSchool']);
         return response()->json([
             'data' => $assistantTemporaryAssignment,

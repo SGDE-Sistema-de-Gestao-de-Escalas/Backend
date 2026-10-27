@@ -136,6 +136,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('schedule-rules', ScheduleRuleController::class);
     Route::apiResource('assistants', AssistantController::class)
         ->withTrashed(['show', 'update', 'destroy']);
+    Route::get('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'index']);
+    Route::get('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'show']);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
@@ -147,7 +149,10 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('assistants.import');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
-        Route::apiResource('assistant-temporary-assignments', \App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class);
+        Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
+        Route::post('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'store']);
+        Route::put('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
+        Route::patch('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
             ->name('schedules.generate');
         Route::post('/schedules/publish', [ScheduleController::class, 'publish'])

@@ -36,18 +36,20 @@ class ScheduleController extends Controller
         $query = Schedule::query()
             ->with([
                 'assistant.user',
+                'school',
                 'assistant.school',
                 'scheduleEntries.activityType',
                 'scheduleEntries.scheduleRule',
                 'scheduleEntries.replacedAssistant.user',
             ]);
 
-        if ($schoolId) {
-            $query->where('school_id', $schoolId);
-        }
-
-        // Limita a listagem às escalas do próprio assistente caso não seja administrador.
-        if (! $user->isAdmin()) {
+        // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
+        // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
+        if ($user->isAdmin()) {
+            if ($schoolId) {
+                $query->where('school_id', $schoolId);
+            }
+        } else {
             $query->whereHas('assistant', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -297,7 +299,8 @@ class ScheduleController extends Controller
     {
         $schedule->load([
             'assistant.user',
-            'assistant.school',
+            'school',
+                'assistant.school',
             'scheduleEntries.activityType',
             'scheduleEntries.scheduleRule',
             'scheduleEntries.replacedAssistant.user',
