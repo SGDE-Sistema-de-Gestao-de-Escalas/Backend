@@ -172,7 +172,13 @@ class ScheduleGenerationService
                 // -------------------------------------------------------------
                 // RONDA A: Período Completo [effStart, effEnd) com a fila da regra
                 // -------------------------------------------------------------
-                foreach ($rule->assistants as $candidate) {
+                $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                    ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                $rondaACandidates = $rule->assistants->concat($incomingAssistants);
+
+                foreach ($rondaACandidates as $candidate) {
                     if ($assignedFullCount >= $rule->min) {
                         break;
                     }
@@ -396,7 +402,13 @@ class ScheduleGenerationService
 
                 $assignedOpt = $this->countFullCoverageForRule($dayAssignments, $rule, $effStart, $effEnd);
 
-                foreach ($rule->assistants as $candidate) {
+                $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                    ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                $rondaACandidates = $rule->assistants->concat($incomingAssistants);
+
+                foreach ($rondaACandidates as $candidate) {
                     if ($assignedOpt >= $rule->min) {
                         break;
                     }
@@ -1289,12 +1301,18 @@ class ScheduleGenerationService
 
                 while ($cursor < $gapEnd) {
                     $remaining = $gapEnd - $cursor;
-                    $minStint = min(60, $remaining);
+                    $minStint = min(15, $remaining);
                     $bestCandidate = null;
                     $bestEnd = $cursor;
                     $bestOptionalConflicts = [];
 
-                    foreach ($rule->assistants as $candidate) {
+                    $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                    $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                    $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                        ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                    $rondaBCandidates = $rule->assistants->concat($incomingAssistants);
+
+                    foreach ($rondaBCandidates as $candidate) {
                         if ($this->isAlreadyAssignedToInterval($dayAssignments, $candidate->id, $cursor, $cursor + 15, $rule->id)) {
                             continue;
                         }
