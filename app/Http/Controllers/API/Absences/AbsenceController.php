@@ -9,6 +9,7 @@ use App\Http\Resources\AbsenceResource;
 use App\Models\Absences\Absence;
 use App\Services\AbsenceService;
 use App\Services\NotificationService;
+use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -20,7 +21,8 @@ class AbsenceController extends Controller
 {
     public function __construct(
         private readonly AbsenceService $absenceService,
-        private readonly NotificationService $notifications
+        private readonly ScheduleIntegrityService $scheduleIntegrityService,
+        private readonly NotificationService $notifications,
     ) {}
 
     /**
@@ -151,21 +153,49 @@ class AbsenceController extends Controller
 
         $absence = $this->absenceService->create($validated, $document, $request->user());
 
-        // Avisa os administradores (nunca falha o registo da ausência).
+        $schoolId = $absence->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->user()?->school_id;
+
+        $impact = null;
+        if ($schoolId && $absence->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $absence->valid_from->format('Y-m-d'),
+                endDate: $absence->valid_until?->format('Y-m-d'),
+                eventType: 'absence',
+                assistantId: $absence->assistant_id
+            );
+        }
+
+        // Notificações para os administradores (nunca falham a operação principal).
         $this->notifications->absenceRegistered($absence, $request->user());
+        if ($schoolId && $impact) {
+            $this->notifications->scheduleRecalculationRequired(
+                (string) $schoolId,
+                $impact,
+                $absence->assistant?->user?->name,
+                'falta',
+                $request->user()
+            );
+        }
 
         $missingDocument = (bool) ($absence->absenceType?->requires_document ?? false) && empty($absence->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
             : null;
 
-        return (new AbsenceResource($absence))
+        $responseResource = (new AbsenceResource($absence))
             ->additional([
                 'message' => $missingDocument
                     ? 'Ausência registada com sucesso. Atenção: falta anexar o documento comprovativo.'
                     : 'Ausência registada com sucesso.',
                 'warning' => $warning,
-            ])
+                'impact' => $impact,
+            ]);
+
+        return $responseResource
             ->response()
             ->setStatusCode(201);
     }
@@ -194,8 +224,34 @@ class AbsenceController extends Controller
 
         $updated = $this->absenceService->update($absence, $validated, $document, $request->user());
 
+        $schoolId = $updated->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->user()?->school_id;
+
+        $impact = null;
+        if ($schoolId && $updated->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $updated->valid_from->format('Y-m-d'),
+                endDate: $updated->valid_until?->format('Y-m-d'),
+                eventType: 'absence',
+                assistantId: $updated->assistant_id
+            );
+        }
+
+        // Notificações para os administradores (nunca falham a operação principal).
         if ($document) {
             $this->notifications->absenceDocumentUploaded($updated, $request->user());
+        }
+        if ($schoolId && $impact) {
+            $this->notifications->scheduleRecalculationRequired(
+                (string) $schoolId,
+                $impact,
+                $updated->assistant?->user?->name,
+                'falta',
+                $request->user()
+            );
         }
 
         $missingDocument = (bool) ($updated->absenceType?->requires_document ?? false) && empty($updated->document_path);
@@ -209,6 +265,7 @@ class AbsenceController extends Controller
                     ? 'Ausência atualizada com sucesso. Atenção: falta anexar o documento comprovativo.'
                     : 'Ausência atualizada com sucesso.',
                 'warning' => $warning,
+                'impact' => $impact,
             ]);
     }
 

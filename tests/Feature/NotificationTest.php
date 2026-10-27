@@ -174,7 +174,7 @@ class NotificationTest extends TestCase
 
     // ------------------------------------------------------------------ eventos
 
-    public function test_absence_registered_notifies_admins_unless_an_admin_is_the_author(): void
+    public function test_absence_registered_by_assistant_notifies_admins_but_not_when_admin_registers(): void
     {
         $assistant = $this->makeAssistant('Maria');
         $payload = [
@@ -182,13 +182,8 @@ class NotificationTest extends TestCase
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->addDay()->toDateString(),
         ];
 
-        // registada pelo próprio assistente (staff). Chamamos o serviço diretamente porque, conforme a
-        // AbsencePolicy em vigor, os assistentes podem ou não criar faltas pela API.
-        $absence = Absence::create([
-            'assistant_id' => $assistant->id, 'absence_type_id' => $payload['absence_type_id'],
-            'valid_from' => $payload['valid_from'], 'valid_until' => $payload['valid_until'], 'total_days' => 2,
-        ]);
-        app(\App\Services\NotificationService::class)->absenceRegistered($absence->load('assistant.user'), $assistant->user);
+        // registada pelo próprio assistente (staff)
+        $this->as($assistant->user)->postJson('/api/absences', $payload)->assertCreated();
 
         foreach ([$this->admin, $this->admin2] as $admin) {
             $n = Notification::where('user_id', $admin->id)->where('event', 'absence.registered')->first();
@@ -200,7 +195,7 @@ class NotificationTest extends TestCase
         }
         $this->assertSame(0, Notification::where('user_id', $assistant->user->id)->count(), 'o assistente não recebe nada');
 
-        // registada por um administrador (pela API) -> ninguém é notificado
+        // registada por um administrador -> ninguém é notificado
         Notification::query()->delete();
         $this->as($this->admin)->postJson('/api/absences', $payload)->assertCreated();
         $this->assertSame(0, Notification::where('event', 'absence.registered')->count());
@@ -220,6 +215,114 @@ class NotificationTest extends TestCase
         $this->as($assistant->user)->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])->assertSuccessful();
 
         $this->assertSame(1, Notification::where('user_id', $this->admin->id)->where('event', 'absence.document_uploaded')->count());
+    }
+
+    public function test_absence_that_breaks_a_generated_schedule_raises_recalculation_alert(): void
+    {
+        $assistant = $this->makeAssistant('Ana');
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->portaria->id,
+            'period_start' => '08:00', 'period_end' => '10:00', 'min' => 1, 'type' => 'mandatory',
+            'valid_from' => '2026-01-01', 'valid_until' => null, 'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach($assistant->id, ['priority' => 1]);
+
+        $this->generate($this->monday)->assertOk();
+        Notification::query()->delete();
+
+        $this->as($this->admin)->postJson('/api/absences', [
+            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
+            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(),
+        ])->assertCreated();
+
+        foreach ([$this->admin, $this->admin2] as $admin) {
+            $n = Notification::where('user_id', $admin->id)->where('event', 'schedule.recalculation_required')->first();
+            $this->assertNotNull($n);
+            $this->assertSame('alert', $n->type);
+            $this->assertContains($this->monday->toDateString(), $n->data['affected_dates']);
+        }
+    }
+
+    public function test_generation_with_deficit_alerts_everyone_and_clean_generation_informs_only_other_admins(): void
+    {
+        $assistant = $this->makeAssistant('Ana');
+
+        // 1) sem conflitos -> info só para o outro admin (quem gerou já viu o resultado)
+        $this->generate($this->monday)->assertOk()->assertJsonPath('resolution_status', 'complete_validated');
+        $this->assertSame(0, Notification::where('user_id', $this->admin->id)->count());
+        $info = Notification::where('user_id', $this->admin2->id)->first();
+        $this->assertSame('info', $info->type);
+        $this->assertSame('schedule.generated', $info->event);
+
+        // 2) com défice: a única pessoa da regra está ausente -> alerta para todos
+        Notification::query()->delete();
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->portaria->id,
+            'period_start' => '08:00', 'period_end' => '10:00', 'min' => 2, 'type' => 'mandatory',
+            'valid_from' => '2026-01-01', 'valid_until' => null, 'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach($assistant->id, ['priority' => 1]);
+        $this->generate($this->monday)->assertOk()->assertJsonPath('resolution_status', 'draft_with_deficit');
+
+        foreach ([$this->admin, $this->admin2] as $admin) {
+            $n = Notification::where('user_id', $admin->id)->where('event', 'schedule.generation_deficit')->first();
+            $this->assertNotNull($n);
+            $this->assertSame('alert', $n->type);
+            $this->assertGreaterThan(0, $n->data['conflicts_count']);
+        }
+    }
+
+    public function test_assistant_without_profile_alert_is_sent_once_per_day(): void
+    {
+        $this->makeAssistant('Com perfil');
+        $noProfile = $this->makeAssistant('Sem perfil');
+        AssistantScheduleProfile::where('assistant_id', $noProfile->id)->get()->each(function ($p) {
+            $p->shifts()->each(fn ($s) => $s->shiftDays()->delete());
+            $p->shifts()->delete();
+            $p->delete();
+        });
+
+        $this->generate($this->monday)->assertOk();
+        $this->generate($this->monday)->assertOk(); // 2.ª geração no mesmo dia: não duplica
+
+        $this->assertSame(1, Notification::where('user_id', $this->admin->id)->where('event', 'assistant.missing_profile')->count());
+        $this->assertStringContainsString('Sem perfil', Notification::where('event', 'assistant.missing_profile')->value('body'));
+    }
+
+    public function test_publishing_informs_other_admins_only(): void
+    {
+        $this->makeAssistant('Ana');
+        $this->generate($this->monday)->assertOk();
+        Notification::query()->delete();
+
+        $this->as($this->admin)->postJson('/api/schedules/publish', [
+            'start_date' => $this->monday->toDateString(), 'end_date' => $this->monday->toDateString(),
+        ])->assertOk()->assertJsonPath('published_schedules_count', 1);
+
+        $this->assertSame(0, Notification::where('user_id', $this->admin->id)->count());
+        $n = Notification::where('user_id', $this->admin2->id)->first();
+        $this->assertSame('schedule.published', $n->event);
+        $this->assertSame('info', $n->type);
+    }
+
+    public function test_transfer_assigned_through_generation_informs_other_admins(): void
+    {
+        $this->makeAssistant('Local');
+        $other = School::create(['name' => 'Escola Externa', 'acronym' => 'EXT', 'active' => true]);
+        $external = $this->makeAssistant('Externo', null, $other);
+
+        $this->generate($this->monday)->assertOk(); // sem transfers
+        Notification::query()->delete();
+
+        $this->as($this->admin)->postJson('/api/schedules/generate', [
+            'start_date' => $this->monday->toDateString(), 'end_date' => $this->monday->toDateString(),
+            'transfers' => [['assistant_id' => $external->id, 'date' => $this->monday->toDateString()]],
+        ])->assertOk();
+
+        $n = Notification::where('user_id', $this->admin2->id)->where('event', 'transfer.assigned')->first();
+        $this->assertNotNull($n);
+        $this->assertSame($this->school->id, $n->school_id);
+        $this->assertStringContainsString('Externo Op', $n->body);
     }
 
     public function test_deactivation_request_alerts_all_admins(): void
@@ -265,11 +368,11 @@ class NotificationTest extends TestCase
         ]);
 
         $other = School::create(['name' => 'Destino', 'acronym' => 'DST', 'active' => true]);
-        AssistantTemporaryAssignments::unguarded(fn () => AssistantTemporaryAssignments::create([
+        AssistantTemporaryAssignments::create([
             'assistant_id' => $a1->id, 'origin_school_id' => $this->school->id, 'destination_school_id' => $other->id,
             'created_by_user_id' => $this->admin->id, 'validated_by_user_id' => $this->admin->id,
             'valid_from' => $today->subDay()->toDateString(), 'valid_until' => $today->addDays(2)->toDateString(),
-        ]));
+        ]);
 
         $pending = Absence::create([
             'assistant_id' => $a1->id, 'absence_type_id' => $this->absenceTypeId(),
@@ -301,20 +404,13 @@ class NotificationTest extends TestCase
 
     public function test_a_failure_while_notifying_never_breaks_the_main_operation(): void
     {
-        // Força o erro removendo a tabela das notificações: o assistente anexa um comprovativo
-        // e a operação principal tem de continuar a responder com sucesso.
+        // Força um erro na criação (coluna `type` inválida para a BD não existe, por isso removemos a tabela)
         $assistant = $this->makeAssistant('Maria');
-        $absence = Absence::create([
-            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
-            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(), 'total_days' => 1,
-        ]);
         \Illuminate\Support\Facades\Schema::drop('notifications');
 
-        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
-        $file = \Illuminate\Http\UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
-
-        $this->as($assistant->user)
-            ->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])
-            ->assertSuccessful();
+        $this->as($assistant->user)->postJson('/api/absences', [
+            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
+            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(),
+        ])->assertCreated();
     }
 }

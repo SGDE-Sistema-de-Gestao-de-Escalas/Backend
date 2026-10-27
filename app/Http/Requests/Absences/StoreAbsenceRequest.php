@@ -12,9 +12,26 @@ class StoreAbsenceRequest extends FormRequest
      * Determine if the user is authorized to make this request.
      * Apenas administradores podem criar ausências.
      */
+    protected function prepareForValidation(): void
+    {
+        $user = $this->user();
+        if ($user && $user->isStaff()) {
+            $this->merge([
+                'assistant_id' => $user->assistant?->id ?? $this->assistant_id,
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() ?? false;
+        $user = $this->user();
+        if (! $user) return false;
+        if ($user->isAdmin()) return true;
+        if ($user->isStaff()) {
+            $userAstId = $user->assistant?->id;
+            return $userAstId && (string) $this->assistant_id === (string) $userAstId;
+        }
+        return false;
     }
 
     /**

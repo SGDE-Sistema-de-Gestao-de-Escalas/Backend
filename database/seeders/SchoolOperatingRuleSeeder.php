@@ -26,7 +26,7 @@ class SchoolOperatingRuleSeeder extends Seeder
     private const VALID_FROM = '2026-09-01';
 
     /** Segunda (1) a sexta (5); 1 = segunda ... 7 = domingo. */
-    private const WEEK_DAYS = [1, 2, 3, 4, 5];
+    private const WEEK_DAYS = [0, 1, 2, 3, 4];
 
     /**
      * acronym => hora de fecho
@@ -74,3 +74,4 @@ class SchoolOperatingRuleSeeder extends Seeder
         }
     }
 }
+

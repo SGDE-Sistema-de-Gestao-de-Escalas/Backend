@@ -9,7 +9,7 @@ class ScheduleRulePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     public function create(User $user): bool
@@ -19,7 +19,7 @@ class ScheduleRulePolicy
 
     public function view(User $user, ScheduleRule $rule): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     public function update(User $user, ScheduleRule $rule): bool

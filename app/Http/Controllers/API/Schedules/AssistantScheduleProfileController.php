@@ -23,11 +23,25 @@ class AssistantScheduleProfileController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $schoolId = $request->header('X-School-ID') ?? $request->attributes->get('currentSchoolId');
         $assistantId = $request->query('assistant_id');
+        $assistantIds = $request->query('assistant_ids');
+        $user = $request->user();
         $query = AssistantScheduleProfile::with(['shifts.shiftDays']);
 
-        if ($assistantId) {
+        if ($user && ! $user->isAdmin()) {
+            $assistant = $user->assistant;
+            $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($assistantId) {
             $query->where('assistant_id', $assistantId);
+        } elseif ($assistantIds) {
+            $ids = is_array($assistantIds) ? $assistantIds : explode(',', (string) $assistantIds);
+            $query->whereIn('assistant_id', $ids);
+        } elseif ($schoolId) {
+            $query->where(function ($q) use ($schoolId) {
+                $q->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId))
+                  ->orWhereHas('assistant.assistantTemporaryAssignments', fn ($tq) => $tq->where('destination_school_id', $schoolId));
+            });
         }
 
         $profiles = $query->orderByDesc('valid_from')->get();
