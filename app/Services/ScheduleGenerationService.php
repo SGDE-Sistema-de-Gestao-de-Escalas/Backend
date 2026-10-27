@@ -1920,6 +1920,10 @@ class ScheduleGenerationService
         $lEnd = $shift['lunch_end_min'];
         $duration = $shift['lunch_duration'];
 
+        if ($lStart === null || $lEnd === null || $duration <= 0) {
+            return null;
+        }
+
         $freeSegments = array_values(array_filter(
             $this->subtractIntervals($lStart, $lEnd, $occupiedIntervals),
             fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
@@ -1935,27 +1939,6 @@ class ScheduleGenerationService
             $seg = $freeSegments[count($freeSegments) - 1];
 
             return [$seg[1] - $duration, $seg[1]];
-        }
-
-        // Se a janela habitual estiver bloqueada por tarefas, alarga apenas para uma janela
-        // razoável de almoço (entre as 11:30 e as 15:30), NUNCA para horários matinais (ex: 10h) ou final de turno
-        $minLunchEarliest = max($shift['entry_min'], 11 * 60 + 30);
-        $maxLunchLatest = min($shift['exit_min'], 15 * 60 + 30);
-
-        if ($maxLunchLatest - $minLunchEarliest >= $duration) {
-            $fallbackSegments = array_values(array_filter(
-                $this->subtractIntervals($minLunchEarliest, $maxLunchLatest, $occupiedIntervals),
-                fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
-            ));
-
-            if (! empty($fallbackSegments)) {
-                usort($fallbackSegments, function ($a, $b) use ($lStart) {
-                    return abs($a[0] - $lStart) <=> abs($b[0] - $lStart);
-                });
-                $seg = $fallbackSegments[0];
-
-                return [$seg[0], $seg[0] + $duration];
-            }
         }
 
         return null;
