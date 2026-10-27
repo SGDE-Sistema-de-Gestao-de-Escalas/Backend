@@ -639,4 +639,129 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonPath('conflicts.0.transfer_candidates.0.causes_origin_shortfall', false)
             ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96);
     }
+    public function test_transfers_are_not_persisted_when_generation_fails(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra',
+            'acronym' => 'EO',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Externo',
+            internalNumber: 'EXT1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        // Erro de pré-validação: janela de almoço inválida (intervalo menor que a duração de 60 min)
+        // Isto faz com que o ScheduleGenerationService lance ValidationException (422)
+        $this->createAssistantWithShift(
+            name: 'Assistente Com Janela Almoço Inválida',
+            internalNumber: 'INV1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            lunchEnabled: true,
+            lunchStart: '12:00:00',
+            lunchEnd: '12:30:00',
+            lunchDuration: 60,
+            days: [0]
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2026-11-02',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422);
+
+        // A cedência NÃO deve ter sido gravada na base de dados
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $externalAssistant->id,
+            'destination_school_id' => $this->school->id,
+        ]);
+    }
+
+    public function test_not_available_for_transfer_is_rejected(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra 2',
+            'acronym' => 'EO2',
+            'active' => true,
+        ]);
+        $unavailableAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Indisponível',
+            internalNumber: 'IND1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: false
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $unavailableAssistant->id,
+                        'date' => '2026-11-02',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('transfers.0.assistant_id');
+
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $unavailableAssistant->id,
+        ]);
+    }
+
+    public function test_date_outside_generation_range_is_rejected(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra 3',
+            'acronym' => 'EO3',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Externo 3',
+            internalNumber: 'EXT3',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2027-06-01',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('transfers.0.date');
+
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $externalAssistant->id,
+        ]);
+    }
 }

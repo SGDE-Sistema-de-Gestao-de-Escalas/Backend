@@ -11,6 +11,7 @@ use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
 use App\Services\ScheduleGenerationService;
+use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Carbon\CarbonImmutable;
@@ -110,40 +111,45 @@ class ScheduleController extends Controller
         $schoolId = (string) ($request->attributes->get('currentSchoolId') ?? $request->header('X-School-ID'));
         $validated = $request->validated();
 
-        // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
-        // registar os AssistantTemporaryAssignments antes de recalcular a escala.
-        if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
-            $userId = $request->user()?->id;
-            foreach ($validated['transfers'] as $tr) {
-                $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
-                if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
-                    continue;
+        // Assegurar previamente que a atividade base/fallback existe para a escola
+        $this->generationService->ensureFallbackActivity($schoolId);
+
+        $result = DB::transaction(function () use ($request, $schoolId, $validated) {
+            // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
+            // registar os AssistantTemporaryAssignments atomicamente junto com a geração da escala.
+            if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
+                $userId = $request->user()?->id;
+                foreach ($validated['transfers'] as $tr) {
+                    $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
+                    if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
+                        continue;
+                    }
+
+                    AssistantTemporaryAssignments::firstOrCreate(
+                        [
+                            'assistant_id' => $extAssistant->id,
+                            'origin_school_id' => $extAssistant->school_id,
+                            'destination_school_id' => $schoolId,
+                            'valid_from' => $tr['date'],
+                            'valid_until' => $tr['date'],
+                        ],
+                        [
+                            'created_by_user_id' => $userId,
+                            'validated_by_user_id' => $userId,
+                            'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
+                        ]
+                    );
                 }
-
-                AssistantTemporaryAssignments::firstOrCreate(
-                    [
-                        'assistant_id' => $extAssistant->id,
-                        'origin_school_id' => $extAssistant->school_id,
-                        'destination_school_id' => $schoolId,
-                        'valid_from' => $tr['date'],
-                        'valid_until' => $tr['date'],
-                    ],
-                    [
-                        'created_by_user_id' => $userId,
-                        'validated_by_user_id' => $userId,
-                        'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
-                    ]
-                );
             }
-        }
 
-        $result = $this->generationService->generate(
-            schoolId: $schoolId,
-            startDate: $validated['start_date'],
-            endDate: $validated['end_date'],
-            preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
-            idempotencyKey: $validated['idempotency_key'] ?? null,
-        );
+            return $this->generationService->generate(
+                schoolId: $schoolId,
+                startDate: $validated['start_date'],
+                endDate: $validated['end_date'],
+                preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
+                idempotencyKey: $validated['idempotency_key'] ?? null,
+            );
+        });
 
         return response()->json($result, 200);
     }

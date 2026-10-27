@@ -644,6 +644,15 @@ class ScheduleGenerationService
     }
 
     /**
+     * Ponto de entrada público para assegurar que a escola tem a atividade fallback persistida.
+     */
+    public function ensureFallbackActivity(string|School $school): ActivityType
+    {
+        $schoolModel = $school instanceof School ? $school : School::findOrFail($school);
+        return $this->resolveOrCreateFallbackActivity($schoolModel);
+    }
+
+    /**
      * Garante que a escola tem uma atividade base com is_fallback = true.
      */
     private function resolveOrCreateFallbackActivity(School $school): ActivityType
