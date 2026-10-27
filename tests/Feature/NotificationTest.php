@@ -174,7 +174,7 @@ class NotificationTest extends TestCase
 
     // ------------------------------------------------------------------ eventos
 
-    public function test_absence_registered_by_assistant_notifies_admins_but_not_when_admin_registers(): void
+    public function test_absence_registered_notifies_admins_unless_an_admin_is_the_author(): void
     {
         $assistant = $this->makeAssistant('Maria');
         $payload = [
@@ -182,8 +182,13 @@ class NotificationTest extends TestCase
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->addDay()->toDateString(),
         ];
 
-        // registada pelo próprio assistente (staff)
-        $this->as($assistant->user)->postJson('/api/absences', $payload)->assertCreated();
+        // registada pelo próprio assistente (staff). Chamamos o serviço diretamente porque, conforme a
+        // AbsencePolicy em vigor, os assistentes podem ou não criar faltas pela API.
+        $absence = Absence::create([
+            'assistant_id' => $assistant->id, 'absence_type_id' => $payload['absence_type_id'],
+            'valid_from' => $payload['valid_from'], 'valid_until' => $payload['valid_until'], 'total_days' => 2,
+        ]);
+        app(\App\Services\NotificationService::class)->absenceRegistered($absence->load('assistant.user'), $assistant->user);
 
         foreach ([$this->admin, $this->admin2] as $admin) {
             $n = Notification::where('user_id', $admin->id)->where('event', 'absence.registered')->first();
@@ -195,7 +200,7 @@ class NotificationTest extends TestCase
         }
         $this->assertSame(0, Notification::where('user_id', $assistant->user->id)->count(), 'o assistente não recebe nada');
 
-        // registada por um administrador -> ninguém é notificado
+        // registada por um administrador (pela API) -> ninguém é notificado
         Notification::query()->delete();
         $this->as($this->admin)->postJson('/api/absences', $payload)->assertCreated();
         $this->assertSame(0, Notification::where('event', 'absence.registered')->count());
@@ -260,11 +265,11 @@ class NotificationTest extends TestCase
         ]);
 
         $other = School::create(['name' => 'Destino', 'acronym' => 'DST', 'active' => true]);
-        AssistantTemporaryAssignments::create([
+        AssistantTemporaryAssignments::unguarded(fn () => AssistantTemporaryAssignments::create([
             'assistant_id' => $a1->id, 'origin_school_id' => $this->school->id, 'destination_school_id' => $other->id,
             'created_by_user_id' => $this->admin->id, 'validated_by_user_id' => $this->admin->id,
             'valid_from' => $today->subDay()->toDateString(), 'valid_until' => $today->addDays(2)->toDateString(),
-        ]);
+        ]));
 
         $pending = Absence::create([
             'assistant_id' => $a1->id, 'absence_type_id' => $this->absenceTypeId(),
@@ -296,13 +301,20 @@ class NotificationTest extends TestCase
 
     public function test_a_failure_while_notifying_never_breaks_the_main_operation(): void
     {
-        // Força um erro na criação (coluna `type` inválida para a BD não existe, por isso removemos a tabela)
+        // Força o erro removendo a tabela das notificações: o assistente anexa um comprovativo
+        // e a operação principal tem de continuar a responder com sucesso.
         $assistant = $this->makeAssistant('Maria');
+        $absence = Absence::create([
+            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
+            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(), 'total_days' => 1,
+        ]);
         \Illuminate\Support\Facades\Schema::drop('notifications');
 
-        $this->as($assistant->user)->postJson('/api/absences', [
-            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
-            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(),
-        ])->assertCreated();
+        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
+        $file = \Illuminate\Http\UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
+
+        $this->as($assistant->user)
+            ->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])
+            ->assertSuccessful();
     }
 }

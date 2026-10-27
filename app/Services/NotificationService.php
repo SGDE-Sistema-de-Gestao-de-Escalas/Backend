@@ -240,7 +240,7 @@ class NotificationService
     public function exceptionExpiring(AssistantException $exception): int
     {
         $exception->loadMissing('assistant.user');
-        $until = $exception->valid_until;
+        $until = CarbonImmutable::parse($exception->valid_until);
         $days = $this->daysUntil($until);
 
         return $this->notifyAdmins(
@@ -256,7 +256,7 @@ class NotificationService
     public function profileExpiring(AssistantScheduleProfile $profile): int
     {
         $profile->loadMissing('assistant.user');
-        $until = $profile->valid_until;
+        $until = CarbonImmutable::parse($profile->valid_until);
         $days = $this->daysUntil($until);
 
         return $this->notifyAdmins(
@@ -272,7 +272,7 @@ class NotificationService
     public function ruleExpiring(ScheduleRule $rule): int
     {
         $rule->loadMissing('activityType');
-        $until = $rule->valid_until;
+        $until = CarbonImmutable::parse($rule->valid_until);
         $days = $this->daysUntil($until);
         $activity = $rule->activityType?->name ?? 'sem atividade';
 
@@ -291,15 +291,18 @@ class NotificationService
      */
     public function transferEnding(AssistantTemporaryAssignments $transfer): int
     {
-        $transfer->loadMissing(['assistant.user', 'originSchool', 'destinationSchool']);
-        $until = $transfer->valid_until;
+        $transfer->loadMissing(['assistant.user']);
+        $until = CarbonImmutable::parse($transfer->valid_until);
         $days = $this->daysUntil($until);
         $name = $this->nameOf($transfer->assistant);
+        $schools = $this->schoolNames([$transfer->origin_school_id, $transfer->destination_school_id]);
+        $originName = $schools[$transfer->origin_school_id] ?? 'outra escola';
+        $destinationName = $schools[$transfer->destination_school_id] ?? 'outra escola';
 
         $created = 0;
         foreach ([
-            'origin' => [$transfer->origin_school_id, "A cedência de {$name} para {$transfer->destinationSchool?->name} termina {$this->inDays($days)} ({$this->fmt($until)})."],
-            'destination' => [$transfer->destination_school_id, "A cedência de {$name} vinda de {$transfer->originSchool?->name} termina {$this->inDays($days)} ({$this->fmt($until)})."],
+            'origin' => [$transfer->origin_school_id, "A cedência de {$name} para {$destinationName} termina {$this->inDays($days)} ({$this->fmt($until)})."],
+            'destination' => [$transfer->destination_school_id, "A cedência de {$name} vinda de {$originName} termina {$this->inDays($days)} ({$this->fmt($until)})."],
         ] as $side => [$schoolId, $body]) {
             $created += $this->notifyAdmins(
                 NotificationEvent::TransferEnding,
@@ -368,12 +371,13 @@ class NotificationService
 
     public function transferAssigned(AssistantTemporaryAssignments $transfer, ?User $actor = null): int
     {
-        $transfer->loadMissing(['assistant.user', 'originSchool']);
+        $transfer->loadMissing(['assistant.user']);
+        $originName = $this->schoolNames([$transfer->origin_school_id])[$transfer->origin_school_id] ?? 'outra escola';
 
         return $this->notifyAdmins(
             NotificationEvent::TransferAssigned,
             'Cedência atribuída',
-            "{$this->nameOf($transfer->assistant)} (de {$transfer->originSchool?->name}) foi cedido(a) a esta escola em {$this->fmt($transfer->valid_from)}.",
+            "{$this->nameOf($transfer->assistant)} (de {$originName}) foi cedido(a) a esta escola em {$this->fmt($transfer->valid_from)}.",
             $transfer->destination_school_id,
             ['transfer_id' => $transfer->id, 'assistant_id' => $transfer->assistant_id, 'link' => '/dashboard'],
             actor: $actor,
@@ -401,7 +405,11 @@ class NotificationService
             ->with('assistant.user')
             ->get()
             ->each(function ($e) use (&$created) {
-                $created['exceptions'] += $this->exceptionExpiring($e);
+                try {
+                    $created['exceptions'] += $this->exceptionExpiring($e);
+                } catch (Throwable $e2) {
+                    report($e2);
+                }
             });
 
         AssistantScheduleProfile::query()
@@ -413,10 +421,14 @@ class NotificationService
                 $hasNext = AssistantScheduleProfile::query()
                     ->where('assistant_id', $p->assistant_id)
                     ->whereKeyNot($p->getKey())
-                    ->where(fn ($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>', $p->valid_until->toDateString()))
+                    ->where(fn ($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>', CarbonImmutable::parse($p->valid_until)->toDateString()))
                     ->exists();
                 if (! $hasNext) {
-                    $created['profiles'] += $this->profileExpiring($p);
+                    try {
+                        $created['profiles'] += $this->profileExpiring($p);
+                    } catch (Throwable $e2) {
+                        report($e2);
+                    }
                 }
             });
 
@@ -425,15 +437,23 @@ class NotificationService
             ->with('activityType')
             ->get()
             ->each(function ($r) use (&$created) {
-                $created['rules'] += $this->ruleExpiring($r);
+                try {
+                    $created['rules'] += $this->ruleExpiring($r);
+                } catch (Throwable $e2) {
+                    report($e2);
+                }
             });
 
         AssistantTemporaryAssignments::query()
             ->whereBetween('valid_until', [$today->toDateString(), $today->addDays(self::TRANSFER_DAYS)->toDateString()])
-            ->with(['assistant.user', 'originSchool', 'destinationSchool'])
+            ->with(['assistant.user'])
             ->get()
             ->each(function ($t) use (&$created) {
-                $created['transfers'] += $this->transferEnding($t);
+                try {
+                    $created['transfers'] += $this->transferEnding($t);
+                } catch (Throwable $e2) {
+                    report($e2);
+                }
             });
 
         DB::table('absences')
@@ -523,6 +543,17 @@ class NotificationService
     private function baseQuery(User $user, ?string $schoolId): Builder
     {
         return Notification::query()->where('user_id', $user->getKey())->forSchool($schoolId);
+    }
+
+    /**
+     * Nomes das escolas por id (consulta direta: não depende das relações do modelo de cedências).
+     *
+     * @param  array<int, mixed>  $ids
+     * @return array<string, string>
+     */
+    private function schoolNames(array $ids): array
+    {
+        return DB::table('schools')->whereIn('id', array_filter($ids))->pluck('name', 'id')->all();
     }
 
     private function fmt(mixed $date): string
