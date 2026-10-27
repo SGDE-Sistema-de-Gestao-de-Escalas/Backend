@@ -125,6 +125,9 @@ class ScheduleController extends Controller
                         continue;
                     }
 
+                    $trStart = ! empty($tr['start_time']) ? substr($tr['start_time'], 0, 5) : null;
+                    $trEnd = ! empty($tr['end_time']) ? substr($tr['end_time'], 0, 5) : null;
+
                     AssistantTemporaryAssignments::firstOrCreate(
                         [
                             'assistant_id' => $extAssistant->id,
@@ -132,6 +135,8 @@ class ScheduleController extends Controller
                             'destination_school_id' => $schoolId,
                             'valid_from' => $tr['date'],
                             'valid_until' => $tr['date'],
+                            'start_time' => $trStart,
+                            'end_time' => $trEnd,
                         ],
                         [
                             'created_by_user_id' => $userId,

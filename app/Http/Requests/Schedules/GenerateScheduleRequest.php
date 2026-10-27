@@ -23,6 +23,8 @@ class GenerateScheduleRequest extends FormRequest
             'transfers' => ['nullable', 'array'],
             'transfers.*.assistant_id' => ['required', 'uuid', 'exists:assistants,id'],
             'transfers.*.date' => ['required', 'date_format:Y-m-d'],
+            'transfers.*.start_time' => ['nullable', 'date_format:H:i'],
+            'transfers.*.end_time' => ['nullable', 'date_format:H:i'],
             'transfers.*.rule_id' => ['nullable', 'uuid'],
             'transfers.*.notes' => ['nullable', 'string', 'max:500'],
         ];
@@ -61,6 +63,20 @@ class GenerateScheduleRequest extends FormRequest
                                 "A data da cedência ({$trDate}) deve estar dentro do intervalo a gerar ({$start} a {$end})."
                             );
                         }
+                    }
+
+                    $trStart = $tr['start_time'] ?? null;
+                    $trEnd = $tr['end_time'] ?? null;
+                    if (($trStart && ! $trEnd) || (! $trStart && $trEnd)) {
+                        $validator->errors()->add(
+                            "transfers.{$index}.start_time",
+                            "Se for especificado um horário parcial, tanto a hora de início como a hora de fim são obrigatórias."
+                        );
+                    } elseif ($trStart && $trEnd && $trEnd <= $trStart) {
+                        $validator->errors()->add(
+                            "transfers.{$index}.end_time",
+                            "A hora de fim da cedência deve ser posterior à hora de início."
+                        );
                     }
 
                     $assistantId = $tr['assistant_id'] ?? null;

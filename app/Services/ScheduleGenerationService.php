@@ -1038,6 +1038,35 @@ class ScheduleGenerationService
             ];
         }
 
+        // Se este assistente tiver uma transferência temporária de entrada com horário parcial nesta data e escola
+        $incomingTr = null;
+        if (! empty($snapshot['incoming_transfers'])) {
+            foreach ($snapshot['incoming_transfers'] as $tr) {
+                if ($tr->assistant_id === $assistantId) {
+                    $from = $tr->valid_from?->format('Y-m-d');
+                    $until = $tr->valid_until?->format('Y-m-d');
+                    if (($from === null || $from <= $date) && ($until === null || $until >= $date)) {
+                        $incomingTr = $tr;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($incomingTr && ! empty($incomingTr->start_time) && ! empty($incomingTr->end_time)) {
+            $trStart = $this->toMinutes(substr((string) $incomingTr->start_time, 0, 5));
+            $trEnd = $this->toMinutes(substr((string) $incomingTr->end_time, 0, 5));
+            return $this->clipShiftToSchoolWindow(
+                $trStart,
+                $trEnd,
+                false,
+                null,
+                null,
+                0,
+                $schoolHours
+            );
+        }
+
         return $this->clipShiftToSchoolWindow(
             $this->toMinutes(substr((string) $shift->entry_time, 0, 5)),
             $this->toMinutes(substr((string) $shift->exit_time, 0, 5)),
@@ -1676,20 +1705,67 @@ class ScheduleGenerationService
 
         $results = [];
         foreach ($candidates as $candidate) {
-            // Verificar falta na data
-            $hasAbsence = Absence::where('assistant_id', $candidate->id)
+            // Verificar faltas do assistente para a data
+            $absences = Absence::where('assistant_id', $candidate->id)
                 ->whereDate('valid_from', '<=', $date)
                 ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
-                ->get()
-                ->contains(function (Absence $abs) use ($startMin, $endMin) {
-                    $aStart = $abs->start_time ? $this->toMinutes(substr((string) $abs->start_time, 0, 5)) : 0;
-                    $aEnd = $abs->end_time ? $this->toMinutes(substr((string) $abs->end_time, 0, 5)) : 1440;
+                ->get();
 
-                    return $this->intervalsOverlap($startMin, $endMin, $aStart, $aEnd);
-                });
+            $fullDayAbsence = false;
+            $partialAbsenceDetail = null;
+            $absenceOverlapsDeficit = false;
 
-            if ($hasAbsence) {
-                continue;
+            foreach ($absences as $abs) {
+                if (empty($abs->start_time) && empty($abs->end_time)) {
+                    $fullDayAbsence = true;
+                    $absenceOverlapsDeficit = true;
+                } else {
+                    $aStart = $abs->start_time ? substr((string) $abs->start_time, 0, 5) : '00:00';
+                    $aEnd = $abs->end_time ? substr((string) $abs->end_time, 0, 5) : '24:00';
+                    $partialAbsenceDetail = "Ausência {$aStart}–{$aEnd}";
+                    if ($this->intervalsOverlap($startMin, $endMin, $this->toMinutes($aStart), $this->toMinutes($aEnd))) {
+                        $absenceOverlapsDeficit = true;
+                    }
+                }
+            }
+
+            // Buscar perfil e turno contratual do assistente para o dia
+            $profile = AssistantScheduleProfile::with(['shifts.shiftDays'])
+                ->where('assistant_id', $candidate->id)
+                ->whereDate('valid_from', '<=', $date)
+                ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
+                ->orderByDesc('valid_from')
+                ->first();
+
+            $shiftStart = null;
+            $shiftEnd = null;
+            $lunchStart = null;
+            $lunchEnd = null;
+            $lunchDuration = null;
+            $worksToday = false;
+
+            if ($profile) {
+                $targetLabel = 'A';
+                if ($profile->type === 'rotativo') {
+                    $anchorDate = CarbonImmutable::parse($profile->valid_from->format('Y-m-d'));
+                    $currentDate = CarbonImmutable::parse($date);
+                    $startsWith = $profile->starts_with === 'B' ? 'B' : 'A';
+                    $opposite = $startsWith === 'A' ? 'B' : 'A';
+                    $weeksDiff = (int) floor($anchorDate->startOfWeek()->diffInDays($currentDate->startOfWeek(), false) / 7);
+                    $index = abs($weeksDiff) % 2;
+                    $targetLabel = $index === 0 ? $startsWith : $opposite;
+                }
+                $shift = $profile->shifts->firstWhere('shift_label', $targetLabel) ?? $profile->shifts->first();
+                if ($shift) {
+                    $worksToday = $shift->shiftDays->contains(fn ($d) => (int) $d->day_of_week === $weekday);
+                    if ($worksToday) {
+                        $shiftStart = substr((string) $shift->entry_time, 0, 5);
+                        $shiftEnd = substr((string) $shift->exit_time, 0, 5);
+                        $lunchStart = $shift->lunch_start ? substr((string) $shift->lunch_start, 0, 5) : null;
+                        $lunchEnd = $shift->lunch_end ? substr((string) $shift->lunch_end, 0, 5) : null;
+                        $lunchDuration = $shift->lunch_enabled ? (int) $shift->lunch_duration_minutes : null;
+                    }
+                }
             }
 
             // Verificar se causa rutura de mínimos em alguma regra obrigatória da escola de origem
@@ -1721,15 +1797,32 @@ class ScheduleGenerationService
                 }
             }
 
+            $selectable = ! $fullDayAbsence && ! $absenceOverlapsDeficit && $worksToday && ! $causesOriginShortfall;
+            $score = 96;
+            if ($fullDayAbsence || ! $worksToday || $absenceOverlapsDeficit) {
+                $score = 0;
+            } elseif ($causesOriginShortfall) {
+                $score = 72;
+            }
+
             $results[] = [
                 'assistant_id' => $candidate->id,
                 'name' => $this->assistantDisplayName($candidate),
                 'origin_school_id' => $candidate->school_id,
                 'origin_school_name' => $candidate->school?->name,
+                'shift_start' => $shiftStart,
+                'shift_end' => $shiftEnd,
+                'lunch_start' => $lunchStart,
+                'lunch_end' => $lunchEnd,
+                'lunch_duration' => $lunchDuration,
+                'is_absent' => $fullDayAbsence,
+                'partial_absence' => $partialAbsenceDetail,
+                'absence_overlaps' => $absenceOverlapsDeficit,
+                'works_today' => $worksToday,
                 'causes_origin_shortfall' => $causesOriginShortfall,
-                'selectable' => ! $causesOriginShortfall,
-                'score' => $causesOriginShortfall ? 72 : 96,
-                'origin_impact_detail' => $originImpactDetail,
+                'selectable' => $selectable,
+                'score' => $score,
+                'origin_impact_detail' => $originImpactDetail ?? ($fullDayAbsence ? 'Ausência de dia inteiro' : ($absenceOverlapsDeficit ? $partialAbsenceDetail : (! $worksToday ? 'Dia de folga' : null))),
             ];
         }
 
@@ -1756,19 +1849,36 @@ class ScheduleGenerationService
             fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
         ));
 
-        if (empty($freeSegments)) {
-            return null;
+        if (! empty($freeSegments)) {
+            if ($alternator % 2 === 0) {
+                $seg = $freeSegments[0];
+
+                return [$seg[0], $seg[0] + $duration];
+            }
+
+            $seg = $freeSegments[count($freeSegments) - 1];
+
+            return [$seg[1] - $duration, $seg[1]];
         }
 
-        if ($alternator % 2 === 0) {
-            $seg = $freeSegments[0];
+        // Se a janela habitual estiver bloqueada pela cedência ou tarefas,
+        // alarga a pesquisa para todo o turno [entry_min, exit_min]
+        // garantindo que o assistente tem sempre o seu bloco contínuo de almoço
+        $fallbackSegments = array_values(array_filter(
+            $this->subtractIntervals($shift['entry_min'], $shift['exit_min'], $occupiedIntervals),
+            fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
+        ));
+
+        if (! empty($fallbackSegments)) {
+            usort($fallbackSegments, function ($a, $b) use ($lStart) {
+                return abs($a[0] - $lStart) <=> abs($b[0] - $lStart);
+            });
+            $seg = $fallbackSegments[0];
 
             return [$seg[0], $seg[0] + $duration];
         }
 
-        $seg = $freeSegments[count($freeSegments) - 1];
-
-        return [$seg[1] - $duration, $seg[1]];
+        return null;
     }
 
     /**
@@ -2206,7 +2316,15 @@ class ScheduleGenerationService
             if (($from && $date < $from) || ($until && $date > $until)) {
                 continue;
             }
-            $intervals[] = [$clipStart, $clipEnd];
+            if (! empty($tr->start_time) && ! empty($tr->end_time)) {
+                $tStart = max($clipStart, $this->toMinutes(substr((string) $tr->start_time, 0, 5)));
+                $tEnd = min($clipEnd, $this->toMinutes(substr((string) $tr->end_time, 0, 5)));
+                if ($tEnd > $tStart) {
+                    $intervals[] = [$tStart, $tEnd];
+                }
+            } else {
+                $intervals[] = [$clipStart, $clipEnd];
+            }
         }
 
         return $intervals;

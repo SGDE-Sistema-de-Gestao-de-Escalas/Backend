@@ -764,4 +764,73 @@ class ScheduleGenerationTest extends TestCase
             'assistant_id' => $externalAssistant->id,
         ]);
     }
+    public function test_partial_hours_transfer_allocates_only_transferred_window_and_adapts_lunch(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra Parcial',
+            'acronym' => 'EOP',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Com Horas Parciais',
+            internalNumber: 'PAR1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            lunchEnabled: true,
+            lunchStart: '12:00:00',
+            lunchEnd: '14:00:00',
+            lunchDuration: 60,
+            days: [0],
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        // Regra obrigatória na escola de destino às 12:15–13:30
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id,
+            'activity_type_id' => $this->vigilancia->id,
+            'period_start' => '12:15',
+            'period_end' => '13:30',
+            'min' => 1,
+            'type' => 'mandatory',
+            'valid_from' => '2026-01-01',
+            'days_of_week' => [0],
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2026-11-02',
+                        'start_time' => '12:15',
+                        'end_time' => '13:30',
+                        'rule_id' => $rule->id,
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(200);
+// Verificar que na escola de destino foram criadas entradas apenas dentro do horário transferido (12:15–13:30)
+        $schedule = Schedule::where('assistant_id', $externalAssistant->id)
+            ->where('school_id', $this->school->id)
+            ->first();
+        $this->assertNotNull($schedule);
+
+        $entries = ScheduleEntry::where('schedule_id', $schedule->id)->get();
+        $this->assertNotEmpty($entries); 
+                foreach ($entries as $e) {
+            $this->assertGreaterThanOrEqual('12:15', substr($e->start_time, 0, 5));
+            $this->assertLessThanOrEqual('13:30', substr($e->end_time, 0, 5));
+        }
+
+        // Verificar que a transferência temporária tem start_time e end_time gravados
+        $assignment = \App\Models\Assistants\AssistantTemporaryAssignments::where('assistant_id', $externalAssistant->id)->first();
+        $this->assertNotNull($assignment);
+        $this->assertEquals('12:15', substr($assignment->start_time, 0, 5));
+        $this->assertEquals('13:30', substr($assignment->end_time, 0, 5));
+    }
 }
