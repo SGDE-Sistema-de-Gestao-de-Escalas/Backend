@@ -12,6 +12,7 @@ use App\Http\Controllers\API\Schools\OperatingCalendarController;
 use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
 use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
+use App\Http\Controllers\API\System\NotificationController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
 use App\Http\Controllers\API\Assistants\AssistantExceptionController;
@@ -118,6 +119,19 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
 
     Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
         ->name('dashboard.bootstrap');
+
+    // Notificações do utilizador autenticado (sino). Pessoais: a NotificationPolicy
+    // garante que cada um só acede às suas. `read-all` tem de vir antes de `{notification}`.
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show'])
+        ->name('notifications.show');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])
+        ->name('notifications.destroy');
 
     // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
     // Permissões via AbsencePolicy e FormRequests.
