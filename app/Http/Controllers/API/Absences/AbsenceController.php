@@ -8,6 +8,7 @@ use App\Http\Requests\Absences\UpdateAbsenceRequest;
 use App\Http\Resources\AbsenceResource;
 use App\Models\Absences\Absence;
 use App\Services\AbsenceService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -18,7 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class AbsenceController extends Controller
 {
     public function __construct(
-        private readonly AbsenceService $absenceService
+        private readonly AbsenceService $absenceService,
+        private readonly NotificationService $notifications
     ) {}
 
     /**
@@ -149,6 +151,9 @@ class AbsenceController extends Controller
 
         $absence = $this->absenceService->create($validated, $document, $request->user());
 
+        // Avisa os administradores (nunca falha o registo da ausência).
+        $this->notifications->absenceRegistered($absence, $request->user());
+
         $missingDocument = (bool) ($absence->absenceType?->requires_document ?? false) && empty($absence->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
@@ -188,6 +193,10 @@ class AbsenceController extends Controller
         $document = $request->file('document');
 
         $updated = $this->absenceService->update($absence, $validated, $document, $request->user());
+
+        if ($document) {
+            $this->notifications->absenceDocumentUploaded($updated, $request->user());
+        }
 
         $missingDocument = (bool) ($updated->absenceType?->requires_document ?? false) && empty($updated->document_path);
         $warning = $missingDocument
