@@ -1815,12 +1815,42 @@ class ScheduleGenerationService
                 }
             }
 
+            $shiftEntryMin = $shiftStart ? $this->toMinutes($shiftStart) : null;
+            $shiftExitMin = $shiftEnd ? $this->toMinutes($shiftEnd) : null;
+
+            $shiftCoversDeficit = 'outside'; // 'full' | 'partial' | 'outside'
+            $overlapMinutes = 0;
+            $deficitDurationMinutes = max(1, $endMin - $startMin);
+
+            if ($shiftEntryMin !== null && $shiftExitMin !== null) {
+                $overlapStart = max($startMin, $shiftEntryMin);
+                $overlapEnd = min($endMin, $shiftExitMin);
+                if ($overlapEnd > $overlapStart) {
+                    $overlapMinutes = $overlapEnd - $overlapStart;
+                    if ($overlapMinutes >= $deficitDurationMinutes) {
+                        $shiftCoversDeficit = 'full';
+                    } else {
+                        $shiftCoversDeficit = 'partial';
+                    }
+                } else {
+                    $shiftCoversDeficit = 'outside';
+                }
+            }
+
             $selectable = ! $fullDayAbsence && ! $absenceOverlapsDeficit && $worksToday && ! $causesOriginShortfall;
-            $score = 96;
+
             if ($fullDayAbsence || ! $worksToday || $absenceOverlapsDeficit) {
                 $score = 0;
-            } elseif ($causesOriginShortfall) {
-                $score = 72;
+            } else {
+                if ($shiftCoversDeficit === 'full') {
+                    $score = $causesOriginShortfall ? 75 : 98;
+                } elseif ($shiftCoversDeficit === 'partial') {
+                    $ratio = $overlapMinutes / $deficitDurationMinutes;
+                    $base = (int) round(55 + ($ratio * 30));
+                    $score = $causesOriginShortfall ? max(35, $base - 20) : $base;
+                } else {
+                    $score = $causesOriginShortfall ? 25 : 45;
+                }
             }
 
             $results[] = [
@@ -1840,7 +1870,10 @@ class ScheduleGenerationService
                 'causes_origin_shortfall' => $causesOriginShortfall,
                 'selectable' => $selectable,
                 'score' => $score,
-                'origin_impact_detail' => $originImpactDetail ?? ($fullDayAbsence ? 'Ausência de dia inteiro' : ($absenceOverlapsDeficit ? $partialAbsenceDetail : (! $worksToday ? 'Dia de folga' : null))),
+                'shift_covers_deficit' => $shiftCoversDeficit,
+                'overlap_minutes' => $overlapMinutes,
+                'deficit_duration_minutes' => $deficitDurationMinutes,
+                'origin_impact_detail' => $originImpactDetail ?? ($fullDayAbsence ? 'Ausência de dia inteiro' : ($absenceOverlapsDeficit ? $partialAbsenceDetail : (! $worksToday ? 'Dia de folga' : ($shiftCoversDeficit === 'outside' ? "Turno habitual ({$shiftStart}–{$shiftEnd}) não abrange o défice ({$startStr}–{$endStr})" : null)))),
             ];
         }
 
