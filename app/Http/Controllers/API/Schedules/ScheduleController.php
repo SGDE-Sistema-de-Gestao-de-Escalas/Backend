@@ -10,6 +10,7 @@ use App\Http\Resources\Schedules\ScheduleResource;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleIntegrityService;
@@ -24,6 +25,7 @@ class ScheduleController extends Controller
     public function __construct(
         private readonly ScheduleGenerationService $generationService,
         private readonly ScheduleIntegrityService $integrityService,
+        private readonly NotificationService $notifications,
     ) {}
 
     /**
@@ -128,7 +130,7 @@ class ScheduleController extends Controller
                     $trStart = ! empty($tr['start_time']) ? substr($tr['start_time'], 0, 5) : null;
                     $trEnd = ! empty($tr['end_time']) ? substr($tr['end_time'], 0, 5) : null;
 
-                    AssistantTemporaryAssignments::firstOrCreate(
+                    $assignment = AssistantTemporaryAssignments::firstOrCreate(
                         [
                             'assistant_id' => $extAssistant->id,
                             'origin_school_id' => $extAssistant->school_id,
@@ -144,6 +146,10 @@ class ScheduleController extends Controller
                             'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
                         ]
                     );
+
+                    if ($assignment->wasRecentlyCreated) {
+                        $this->notifications->transferAssigned($assignment, $request->user());
+                    }
                 }
             }
 
@@ -155,6 +161,15 @@ class ScheduleController extends Controller
                 idempotencyKey: $validated['idempotency_key'] ?? null,
             );
         });
+
+        // Notificações para os administradores (nunca falham a operação principal).
+        $actor = $request->user();
+        if (! empty($result['conflicts'])) {
+            $this->notifications->scheduleGenerationDeficit($schoolId, $result, $actor);
+        } else {
+            $this->notifications->scheduleGenerated($schoolId, $result, $actor);
+        }
+        $this->notifications->assistantsMissingProfile($schoolId, $result, $actor);
 
         return response()->json($result, 200);
     }
@@ -288,6 +303,14 @@ class ScheduleController extends Controller
             schoolId: $schoolId,
             startDate: $validated['start_date'],
             endDate: $validated['end_date'],
+        );
+
+        $this->notifications->schedulePublished(
+            $schoolId,
+            $validated['start_date'],
+            $validated['end_date'],
+            $count,
+            $request->user()
         );
 
         return response()->json([
