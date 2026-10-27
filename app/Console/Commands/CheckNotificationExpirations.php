@@ -9,7 +9,7 @@ class CheckNotificationExpirations extends Command
 {
     protected $signature = 'notifications:check-expirations';
 
-    protected $description = 'Cria notificações para vigências a expirar (exceções, perfis, regras, cedências) e faltas por justificar.';
+    protected $description = 'Cria notificações para vigências a expirar (exceções, exceções de funcionamento, perfis, regras, cedências) e faltas por justificar.';
 
     public function handle(NotificationService $notifications): int
     {

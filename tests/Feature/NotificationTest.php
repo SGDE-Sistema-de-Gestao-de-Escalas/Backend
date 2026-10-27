@@ -358,6 +358,15 @@ class NotificationTest extends TestCase
             'valid_from' => $today->toDateString(), 'valid_until' => $today->addDays(40)->toDateString(),
         ]);
 
+        $closure = \App\Models\Schools\SchoolOperatingException::create([ // exceção de funcionamento (Motor) a terminar
+            'school_id' => $this->school->id, 'name' => 'Obras', 'is_closed' => true,
+            'valid_from' => $today->subDays(3)->toDateString(), 'valid_until' => $today->addDays(4)->toDateString(),
+        ]);
+        \App\Models\Schools\SchoolOperatingException::create([ // fora da janela de 7 dias: não notifica
+            'school_id' => $this->school->id, 'name' => 'Natal', 'is_closed' => true,
+            'valid_from' => $today->addDays(20)->toDateString(), 'valid_until' => $today->addDays(30)->toDateString(),
+        ]);
+
         $this->makeAssistant('Perfil', $today->addDays(10)->toDateString()); // perfil a terminar, sem seguinte
         $withNext = $this->makeAssistant('PerfilComSeguinte', $today->addDays(10)->toDateString());
         AssistantScheduleProfile::create(['assistant_id' => $withNext->id, 'type' => 'fixo', 'valid_from' => $today->addDays(11)->toDateString(), 'valid_until' => null]);
@@ -387,13 +396,14 @@ class NotificationTest extends TestCase
         $expected = [
             'absence.pending_review' => 1,
             'exception.expiring' => 1,
+            'operating_exception.expiring' => 1,
             'profile.expiring' => 1,
             'rule.expiring' => 1,
             'transfer.ending' => 2, // escola de origem + escola de destino
         ];
         $this->assertEquals($expected, $byEvent());
         $this->assertEquals(
-            ['exception.expiring' => 'expiry', 'profile.expiring' => 'expiry', 'rule.expiring' => 'expiry', 'transfer.ending' => 'expiry', 'absence.pending_review' => 'absence'],
+            ['exception.expiring' => 'expiry', 'operating_exception.expiring' => 'expiry', 'profile.expiring' => 'expiry', 'rule.expiring' => 'expiry', 'transfer.ending' => 'expiry', 'absence.pending_review' => 'absence'],
             Notification::where('user_id', $this->admin->id)->pluck('type', 'event')->all()
         );
 
