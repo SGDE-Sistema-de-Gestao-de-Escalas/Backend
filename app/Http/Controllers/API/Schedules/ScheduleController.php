@@ -230,6 +230,7 @@ class ScheduleController extends Controller
                 // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
                 if ($schedule->status !== 'draft') {
                     $schedule->status = 'draft';
+                    $schedule->published_at = null;
                     $schedule->save();
                 }
 

@@ -2061,9 +2061,8 @@ class ScheduleGenerationService
                         'week_end' => $weekEnd,
                     ]);
                     $schedule->assistant_schedule_profile_id = $profile?->id;
-                    if (! $schedule->exists) {
-                        $schedule->status = 'draft';
-                    }
+                    $schedule->status = 'draft';
+                    $schedule->published_at = null;
                     $schedule->generated_at = $now;
                     $schedule->save();
 
