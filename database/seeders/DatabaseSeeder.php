@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
             // Assistentes e respetivos horários (dependem das escolas).
             AssistantSeeder::class,
             AssistantScheduleProfileSeeder::class,
+            // Regras de horário por período com assistentes aptos.
+            ScheduleRuleSeeder::class,
         ]);
     }
 }

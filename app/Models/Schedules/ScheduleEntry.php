@@ -2,10 +2,11 @@
 
 namespace App\Models\Schedules;
 
+use App\Models\Assistants\Assistant;
 use App\Models\System\ActivityType;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class ScheduleEntry extends Model
 {
@@ -16,11 +17,21 @@ class ScheduleEntry extends Model
         'schedule_id',
         'activity_type_id',
         'activity_name',
+        'schedule_rule_id',
         'date',
         'start_time',
         'end_time',
         'is_locked',
+        'replaced_assistant_id',
+        'replacement_reason',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_locked' => 'boolean',
+        ];
+    }
 
     /**
      * O nome da atividade fica gravado na entrada no momento em que ela é
@@ -45,5 +56,15 @@ class ScheduleEntry extends Model
     public function activityType()
     {
         return $this->belongsTo(ActivityType::class);
+    }
+
+    public function scheduleRule()
+    {
+        return $this->belongsTo(ScheduleRule::class);
+    }
+
+    public function replacedAssistant()
+    {
+        return $this->belongsTo(Assistant::class, 'replaced_assistant_id');
     }
 }

@@ -25,10 +25,19 @@ class SchoolController extends Controller
     {
         Gate::authorize('viewAny', School::class);
 
-        $schools = School::withCount('assistants')
+        $user = request()->user();
+        $query = School::withCount('assistants')
             ->withCount(SchoolService::blockingCounts())
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($user && ! $user->isAdmin()) {
+            $schoolId = $user->assistant?->school_id;
+            if ($schoolId) {
+                $query->where('id', $schoolId);
+            }
+        }
+
+        $schools = $query->get();
 
         return SchoolResource::collection($schools);
     }

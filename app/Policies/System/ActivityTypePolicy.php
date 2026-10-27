@@ -9,12 +9,12 @@ class ActivityTypePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     public function view(User $user, ActivityType $activityType): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     public function create(User $user): bool

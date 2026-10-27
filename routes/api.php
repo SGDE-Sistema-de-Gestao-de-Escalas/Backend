@@ -12,10 +12,12 @@ use App\Http\Controllers\API\Schools\OperatingCalendarController;
 use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
 use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
+use App\Http\Controllers\API\System\NotificationController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
 use App\Http\Controllers\API\Assistants\AssistantExceptionController;
 use App\Http\Controllers\API\Auth\PrivacyController;
+use App\Http\Controllers\API\Dashboard\DashboardBootstrapController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -82,16 +84,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::apiResource('holidays', HolidayController::class);
 
     // Restringe as restantes operações de gestão aos administradores.
+    // Escolas e tipos de ausência (leitura permitida a Staff para o seu perfil e justificações)
+    Route::apiResource('schools', SchoolController::class);
+    Route::apiResource('absence-types', AbsenceTypeController::class);
+
+    // Restringe as restantes operações de gestão aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         Route::apiResource('roles', RoleController::class)->only(['index']);
-        Route::apiResource('schools', SchoolController::class);
         Route::get('/assistants/{assistant}/can-anonymize', [AssistantController::class, 'canAnonymize'])
             ->withTrashed()
             ->name('assistants.can-anonymize');
         Route::post('/assistants/{assistant}/anonymize', [AssistantController::class, 'anonymize'])
             ->withTrashed()
             ->name('assistants.anonymize');
-        Route::apiResource('absence-types', AbsenceTypeController::class);
     });
 });
 
@@ -112,30 +117,66 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
         ->name('operating-calendar.index');
 
+    Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
+        ->name('dashboard.bootstrap');
+
+    // Notificações do utilizador autenticado (sino). Pessoais: a NotificationPolicy
+    // garante que cada um só acede às suas. `read-all` tem de vir antes de `{notification}`.
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show'])
+        ->name('notifications.show');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])
+        ->name('notifications.destroy');
+
     // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
     // Permissões via AbsencePolicy e FormRequests.
     Route::get('/absences/{absence}/document', [AbsenceController::class, 'downloadDocument'])
         ->name('absences.document');
     Route::post('/absences/{absence}/document', [AbsenceController::class, 'update'])
         ->name('absences.document.upload');
+    Route::patch('/absences/{absence}/status', [AbsenceController::class, 'update'])
+        ->name('absences.status');
     Route::apiResource('absences', AbsenceController::class);
+
+    // Recursos acessíveis para consulta de horários e assistência por Staff (com escrita restrita a Admin)
+    Route::apiResource('activity-types', ActivityTypeController::class);
+    Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
+    Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
+    Route::apiResource('schedule-rules', ScheduleRuleController::class);
+    Route::apiResource('assistants', AssistantController::class)
+        ->withTrashed(['show', 'update', 'destroy']);
+    Route::get('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'index']);
+    Route::get('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'show']);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
         // Importação e exportação em CSV. Têm de vir antes do apiResource,
         // senão "export" seria lido como o id de um assistente.
+        Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])
+            ->name('reports.index');
         Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
             ->name('assistants.export');
         Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
             ->name('assistants.import');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
-        Route::apiResource('assistants', AssistantController::class)
-            ->withTrashed(['show', 'update', 'destroy']);
-        Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
-        Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
-        Route::apiResource('activity-types', ActivityTypeController::class);
-        Route::apiResource('schedule-rules', ScheduleRuleController::class);
+        Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
+        Route::post('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'store']);
+        Route::put('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
+        Route::patch('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
+        Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
+            ->name('schedules.generate');
+        Route::post('/schedules/publish', [ScheduleController::class, 'publish'])
+            ->name('schedules.publish');
+        Route::post('/schedules/save-days', [ScheduleController::class, 'saveDays'])
+            ->name('schedules.save-days');
+        Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
+            ->name('schedules.pending-recalculations');
     });
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
