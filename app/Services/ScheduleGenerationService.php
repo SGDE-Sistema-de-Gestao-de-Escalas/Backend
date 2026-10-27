@@ -104,6 +104,9 @@ class ScheduleGenerationService
                 'closing' => $this->toMinutes($dayInfo['closing_time']),
                 'opening_str' => $dayInfo['opening_time'],
                 'closing_str' => $dayInfo['closing_time'],
+                'lunch_start' => ! empty($dayInfo['lunch_start']) ? $this->toMinutes(substr((string) $dayInfo['lunch_start'], 0, 5)) : null,
+                'lunch_end' => ! empty($dayInfo['lunch_end']) ? $this->toMinutes(substr((string) $dayInfo['lunch_end'], 0, 5)) : null,
+                'lunch_duration' => ! empty($dayInfo['lunch_duration_minutes']) ? (int) $dayInfo['lunch_duration_minutes'] : 60,
             ];
 
             $daysSummary[] = [
@@ -494,7 +497,21 @@ class ScheduleGenerationService
 
                 // 1. Posicionar o bloco exato de almoço (lunch_duration_minutes) dentro de [lunch_start, lunch_end]
                 $lunchBlock = null;
-                if ($shift['lunch_enabled'] && $shift['lunch_duration'] > 0) {
+
+                // Prioridade de Ausências sobre Almoço:
+                // Se o assistente tem uma ausência parcial que cubra ou coincida com a janela de almoço,
+                // a ausência absorve a refeição ("esquece o almoço") e não aloca almoço no dia.
+                $absenceCoversLunch = false;
+                if (! empty($partialAbsences) && $shift['lunch_start_min'] !== null && $shift['lunch_end_min'] !== null) {
+                    foreach ($partialAbsences as [$absStart, $absEnd]) {
+                        if ($absEnd > $shift['lunch_start_min'] && $absStart < $shift['lunch_end_min']) {
+                            $absenceCoversLunch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (! $absenceCoversLunch && $shift['lunch_enabled'] && $shift['lunch_duration'] > 0) {
                     $occupiedForLunch = array_merge(
                         array_map(fn ($t) => [$t['start_min'], $t['end_min']], $currentTasks),
                         $partialAbsences,
@@ -1079,13 +1096,21 @@ class ScheduleGenerationService
             );
         }
 
+        $shiftLunchStart = $shift->lunch_start
+            ? $this->toMinutes(substr((string) $shift->lunch_start, 0, 5))
+            : ($schoolHours['lunch_start'] ?? null);
+        $shiftLunchEnd = $shift->lunch_end
+            ? $this->toMinutes(substr((string) $shift->lunch_end, 0, 5))
+            : ($schoolHours['lunch_end'] ?? null);
+        $shiftLunchDuration = (int) ($shift->lunch_duration_minutes ?? $schoolHours['lunch_duration'] ?? 60);
+
         return $this->clipShiftToSchoolWindow(
             $this->toMinutes(substr((string) $shift->entry_time, 0, 5)),
             $this->toMinutes(substr((string) $shift->exit_time, 0, 5)),
             (bool) $shift->lunch_enabled,
-            $shift->lunch_start ? $this->toMinutes(substr((string) $shift->lunch_start, 0, 5)) : null,
-            $shift->lunch_end ? $this->toMinutes(substr((string) $shift->lunch_end, 0, 5)) : null,
-            (int) ($shift->lunch_duration_minutes ?? 0),
+            $shiftLunchStart,
+            $shiftLunchEnd,
+            $shiftLunchDuration,
             $schoolHours
         );
     }
@@ -1912,21 +1937,25 @@ class ScheduleGenerationService
             return [$seg[1] - $duration, $seg[1]];
         }
 
-        // Se a janela habitual estiver bloqueada pela cedência ou tarefas,
-        // alarga a pesquisa para todo o turno [entry_min, exit_min]
-        // garantindo que o assistente tem sempre o seu bloco contínuo de almoço
-        $fallbackSegments = array_values(array_filter(
-            $this->subtractIntervals($shift['entry_min'], $shift['exit_min'], $occupiedIntervals),
-            fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
-        ));
+        // Se a janela habitual estiver bloqueada por tarefas, alarga apenas para uma janela
+        // razoável de almoço (entre as 11:30 e as 15:30), NUNCA para horários matinais (ex: 10h) ou final de turno
+        $minLunchEarliest = max($shift['entry_min'], 11 * 60 + 30);
+        $maxLunchLatest = min($shift['exit_min'], 15 * 60 + 30);
 
-        if (! empty($fallbackSegments)) {
-            usort($fallbackSegments, function ($a, $b) use ($lStart) {
-                return abs($a[0] - $lStart) <=> abs($b[0] - $lStart);
-            });
-            $seg = $fallbackSegments[0];
+        if ($maxLunchLatest - $minLunchEarliest >= $duration) {
+            $fallbackSegments = array_values(array_filter(
+                $this->subtractIntervals($minLunchEarliest, $maxLunchLatest, $occupiedIntervals),
+                fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
+            ));
 
-            return [$seg[0], $seg[0] + $duration];
+            if (! empty($fallbackSegments)) {
+                usort($fallbackSegments, function ($a, $b) use ($lStart) {
+                    return abs($a[0] - $lStart) <=> abs($b[0] - $lStart);
+                });
+                $seg = $fallbackSegments[0];
+
+                return [$seg[0], $seg[0] + $duration];
+            }
         }
 
         return null;
