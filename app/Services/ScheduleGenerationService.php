@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\SchedulePublishedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
@@ -18,7 +19,9 @@ use Database\Seeders\ActivityTypeSeeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ScheduleGenerationService
 {
@@ -625,12 +628,16 @@ class ScheduleGenerationService
     }
 
     /**
-     * Publica as escalas em rascunho de uma escola num intervalo de datas.
+     * Publica as escalas em rascunho de uma escola num intervalo de datas
+     * e envia um único email consolidado por assistente abrangido.
      */
     public function publish(string $schoolId, string $startDate, string $endDate): int
     {
-        return DB::transaction(function () use ($schoolId, $startDate, $endDate) {
-            $schedules = Schedule::where('school_id', $schoolId)
+        $notificationsByAssistant = [];
+
+        $publishedCount = DB::transaction(function () use ($schoolId, $startDate, $endDate, &$notificationsByAssistant) {
+            $schedules = Schedule::with(['assistant.user', 'school'])
+                ->where('school_id', $schoolId)
                 ->whereDate('week_start', '<=', $endDate)
                 ->whereDate('week_end', '>=', $startDate)
                 ->where('status', 'draft')
@@ -639,13 +646,47 @@ class ScheduleGenerationService
 
             $now = now();
             foreach ($schedules as $schedule) {
+                $wasPreviouslyPublished = $schedule->published_at !== null;
+
                 $schedule->status = 'published';
                 $schedule->published_at = $now;
                 $schedule->save();
+
+                $assistant = $schedule->assistant;
+                $user = $assistant?->user;
+
+                if ($assistant && ! $assistant->is_anonymized && $user && $user->is_active && $user->email) {
+                    $assistantId = (string) $assistant->id;
+                    if (! isset($notificationsByAssistant[$assistantId])) {
+                        $notificationsByAssistant[$assistantId] = [
+                            'user' => $user,
+                            'school_name' => $schedule->school?->name ?? 'Estabelecimento de Ensino',
+                            'is_update' => $wasPreviouslyPublished,
+                        ];
+                    } elseif ($wasPreviouslyPublished) {
+                        $notificationsByAssistant[$assistantId]['is_update'] = true;
+                    }
+                }
             }
 
             return $schedules->count();
         });
+
+        foreach ($notificationsByAssistant as $payload) {
+            try {
+                Mail::to($payload['user']->email)->send(new SchedulePublishedMail(
+                    user: $payload['user'],
+                    schoolName: $payload['school_name'],
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    isUpdate: $payload['is_update'],
+                ));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $publishedCount;
     }
 
     /**
@@ -1953,9 +1994,7 @@ class ScheduleGenerationService
                         'week_end' => $weekEnd,
                     ]);
                     $schedule->assistant_schedule_profile_id = $profile?->id;
-                    if (! $schedule->exists) {
-                        $schedule->status = 'draft';
-                    }
+                    $schedule->status = 'draft';
                     $schedule->generated_at = $now;
                     $schedule->save();
 
