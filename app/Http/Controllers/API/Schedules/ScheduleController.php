@@ -10,7 +10,9 @@ use App\Http\Resources\Schedules\ScheduleResource;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
+use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Carbon\CarbonImmutable;
@@ -23,6 +25,7 @@ class ScheduleController extends Controller
     public function __construct(
         private readonly ScheduleGenerationService $generationService,
         private readonly ScheduleIntegrityService $integrityService,
+        private readonly NotificationService $notifications,
     ) {}
 
     /**
@@ -36,18 +39,20 @@ class ScheduleController extends Controller
         $query = Schedule::query()
             ->with([
                 'assistant.user',
+                'school',
                 'assistant.school',
                 'scheduleEntries.activityType',
                 'scheduleEntries.scheduleRule',
                 'scheduleEntries.replacedAssistant.user',
             ]);
 
-        if ($schoolId) {
-            $query->where('school_id', $schoolId);
-        }
-
-        // Limita a listagem às escalas do próprio assistente caso não seja administrador.
-        if (! $user->isAdmin()) {
+        // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
+        // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
+        if ($user->isAdmin()) {
+            if ($schoolId) {
+                $query->where('school_id', $schoolId);
+            }
+        } else {
             $query->whereHas('assistant', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -108,40 +113,63 @@ class ScheduleController extends Controller
         $schoolId = (string) ($request->attributes->get('currentSchoolId') ?? $request->header('X-School-ID'));
         $validated = $request->validated();
 
-        // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
-        // registar os AssistantTemporaryAssignments antes de recalcular a escala.
-        if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
-            $userId = $request->user()?->id;
-            foreach ($validated['transfers'] as $tr) {
-                $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
-                if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
-                    continue;
+        // Assegurar previamente que a atividade base/fallback existe para a escola
+        $this->generationService->ensureFallbackActivity($schoolId);
+
+        $result = DB::transaction(function () use ($request, $schoolId, $validated) {
+            // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
+            // registar os AssistantTemporaryAssignments atomicamente junto com a geração da escala.
+            if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
+                $userId = $request->user()?->id;
+                foreach ($validated['transfers'] as $tr) {
+                    $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
+                    if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
+                        continue;
+                    }
+
+                    $trStart = ! empty($tr['start_time']) ? substr($tr['start_time'], 0, 5) : null;
+                    $trEnd = ! empty($tr['end_time']) ? substr($tr['end_time'], 0, 5) : null;
+
+                    $assignment = AssistantTemporaryAssignments::firstOrCreate(
+                        [
+                            'assistant_id' => $extAssistant->id,
+                            'origin_school_id' => $extAssistant->school_id,
+                            'destination_school_id' => $schoolId,
+                            'valid_from' => $tr['date'],
+                            'valid_until' => $tr['date'],
+                            'start_time' => $trStart,
+                            'end_time' => $trEnd,
+                        ],
+                        [
+                            'created_by_user_id' => $userId,
+                            'validated_by_user_id' => $userId,
+                            'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
+                        ]
+                    );
+
+                    if ($assignment->wasRecentlyCreated) {
+                        $this->notifications->transferAssigned($assignment, $request->user());
+                    }
                 }
-
-                AssistantTemporaryAssignments::firstOrCreate(
-                    [
-                        'assistant_id' => $extAssistant->id,
-                        'origin_school_id' => $extAssistant->school_id,
-                        'destination_school_id' => $schoolId,
-                        'valid_from' => $tr['date'],
-                        'valid_until' => $tr['date'],
-                    ],
-                    [
-                        'created_by_user_id' => $userId,
-                        'validated_by_user_id' => $userId,
-                        'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
-                    ]
-                );
             }
-        }
 
-        $result = $this->generationService->generate(
-            schoolId: $schoolId,
-            startDate: $validated['start_date'],
-            endDate: $validated['end_date'],
-            preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
-            idempotencyKey: $validated['idempotency_key'] ?? null,
-        );
+            return $this->generationService->generate(
+                schoolId: $schoolId,
+                startDate: $validated['start_date'],
+                endDate: $validated['end_date'],
+                preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
+                idempotencyKey: $validated['idempotency_key'] ?? null,
+            );
+        });
+
+        // Notificações para os administradores (nunca falham a operação principal).
+        $actor = $request->user();
+        if (! empty($result['conflicts'])) {
+            $this->notifications->scheduleGenerationDeficit($schoolId, $result, $actor);
+        } else {
+            $this->notifications->scheduleGenerated($schoolId, $result, $actor);
+        }
+        $this->notifications->assistantsMissingProfile($schoolId, $result, $actor);
 
         return response()->json($result, 200);
     }
@@ -217,6 +245,7 @@ class ScheduleController extends Controller
                 // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
                 if ($schedule->status !== 'draft') {
                     $schedule->status = 'draft';
+                    $schedule->published_at = null;
                     $schedule->save();
                 }
 
@@ -276,6 +305,14 @@ class ScheduleController extends Controller
             endDate: $validated['end_date'],
         );
 
+        $this->notifications->schedulePublished(
+            $schoolId,
+            $validated['start_date'],
+            $validated['end_date'],
+            $count,
+            $request->user()
+        );
+
         return response()->json([
             'status' => 'published',
             'published_schedules_count' => $count,
@@ -297,7 +334,8 @@ class ScheduleController extends Controller
     {
         $schedule->load([
             'assistant.user',
-            'assistant.school',
+            'school',
+                'assistant.school',
             'scheduleEntries.activityType',
             'scheduleEntries.scheduleRule',
             'scheduleEntries.replacedAssistant.user',

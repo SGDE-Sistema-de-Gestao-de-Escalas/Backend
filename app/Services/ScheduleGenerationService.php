@@ -111,6 +111,9 @@ class ScheduleGenerationService
                 'closing' => $this->toMinutes($dayInfo['closing_time']),
                 'opening_str' => $dayInfo['opening_time'],
                 'closing_str' => $dayInfo['closing_time'],
+                'lunch_start' => ! empty($dayInfo['lunch_start']) ? $this->toMinutes(substr((string) $dayInfo['lunch_start'], 0, 5)) : null,
+                'lunch_end' => ! empty($dayInfo['lunch_end']) ? $this->toMinutes(substr((string) $dayInfo['lunch_end'], 0, 5)) : null,
+                'lunch_duration' => ! empty($dayInfo['lunch_duration_minutes']) ? (int) $dayInfo['lunch_duration_minutes'] : 60,
             ];
 
             $daysSummary[] = [
@@ -179,7 +182,13 @@ class ScheduleGenerationService
                 // -------------------------------------------------------------
                 // RONDA A: Período Completo [effStart, effEnd) com a fila da regra
                 // -------------------------------------------------------------
-                foreach ($rule->assistants as $candidate) {
+                $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                    ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                $rondaACandidates = $rule->assistants->concat($incomingAssistants);
+
+                foreach ($rondaACandidates as $candidate) {
                     if ($assignedFullCount >= $rule->min) {
                         break;
                     }
@@ -403,7 +412,13 @@ class ScheduleGenerationService
 
                 $assignedOpt = $this->countFullCoverageForRule($dayAssignments, $rule, $effStart, $effEnd);
 
-                foreach ($rule->assistants as $candidate) {
+                $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                    ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                $rondaACandidates = $rule->assistants->concat($incomingAssistants);
+
+                foreach ($rondaACandidates as $candidate) {
                     if ($assignedOpt >= $rule->min) {
                         break;
                     }
@@ -489,7 +504,21 @@ class ScheduleGenerationService
 
                 // 1. Posicionar o bloco exato de almoço (lunch_duration_minutes) dentro de [lunch_start, lunch_end]
                 $lunchBlock = null;
-                if ($shift['lunch_enabled'] && $shift['lunch_duration'] > 0) {
+
+                // Prioridade de Ausências sobre Almoço:
+                // Se o assistente tem uma ausência parcial que cubra ou coincida com a janela de almoço,
+                // a ausência absorve a refeição ("esquece o almoço") e não aloca almoço no dia.
+                $absenceCoversLunch = false;
+                if (! empty($partialAbsences) && $shift['lunch_start_min'] !== null && $shift['lunch_end_min'] !== null) {
+                    foreach ($partialAbsences as [$absStart, $absEnd]) {
+                        if ($absEnd > $shift['lunch_start_min'] && $absStart < $shift['lunch_end_min']) {
+                            $absenceCoversLunch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (! $absenceCoversLunch && $shift['lunch_enabled'] && $shift['lunch_duration'] > 0) {
                     $occupiedForLunch = array_merge(
                         array_map(fn ($t) => [$t['start_min'], $t['end_min']], $currentTasks),
                         $partialAbsences,
@@ -687,6 +716,15 @@ class ScheduleGenerationService
         }
 
         return $publishedCount;
+    }
+
+    /**
+     * Ponto de entrada público para assegurar que a escola tem a atividade fallback persistida.
+     */
+    public function ensureFallbackActivity(string|School $school): ActivityType
+    {
+        $schoolModel = $school instanceof School ? $school : School::findOrFail($school);
+        return $this->resolveOrCreateFallbackActivity($schoolModel);
     }
 
     /**
@@ -1132,13 +1170,50 @@ class ScheduleGenerationService
             ];
         }
 
+        // Se este assistente tiver uma transferência temporária de entrada com horário parcial nesta data e escola
+        $incomingTr = null;
+        if (! empty($snapshot['incoming_transfers'])) {
+            foreach ($snapshot['incoming_transfers'] as $tr) {
+                if ($tr->assistant_id === $assistantId) {
+                    $from = $tr->valid_from?->format('Y-m-d');
+                    $until = $tr->valid_until?->format('Y-m-d');
+                    if (($from === null || $from <= $date) && ($until === null || $until >= $date)) {
+                        $incomingTr = $tr;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($incomingTr && ! empty($incomingTr->start_time) && ! empty($incomingTr->end_time)) {
+            $trStart = $this->toMinutes(substr((string) $incomingTr->start_time, 0, 5));
+            $trEnd = $this->toMinutes(substr((string) $incomingTr->end_time, 0, 5));
+            return $this->clipShiftToSchoolWindow(
+                $trStart,
+                $trEnd,
+                false,
+                null,
+                null,
+                0,
+                $schoolHours
+            );
+        }
+
+        $shiftLunchStart = $shift->lunch_start
+            ? $this->toMinutes(substr((string) $shift->lunch_start, 0, 5))
+            : ($schoolHours['lunch_start'] ?? null);
+        $shiftLunchEnd = $shift->lunch_end
+            ? $this->toMinutes(substr((string) $shift->lunch_end, 0, 5))
+            : ($schoolHours['lunch_end'] ?? null);
+        $shiftLunchDuration = (int) ($shift->lunch_duration_minutes ?? $schoolHours['lunch_duration'] ?? 60);
+
         return $this->clipShiftToSchoolWindow(
             $this->toMinutes(substr((string) $shift->entry_time, 0, 5)),
             $this->toMinutes(substr((string) $shift->exit_time, 0, 5)),
             (bool) $shift->lunch_enabled,
-            $shift->lunch_start ? $this->toMinutes(substr((string) $shift->lunch_start, 0, 5)) : null,
-            $shift->lunch_end ? $this->toMinutes(substr((string) $shift->lunch_end, 0, 5)) : null,
-            (int) ($shift->lunch_duration_minutes ?? 0),
+            $shiftLunchStart,
+            $shiftLunchEnd,
+            $shiftLunchDuration,
             $schoolHours
         );
     }
@@ -1354,12 +1429,18 @@ class ScheduleGenerationService
 
                 while ($cursor < $gapEnd) {
                     $remaining = $gapEnd - $cursor;
-                    $minStint = min(60, $remaining);
+                    $minStint = min(15, $remaining);
                     $bestCandidate = null;
                     $bestEnd = $cursor;
                     $bestOptionalConflicts = [];
 
-                    foreach ($rule->assistants as $candidate) {
+                    $ruleCandidateIds = $rule->assistants->pluck('id')->all();
+                    $incomingTrIds = collect($snapshot['incoming_transfers'] ?? [])->pluck('assistant_id')->all();
+                    $incomingAssistants = $this->getSchoolAndIncomingAssistantsForDay($snapshot, $schoolId, $date)
+                        ->filter(fn ($a) => in_array($a->id, $incomingTrIds, true) && ! in_array($a->id, $ruleCandidateIds, true));
+                    $rondaBCandidates = $rule->assistants->concat($incomingAssistants);
+
+                    foreach ($rondaBCandidates as $candidate) {
                         if ($this->isAlreadyAssignedToInterval($dayAssignments, $candidate->id, $cursor, $cursor + 15, $rule->id)) {
                             continue;
                         }
@@ -1770,20 +1851,67 @@ class ScheduleGenerationService
 
         $results = [];
         foreach ($candidates as $candidate) {
-            // Verificar falta na data
-            $hasAbsence = Absence::where('assistant_id', $candidate->id)
+            // Verificar faltas do assistente para a data
+            $absences = Absence::where('assistant_id', $candidate->id)
                 ->whereDate('valid_from', '<=', $date)
                 ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
-                ->get()
-                ->contains(function (Absence $abs) use ($startMin, $endMin) {
-                    $aStart = $abs->start_time ? $this->toMinutes(substr((string) $abs->start_time, 0, 5)) : 0;
-                    $aEnd = $abs->end_time ? $this->toMinutes(substr((string) $abs->end_time, 0, 5)) : 1440;
+                ->get();
 
-                    return $this->intervalsOverlap($startMin, $endMin, $aStart, $aEnd);
-                });
+            $fullDayAbsence = false;
+            $partialAbsenceDetail = null;
+            $absenceOverlapsDeficit = false;
 
-            if ($hasAbsence) {
-                continue;
+            foreach ($absences as $abs) {
+                if (empty($abs->start_time) && empty($abs->end_time)) {
+                    $fullDayAbsence = true;
+                    $absenceOverlapsDeficit = true;
+                } else {
+                    $aStart = $abs->start_time ? substr((string) $abs->start_time, 0, 5) : '00:00';
+                    $aEnd = $abs->end_time ? substr((string) $abs->end_time, 0, 5) : '24:00';
+                    $partialAbsenceDetail = "Ausência {$aStart}–{$aEnd}";
+                    if ($this->intervalsOverlap($startMin, $endMin, $this->toMinutes($aStart), $this->toMinutes($aEnd))) {
+                        $absenceOverlapsDeficit = true;
+                    }
+                }
+            }
+
+            // Buscar perfil e turno contratual do assistente para o dia
+            $profile = AssistantScheduleProfile::with(['shifts.shiftDays'])
+                ->where('assistant_id', $candidate->id)
+                ->whereDate('valid_from', '<=', $date)
+                ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
+                ->orderByDesc('valid_from')
+                ->first();
+
+            $shiftStart = null;
+            $shiftEnd = null;
+            $lunchStart = null;
+            $lunchEnd = null;
+            $lunchDuration = null;
+            $worksToday = false;
+
+            if ($profile) {
+                $targetLabel = 'A';
+                if ($profile->type === 'rotativo') {
+                    $anchorDate = CarbonImmutable::parse($profile->valid_from->format('Y-m-d'));
+                    $currentDate = CarbonImmutable::parse($date);
+                    $startsWith = $profile->starts_with === 'B' ? 'B' : 'A';
+                    $opposite = $startsWith === 'A' ? 'B' : 'A';
+                    $weeksDiff = (int) floor($anchorDate->startOfWeek()->diffInDays($currentDate->startOfWeek(), false) / 7);
+                    $index = abs($weeksDiff) % 2;
+                    $targetLabel = $index === 0 ? $startsWith : $opposite;
+                }
+                $shift = $profile->shifts->firstWhere('shift_label', $targetLabel) ?? $profile->shifts->first();
+                if ($shift) {
+                    $worksToday = $shift->shiftDays->contains(fn ($d) => (int) $d->day_of_week === $weekday);
+                    if ($worksToday) {
+                        $shiftStart = substr((string) $shift->entry_time, 0, 5);
+                        $shiftEnd = substr((string) $shift->exit_time, 0, 5);
+                        $lunchStart = $shift->lunch_start ? substr((string) $shift->lunch_start, 0, 5) : null;
+                        $lunchEnd = $shift->lunch_end ? substr((string) $shift->lunch_end, 0, 5) : null;
+                        $lunchDuration = $shift->lunch_enabled ? (int) $shift->lunch_duration_minutes : null;
+                    }
+                }
             }
 
             // Verificar se causa rutura de mínimos em alguma regra obrigatória da escola de origem
@@ -1815,15 +1943,65 @@ class ScheduleGenerationService
                 }
             }
 
+            $shiftEntryMin = $shiftStart ? $this->toMinutes($shiftStart) : null;
+            $shiftExitMin = $shiftEnd ? $this->toMinutes($shiftEnd) : null;
+
+            $shiftCoversDeficit = 'outside'; // 'full' | 'partial' | 'outside'
+            $overlapMinutes = 0;
+            $deficitDurationMinutes = max(1, $endMin - $startMin);
+
+            if ($shiftEntryMin !== null && $shiftExitMin !== null) {
+                $overlapStart = max($startMin, $shiftEntryMin);
+                $overlapEnd = min($endMin, $shiftExitMin);
+                if ($overlapEnd > $overlapStart) {
+                    $overlapMinutes = $overlapEnd - $overlapStart;
+                    if ($overlapMinutes >= $deficitDurationMinutes) {
+                        $shiftCoversDeficit = 'full';
+                    } else {
+                        $shiftCoversDeficit = 'partial';
+                    }
+                } else {
+                    $shiftCoversDeficit = 'outside';
+                }
+            }
+
+            $selectable = ! $fullDayAbsence && ! $absenceOverlapsDeficit && $worksToday && ! $causesOriginShortfall;
+
+            if ($fullDayAbsence || ! $worksToday || $absenceOverlapsDeficit) {
+                $score = 0;
+            } else {
+                if ($shiftCoversDeficit === 'full') {
+                    $score = $causesOriginShortfall ? 75 : 98;
+                } elseif ($shiftCoversDeficit === 'partial') {
+                    $ratio = $overlapMinutes / $deficitDurationMinutes;
+                    $base = (int) round(55 + ($ratio * 30));
+                    $score = $causesOriginShortfall ? max(35, $base - 20) : $base;
+                } else {
+                    $score = $causesOriginShortfall ? 25 : 45;
+                }
+            }
+
             $results[] = [
                 'assistant_id' => $candidate->id,
                 'name' => $this->assistantDisplayName($candidate),
                 'origin_school_id' => $candidate->school_id,
                 'origin_school_name' => $candidate->school?->name,
+                'shift_start' => $shiftStart,
+                'shift_end' => $shiftEnd,
+                'lunch_start' => $lunchStart,
+                'lunch_end' => $lunchEnd,
+                'lunch_duration' => $lunchDuration,
+                'is_absent' => $fullDayAbsence,
+                'partial_absence' => $partialAbsenceDetail,
+                'absence_overlaps' => $absenceOverlapsDeficit,
+                'works_today' => $worksToday,
                 'causes_origin_shortfall' => $causesOriginShortfall,
-                'selectable' => ! $causesOriginShortfall,
-                'score' => $causesOriginShortfall ? 72 : 96,
-                'origin_impact_detail' => $originImpactDetail,
+                'selectable' => $selectable,
+                'score' => $score,
+                'shift_covers_deficit' => $shiftCoversDeficit,
+                'overlap_minutes' => $overlapMinutes,
+                'deficit_duration_minutes' => $deficitDurationMinutes,
+                'origin_impact_detail' => $originImpactDetail ?? ($fullDayAbsence ? 'Ausência de dia inteiro' : ($absenceOverlapsDeficit ? $partialAbsenceDetail : (! $worksToday ? 'Dia de folga' : ($shiftCoversDeficit === 'outside' ? "Turno habitual ({$shiftStart}–{$shiftEnd}) não abrange o défice ({$startStr}–{$endStr})" : null)))),
             ];
         }
 
@@ -1845,24 +2023,28 @@ class ScheduleGenerationService
         $lEnd = $shift['lunch_end_min'];
         $duration = $shift['lunch_duration'];
 
+        if ($lStart === null || $lEnd === null || $duration <= 0) {
+            return null;
+        }
+
         $freeSegments = array_values(array_filter(
             $this->subtractIntervals($lStart, $lEnd, $occupiedIntervals),
             fn (array $seg) => ($seg[1] - $seg[0]) >= $duration
         ));
 
-        if (empty($freeSegments)) {
-            return null;
+        if (! empty($freeSegments)) {
+            if ($alternator % 2 === 0) {
+                $seg = $freeSegments[0];
+
+                return [$seg[0], $seg[0] + $duration];
+            }
+
+            $seg = $freeSegments[count($freeSegments) - 1];
+
+            return [$seg[1] - $duration, $seg[1]];
         }
 
-        if ($alternator % 2 === 0) {
-            $seg = $freeSegments[0];
-
-            return [$seg[0], $seg[0] + $duration];
-        }
-
-        $seg = $freeSegments[count($freeSegments) - 1];
-
-        return [$seg[1] - $duration, $seg[1]];
+        return null;
     }
 
     /**
@@ -1995,6 +2177,7 @@ class ScheduleGenerationService
                     ]);
                     $schedule->assistant_schedule_profile_id = $profile?->id;
                     $schedule->status = 'draft';
+                    $schedule->published_at = null;
                     $schedule->generated_at = $now;
                     $schedule->save();
 
@@ -2298,7 +2481,15 @@ class ScheduleGenerationService
             if (($from && $date < $from) || ($until && $date > $until)) {
                 continue;
             }
-            $intervals[] = [$clipStart, $clipEnd];
+            if (! empty($tr->start_time) && ! empty($tr->end_time)) {
+                $tStart = max($clipStart, $this->toMinutes(substr((string) $tr->start_time, 0, 5)));
+                $tEnd = min($clipEnd, $this->toMinutes(substr((string) $tr->end_time, 0, 5)));
+                if ($tEnd > $tStart) {
+                    $intervals[] = [$tStart, $tEnd];
+                }
+            } else {
+                $intervals[] = [$clipStart, $clipEnd];
+            }
         }
 
         return $intervals;

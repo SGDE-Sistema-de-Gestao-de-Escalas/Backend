@@ -637,10 +637,204 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonCount(1, 'conflicts')
             ->assertJsonPath('conflicts.0.transfer_candidates.0.assistant_id', $externalAssistant->id)
             ->assertJsonPath('conflicts.0.transfer_candidates.0.causes_origin_shortfall', false)
-            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96);
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 98);
+    }
+public function test_transfers_are_not_persisted_when_generation_fails(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra',
+            'acronym' => 'EO',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Externo',
+            internalNumber: 'EXT1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        // Erro de pré-validação: janela de almoço inválida (intervalo menor que a duração de 60 min)
+        // Isto faz com que o ScheduleGenerationService lance ValidationException (422)
+        $this->createAssistantWithShift(
+            name: 'Assistente Com Janela Almoço Inválida',
+            internalNumber: 'INV1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            lunchEnabled: true,
+            lunchStart: '12:00:00',
+            lunchEnd: '12:30:00',
+            lunchDuration: 60,
+            days: [0]
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2026-11-02',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422);
+
+        // A cedência NÃO deve ter sido gravada na base de dados
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $externalAssistant->id,
+            'destination_school_id' => $this->school->id,
+        ]);
     }
 
-    public function test_idempotency_key_reused_with_other_range_generates_fresh_schedule(): void
+    public function test_not_available_for_transfer_is_rejected(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra 2',
+            'acronym' => 'EO2',
+            'active' => true,
+        ]);
+        $unavailableAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Indisponível',
+            internalNumber: 'IND1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: false
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $unavailableAssistant->id,
+                        'date' => '2026-11-02',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('transfers.0.assistant_id');
+
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $unavailableAssistant->id,
+        ]);
+    }
+
+    public function test_date_outside_generation_range_is_rejected(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra 3',
+            'acronym' => 'EO3',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Externo 3',
+            internalNumber: 'EXT3',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2027-06-01',
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('transfers.0.date');
+
+        $this->assertDatabaseMissing('assistant_temporary_assignments', [
+            'assistant_id' => $externalAssistant->id,
+        ]);
+    }
+    public function test_partial_hours_transfer_allocates_only_transferred_window_and_adapts_lunch(): void
+    {
+        $otherSchool = School::create([
+            'name' => 'Escola Outra Parcial',
+            'acronym' => 'EOP',
+            'active' => true,
+        ]);
+        $externalAssistant = $this->createAssistantWithShift(
+            name: 'Assistente Com Horas Parciais',
+            internalNumber: 'PAR1',
+            entryTime: '08:00:00',
+            exitTime: '16:00:00',
+            lunchEnabled: true,
+            lunchStart: '12:00:00',
+            lunchEnd: '14:00:00',
+            lunchDuration: 60,
+            days: [0],
+            school: $otherSchool,
+            availableForTransfer: true
+        );
+
+        // Regra obrigatória na escola de destino às 12:15–13:30
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id,
+            'activity_type_id' => $this->vigilancia->id,
+            'period_start' => '12:15',
+            'period_end' => '13:30',
+            'min' => 1,
+            'type' => 'mandatory',
+            'valid_from' => '2026-01-01',
+            'days_of_week' => [0],
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-02',
+                'end_date' => '2026-11-02',
+                'transfers' => [
+                    [
+                        'assistant_id' => $externalAssistant->id,
+                        'date' => '2026-11-02',
+                        'start_time' => '12:15',
+                        'end_time' => '13:30',
+                        'rule_id' => $rule->id,
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(200);
+// Verificar que na escola de destino foram criadas entradas apenas dentro do horário transferido (12:15–13:30)
+        $schedule = Schedule::where('assistant_id', $externalAssistant->id)
+            ->where('school_id', $this->school->id)
+            ->first();
+        $this->assertNotNull($schedule);
+
+        $entries = ScheduleEntry::where('schedule_id', $schedule->id)->get();
+        $this->assertNotEmpty($entries); 
+                foreach ($entries as $e) {
+            $this->assertGreaterThanOrEqual('12:15', substr($e->start_time, 0, 5));
+            $this->assertLessThanOrEqual('13:30', substr($e->end_time, 0, 5));
+        }
+
+        // Verificar que a transferência temporária tem start_time e end_time gravados
+        $assignment = \App\Models\Assistants\AssistantTemporaryAssignments::where('assistant_id', $externalAssistant->id)->first();
+        $this->assertNotNull($assignment);
+        $this->assertEquals('12:15', substr($assignment->start_time, 0, 5));
+        $this->assertEquals('13:30', substr($assignment->end_time, 0, 5));
+    }
+
+public function test_idempotency_key_reused_with_other_range_generates_fresh_schedule(): void
     {
         $this->createAssistantWithShift(
             name: 'Assistente Alfa',

@@ -18,7 +18,14 @@ class NotificationFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'user_id' => \App\Models\Auth\User::factory(),
+            'school_id' => null,
+            'type' => 'info',
+            'event' => 'schedule.generated',
+            'title' => fake()->sentence(4),
+            'body' => fake()->sentence(),
+            'data' => null,
+            'read_at' => null,
         ];
     }
 }
