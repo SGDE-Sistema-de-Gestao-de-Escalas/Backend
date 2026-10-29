@@ -8,6 +8,7 @@ use App\Mail\AbsenceStatusUpdatedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
+use App\Support\DocumentExtension;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,11 @@ class AbsenceService
                 $documentPath = $this->storeAbsenceDocument($document, $assistant);
             }
 
-            $status = $data['status'] ?? 'pending';
+            // Só o administrador decide o estado de uma falta. Um assistente cria-a
+            // sempre como pendente, mesmo que envie outro valor (o frontend envia "pending").
+            $status = ($user !== null && ! $user->isAdmin())
+                ? 'pending'
+                : ($data['status'] ?? 'pending');
             $justifiedByUserId = in_array($status, ['justified', 'unjustified'], true) ? $user?->id : null;
 
             $absence = Absence::create([
@@ -328,7 +333,7 @@ class AbsenceService
     public function storeAbsenceDocument(UploadedFile $file, Assistant $assistant): string
     {
         $folder = $this->getAssistantAbsenceDirectory($assistant);
-        $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'pdf';
+        $extension = DocumentExtension::for($file); // do conteúdo, não do nome do cliente (F-03)
         $filename = 'ausencia_' . time() . '_' . Str::random(6) . ".{$extension}";
 
         $disk = $this->getDocumentDisk();

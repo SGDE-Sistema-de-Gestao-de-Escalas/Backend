@@ -81,11 +81,17 @@ return [
     | Documents Disk
     |--------------------------------------------------------------------------
     |
-    | Define o disco onde os documentos (ex: registo criminal) são armazenados.
-    | Opções comuns: 'public' (armazenamento local) ou 'r2' (Cloudflare R2).
+    | Define o disco onde os documentos (atestados, registos criminais) são
+    | armazenados. Contêm dados pessoais, por isso o valor por omissão é o disco
+    | privado ('local', em storage/app/private), que o servidor web não serve.
+    |
+    | NUNCA usar 'public' para documentos: com `storage:link` qualquer pessoa
+    | com o endereço descarrega o ficheiro sem iniciar sessão. Os ficheiros só
+    | devem sair pelas rotas autenticadas (/absences/{id}/document e
+    | /assistants/{id}/criminal-record). Com 'r2', o bucket tem de ser privado.
     |
     */
-    'documents_disk' => env('DOCUMENTS_DISK', 'public'),
+    'documents_disk' => env('DOCUMENTS_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------

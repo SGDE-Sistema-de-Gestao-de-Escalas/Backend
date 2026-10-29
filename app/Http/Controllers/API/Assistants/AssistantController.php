@@ -204,7 +204,7 @@ class AssistantController extends Controller
             abort(404, 'Ficheiro do registo criminal não encontrado no servidor.');
         }
 
-        return Storage::disk($disk)->response($assistant->criminal_record_path);
+        return Storage::disk($disk)->response($assistant->criminal_record_path, null, ['X-Content-Type-Options' => 'nosniff']);
     }
 
 
