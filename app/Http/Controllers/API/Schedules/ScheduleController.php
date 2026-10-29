@@ -347,7 +347,7 @@ class ScheduleController extends Controller
             'start_date' => ['required', 'date_format:Y-m-d'],
             'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'format' => ['sometimes', 'string', 'in:pdf,csv'],
-            'model' => ['sometimes', 'string', 'in:wall,individual'],
+            'model' => ['sometimes', 'string', 'in:wall,individual,monthly'],
             'assistant_id' => ['nullable', 'string'],
         ]);
 
@@ -360,8 +360,17 @@ class ScheduleController extends Controller
         $startCarbon = CarbonImmutable::parse($startDate)->startOfDay();
         $endCarbon = CarbonImmutable::parse($endDate)->startOfDay();
 
-        // Limite máximo de 7 dias por exportação (inclusive: diffInDays <= 6 => 7 dias no total)
-        if ($startCarbon->diffInDays($endCarbon) >= 7) {
+        // Limite máximo de 7 dias para Escala Diária e Horário Semanal; até 45 dias para Horário Mensal
+        if ($model === 'monthly') {
+            if ($startCarbon->diffInDays($endCarbon) > 45) {
+                return response()->json([
+                    'message' => 'O intervalo de datas para o mapa mensal não pode exceder 1 mês.',
+                    'errors' => [
+                        'end_date' => ['O intervalo selecionado para o mapa mensal não pode ultrapassar 1 mês.'],
+                    ],
+                ], 422);
+            }
+        } elseif ($startCarbon->diffInDays($endCarbon) >= 7) {
             return response()->json([
                 'message' => 'O intervalo de datas para exportação não pode exceder 7 dias.',
                 'errors' => [
@@ -394,25 +403,29 @@ class ScheduleController extends Controller
         $dateSuffix = $startDate === $endDate ? $startDate : "{$startDate}_a_{$endDate}";
 
         if ($format === 'csv') {
-            $filename = $model === 'individual'
-                ? "horario_individual_{$dateSuffix}.csv"
-                : "escala_servico_{$dateSuffix}.csv";
+            $filename = match ($model) {
+                'monthly' => "horario_mensal_{$dateSuffix}.csv",
+                'individual' => "horario_individual_{$dateSuffix}.csv",
+                default => "escala_servico_{$dateSuffix}.csv",
+            };
 
-            return response()->streamDownload(function () use ($schoolId, $startDate, $endDate, $assistantId): void {
+            return response()->streamDownload(function () use ($schoolId, $startDate, $endDate, $assistantId, $model): void {
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     return;
                 }
-                $this->exportService->writeCsv($out, $schoolId, $startDate, $endDate, $assistantId);
+                $this->exportService->writeCsv($out, $schoolId, $startDate, $endDate, $assistantId, $model);
                 fclose($out);
             }, $filename, [
                 'Content-Type' => 'text/csv; charset=UTF-8',
             ]);
         }
 
-        $filename = $model === 'individual'
-            ? "horario_individual_{$dateSuffix}.pdf"
-            : "escala_diaria_{$dateSuffix}.pdf";
+        $filename = match ($model) {
+            'monthly' => "horario_mensal_{$dateSuffix}.pdf",
+            'individual' => "horario_individual_{$dateSuffix}.pdf",
+            default => "escala_diaria_{$dateSuffix}.pdf",
+        };
 
         $pdf = $this->exportService->generatePdf($schoolId, $startDate, $endDate, $model, $assistantId);
 

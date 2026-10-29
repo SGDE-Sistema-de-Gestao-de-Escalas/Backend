@@ -63,6 +63,32 @@ class ScheduleExportService
      *
      * @return array{grid_start: string, grid_end: string, month: int, year: int, month_year_title: string}
      */
+    public function resolveMonthlyGridBounds(string $startDate, string $endDate): array
+    {
+        $s = Carbon::parse($startDate)->startOfDay();
+        $e = Carbon::parse($endDate)->startOfDay();
+        $midDays = (int) floor($s->diffInDays($e) / 2);
+        $refDate = $s->copy()->addDays($midDays);
+
+        $monthFirstDay = $refDate->copy()->startOfMonth();
+        $monthLastDay = $refDate->copy()->endOfMonth();
+
+        $gridStart = $monthFirstDay->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
+        $gridEnd = $monthLastDay->copy()->endOfWeek(Carbon::SUNDAY)->format('Y-m-d');
+
+        $mNum = (int) $refDate->month;
+        $year = (int) $refDate->year;
+        $monthYearTitle = (self::MONTH_NAMES[$mNum] ?? '') . ' de ' . $year;
+
+        return [
+            'grid_start' => $gridStart,
+            'grid_end' => $gridEnd,
+            'month' => $mNum,
+            'year' => $year,
+            'month_year_title' => $monthYearTitle,
+        ];
+    }
+
     /**
      * Valida se existem escalas publicadas para permitir a impressão/exportação.
      * Devolve null se for válido ou a mensagem de erro (PT-PT) caso não possa exportar.
@@ -75,6 +101,37 @@ class ScheduleExportService
         ?string $assistantFilterId = null
     ): ?string {
         $schoolModel = $school instanceof School ? $school : School::findOrFail($school);
+
+        if ($model === 'monthly') {
+            $bounds = $this->resolveMonthlyGridBounds($startDate, $endDate);
+            $gridStart = $bounds['grid_start'];
+            $gridEnd = $bounds['grid_end'];
+            $monthTitle = $bounds['month_year_title'];
+
+            $publishedInGrid = ScheduleEntry::whereBetween('date', [$gridStart, $gridEnd])
+                ->whereHas('schedule', fn ($q) => $q->where('school_id', $schoolModel->id)->where('status', 'published'))
+                ->exists();
+
+            if (! $publishedInGrid) {
+                return "Não existe nenhuma escala publicada para {$monthTitle}. Publique a escala antes de imprimir ou exportar.";
+            }
+
+            if ($assistantFilterId !== null && $assistantFilterId !== '' && $assistantFilterId !== 'all') {
+                $hasAssistantPublished = ScheduleEntry::whereBetween('date', [$gridStart, $gridEnd])
+                    ->whereHas('schedule', fn ($q) => $q
+                        ->where('school_id', $schoolModel->id)
+                        ->where('status', 'published')
+                        ->where('assistant_id', $assistantFilterId)
+                    )
+                    ->exists();
+
+                if (! $hasAssistantPublished) {
+                    return "Não existe nenhuma escala publicada para o assistente selecionado em {$monthTitle}. Publique a escala antes de imprimir ou exportar.";
+                }
+            }
+
+            return null;
+        }
 
         $operatingDays = $this->operatingHoursResolver->forRange($schoolModel->id, $startDate, $endDate);
 
@@ -169,6 +226,22 @@ class ScheduleExportService
         $printedAt = Carbon::now()->format('d/m/Y H:i');
         $appVersion = 'SGDE v1.0';
 
+        if ($model === 'monthly') {
+            $monthlyData = $this->buildMonthlyExportData(
+                $schoolModel,
+                $startDate,
+                $endDate,
+                $assistantFilterId
+            );
+
+            return Pdf::loadView('exports.schedules-monthly', array_merge($monthlyData, [
+                'school' => $schoolModel,
+                'logoBase64' => $logoBase64,
+                'printedAt' => $printedAt,
+                'appVersion' => $appVersion,
+            ]))->setPaper('a4', 'landscape');
+        }
+
         if ($model === 'individual') {
             $individualData = $this->buildIndividualExportData(
                 $schoolModel,
@@ -212,6 +285,12 @@ class ScheduleExportService
         string $model = 'wall'
     ): void {
         $schoolModel = $school instanceof School ? $school : School::findOrFail($school);
+
+        if ($model === 'monthly') {
+            $bounds = $this->resolveMonthlyGridBounds($startDate, $endDate);
+            $startDate = $bounds['grid_start'];
+            $endDate = $bounds['grid_end'];
+        }
 
         fwrite($stream, "\xEF\xBB\xBF");
 
@@ -281,6 +360,282 @@ class ScheduleExportService
                 ], ';');
             }
         }
+    }
+
+    /**
+     * Constrói a estrutura de dados para o Horário Mensal de Serviço (grelha de calendário Segunda a Domingo,
+     * incluindo os dias do mês anterior/seguinte que completam a primeira e a última semana).
+     * Apenas considera escalas com status = 'published'.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildMonthlyExportData(
+        School $school,
+        string $startDate,
+        string $endDate,
+        ?string $assistantFilterId = null
+    ): array {
+        $bounds = $this->resolveMonthlyGridBounds($startDate, $endDate);
+        $gridStart = $bounds['grid_start'];
+        $gridEnd = $bounds['grid_end'];
+        $targetMonth = $bounds['month'];
+        $monthYearTitle = $bounds['month_year_title'];
+
+        $operatingDays = $this->operatingHoursResolver->forRange($school->id, $gridStart, $gridEnd);
+        $operatingByDate = [];
+        foreach ($operatingDays as $od) {
+            $operatingByDate[(string) $od['date']] = $od;
+        }
+
+        // Apenas entradas de escalas PUBLICADAS (status = 'published')
+        $entries = ScheduleEntry::whereBetween('date', [$gridStart, $gridEnd])
+            ->whereHas('schedule', fn ($q) => $q->where('school_id', $school->id)->where('status', 'published'))
+            ->with(['schedule.assistant.user', 'activityType'])
+            ->orderBy('start_time')
+            ->get();
+
+        $schoolAssistants = Assistant::where('school_id', $school->id)
+            ->with(['user', 'assistantScheduleProfiles.shifts.shiftDays'])
+            ->orderBy('internal_number')
+            ->orderBy('id')
+            ->get()
+            ->keyBy(fn (Assistant $a) => (string) $a->id);
+
+        foreach ($entries as $entry) {
+            $assistant = $entry->schedule?->assistant;
+            if ($assistant && ! $schoolAssistants->has((string) $assistant->id)) {
+                $assistant->loadMissing(['user', 'assistantScheduleProfiles.shifts.shiftDays']);
+                $schoolAssistants->put((string) $assistant->id, $assistant);
+            }
+        }
+
+        if ($assistantFilterId !== null && $assistantFilterId !== '' && $assistantFilterId !== 'all') {
+            if (! $schoolAssistants->has((string) $assistantFilterId)) {
+                $extraAssistant = Assistant::with(['user', 'assistantScheduleProfiles.shifts.shiftDays'])
+                    ->find($assistantFilterId);
+                if ($extraAssistant) {
+                    $schoolAssistants->put((string) $extraAssistant->id, $extraAssistant);
+                }
+            }
+
+            $schoolAssistants = $schoolAssistants
+                ->filter(fn (Assistant $a) => (string) $a->id === (string) $assistantFilterId)
+                ->keyBy(fn (Assistant $a) => (string) $a->id);
+        }
+
+        $assistantIds = $schoolAssistants->map(fn (Assistant $a) => (string) $a->id)->values()->all();
+
+        $absences = Absence::whereDate('valid_from', '<=', $gridEnd)
+            ->whereDate('valid_until', '>=', $gridStart)
+            ->whereIn('assistant_id', $assistantIds)
+            ->get()
+            ->groupBy(fn (Absence $ab) => (string) $ab->assistant_id);
+
+        $entriesByAssistant = $entries->groupBy(fn (ScheduleEntry $e) => (string) $e->schedule->assistant_id);
+
+        $gridStartFmt = Carbon::parse($gridStart)->format('d/m/Y');
+        $gridEndFmt = Carbon::parse($gridEnd)->format('d/m/Y');
+
+        $sheets = [];
+        $maxWeeksCount = 5;
+
+        foreach ($schoolAssistants as $assistant) {
+            if (! $assistant || ! $assistant->user) {
+                continue;
+            }
+
+            $assistantId = (string) $assistant->id;
+            $aEntriesAll = $entriesByAssistant->get($assistantId, collect());
+            $aAbsences = $absences->get($assistantId, collect());
+
+            if (
+                ($assistantFilterId === null || $assistantFilterId === '' || $assistantFilterId === 'all')
+                && $aEntriesAll->isEmpty()
+                && $aAbsences->isEmpty()
+            ) {
+                continue;
+            }
+
+            $entriesByDate = $aEntriesAll->groupBy(
+                fn (ScheduleEntry $e) => is_string($e->date) ? substr($e->date, 0, 10) : $e->date->format('Y-m-d')
+            );
+
+            $weeks = [];
+            $workingDaysCount = 0;
+            $absentDaysCount = 0;
+            $hasUnpublished = false;
+
+            $curr = Carbon::parse($gridStart)->startOfDay();
+            $end = Carbon::parse($gridEnd)->startOfDay();
+
+            while ($curr->lte($end)) {
+                $week = [];
+                for ($col = 0; $col < 7; $col++) {
+                    $dStr = $curr->format('Y-m-d');
+                    $inMonth = ((int) $curr->month === $targetMonth);
+                    $dayLabel = $inMonth
+                        ? $curr->format('d')
+                        : $curr->format('d') . ' ' . (self::SHORT_MONTH_NAMES[(int) $curr->month] ?? '');
+
+                    $od = $operatingByDate[$dStr] ?? [
+                        'date' => $dStr,
+                        'is_open' => ! in_array($curr->dayOfWeek, [0, 6], true),
+                        'source' => in_array($curr->dayOfWeek, [0, 6], true) ? 'weekend' : 'default',
+                        'reason' => null,
+                        'day_of_week' => ($curr->dayOfWeek + 6) % 7,
+                    ];
+
+                    if (! $od['is_open']) {
+                        $isHoliday = ($od['source'] ?? '') === 'holiday';
+                        $week[] = [
+                            'day_num' => $dayLabel,
+                            'in_month' => $inMonth,
+                            'state' => $isHoliday ? 'holiday' : 'weekend',
+                            'badge' => $isHoliday ? 'Encerrado' : 'Folga',
+                            'shift' => $isHoliday ? 'FERIADO / ENCERRADO' : 'FOLGA SEMANAL',
+                            'lunch' => $isHoliday ? ($od['reason'] ?: 'Estabelecimento encerrado') : 'Descanso semanal',
+                        ];
+                        $curr->addDay();
+                        continue;
+                    }
+
+                    $absenceRecord = $aAbsences->first(function (Absence $ab) use ($dStr) {
+                        $f = $ab->valid_from ? $ab->valid_from->format('Y-m-d') : '';
+                        $u = $ab->valid_until ? $ab->valid_until->format('Y-m-d') : $f;
+
+                        return $f <= $dStr && $u >= $dStr;
+                    });
+
+                    $isFullDayAbsent = $absenceRecord !== null && (empty($absenceRecord->start_time) || empty($absenceRecord->end_time));
+                    $dEntries = $entriesByDate->get($dStr, collect())->sortBy('start_time')->values();
+
+                    // Se já estiver uma falta programada para o dia, mostra sempre no mapa mensal (respeitando RGPD)
+                    if ($isFullDayAbsent || ($absenceRecord !== null && $dEntries->isEmpty())) {
+                        [$shiftStart, $shiftEnd] = $this->resolveDefaultShift($assistant, $dStr, (int) $od['day_of_week']);
+                        $absentDaysCount++;
+                        $week[] = [
+                            'day_num' => $dayLabel,
+                            'in_month' => $inMonth,
+                            'state' => 'absent',
+                            'badge' => 'Ausente',
+                            'shift' => 'FALTA PROGRAMADA',
+                            'lunch' => "Turno previsto: {$shiftStart} – {$shiftEnd}",
+                        ];
+                        $curr->addDay();
+                        continue;
+                    }
+
+                    if ($dEntries->isNotEmpty()) {
+                        $merged = [];
+                        foreach ($dEntries as $entry) {
+                            $st = substr((string) $entry->start_time, 0, 5);
+                            $et = substr((string) $entry->end_time, 0, 5);
+                            $actName = (string) ($entry->activity_name ?: ($entry->activityType?->name ?? 'Atividade'));
+
+                            $last = count($merged) - 1;
+                            if (
+                                $last >= 0
+                                && $merged[$last]['end'] === $st
+                                && mb_strtolower($merged[$last]['activity']) === mb_strtolower($actName)
+                            ) {
+                                $merged[$last]['end'] = $et;
+                            } else {
+                                $merged[] = [
+                                    'start' => $st,
+                                    'end' => $et,
+                                    'activity' => $actName,
+                                ];
+                            }
+                        }
+
+                        $shiftStart = $merged[0]['start'];
+                        $shiftEnd = $merged[count($merged) - 1]['end'];
+                        $lunchStr = null;
+                        $prevEnd = null;
+
+                        foreach ($merged as $m) {
+                            $st = $m['start'];
+                            $et = $m['end'];
+                            if ($prevEnd !== null && $this->timeToMin($st) > $this->timeToMin($prevEnd)) {
+                                $gapMin = $this->timeToMin($st) - $this->timeToMin($prevEnd);
+                                if ($gapMin >= 30) {
+                                    $lunchStr = "{$prevEnd} – {$st}";
+                                }
+                            }
+                            $prevEnd = $et;
+                        }
+
+                        $workingDaysCount++;
+                        $week[] = [
+                            'day_num' => $dayLabel,
+                            'in_month' => $inMonth,
+                            'state' => 'working',
+                            'badge' => 'Serviço',
+                            'shift' => "{$shiftStart} – {$shiftEnd}",
+                            'lunch' => $lunchStr ?: 'Sem pausa almoço',
+                        ];
+                        $curr->addDay();
+                        continue;
+                    }
+
+                    // Dia útil aberto sem escala publicada
+                    $contractShift = ((string) $assistant->school_id === (string) $school->id)
+                        ? $this->resolveShiftForDay($assistant, $dStr, (int) $od['day_of_week'])
+                        : null;
+
+                    if ($contractShift !== null) {
+                        [$shiftStart, $shiftEnd] = $contractShift;
+                        $hasUnpublished = true;
+                        $week[] = [
+                            'day_num' => $dayLabel,
+                            'in_month' => $inMonth,
+                            'state' => 'unpublished',
+                            'badge' => 'Por Publicar',
+                            'shift' => "{$shiftStart} – {$shiftEnd}",
+                            'lunch' => 'Sem horário publicado',
+                        ];
+                    } else {
+                        $week[] = [
+                            'day_num' => $dayLabel,
+                            'in_month' => $inMonth,
+                            'state' => 'weekend',
+                            'badge' => 'Folga',
+                            'shift' => 'FOLGA SEMANAL',
+                            'lunch' => 'Descanso semanal',
+                        ];
+                    }
+
+                    $curr->addDay();
+                }
+
+                $weeks[] = $week;
+            }
+
+            $maxWeeksCount = max($maxWeeksCount, count($weeks));
+
+            $periodSubtitle = "{$gridStartFmt} a {$gridEndFmt} · {$workingDaysCount} " . ($workingDaysCount === 1 ? 'dia de serviço' : 'dias de serviço');
+            if ($absentDaysCount > 0) {
+                $periodSubtitle .= " · {$absentDaysCount} " . ($absentDaysCount === 1 ? 'falta programada' : 'faltas programadas');
+            }
+
+            $sheets[] = [
+                'assistant_name' => trim(($assistant->user->first_name ?? '') . ' ' . ($assistant->user->last_name ?? '')),
+                'assistant_code' => $assistant->internal_number ?? '',
+                'period_subtitle' => $periodSubtitle,
+                'has_unpublished' => $hasUnpublished,
+                'weeks' => $weeks,
+            ];
+        }
+
+        $cardHeightPt = ($maxWeeksCount >= 6) ? 39 : 51;
+        $centerPadTopPt = ($maxWeeksCount >= 6) ? 10 : 15;
+
+        return [
+            'sheets' => $sheets,
+            'monthYearTitle' => $monthYearTitle,
+            'cardHeightPt' => $cardHeightPt,
+            'centerPadTopPt' => $centerPadTopPt,
+        ];
     }
 
     /**
