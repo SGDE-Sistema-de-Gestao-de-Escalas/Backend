@@ -19,6 +19,7 @@ use App\Models\System\ActivityType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ScheduleGenerationTest extends TestCase
@@ -159,6 +160,93 @@ class ScheduleGenerationTest extends TestCase
         }
 
         return $assistant;
+    }
+
+    public static function ruleTypes(): array
+    {
+        return [['mandatory'], ['optional']];
+    }
+
+    #[DataProvider('ruleTypes')]
+    public function test_rule_assigns_late_arrival_even_when_minimum_is_already_covered(string $type): void
+    {
+        SchoolOperatingRuleDay::query()->update(['opening_time' => '07:30:00']);
+        $susana = $this->createAssistantWithShift('Susana', 'S001', entryTime: '07:30:00', lunchEnabled: false);
+        $joana = $this->createAssistantWithShift('Joana', 'J001', entryTime: '07:45:00', lunchEnabled: false);
+        $other = $this->createAssistantWithShift('Outra', 'O001', entryTime: '07:30:00', lunchEnabled: false);
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->portaria->id,
+            'period_start' => '07:30', 'period_end' => '08:00', 'min' => 1,
+            'type' => $type, 'valid_from' => '2026-01-01', 'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach([$susana->id => ['priority' => 1], $joana->id => ['priority' => 2]]);
+
+        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+
+        foreach ([[$susana, '07:30:00'], [$joana, '07:45:00']] as [$assistant, $start]) {
+            $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)
+                ->whereHas('schedule', fn ($query) => $query->where('assistant_id', $assistant->id))->get();
+            $this->assertCount(1, $entries);
+            $this->assertSame(substr($start, 0, 5), substr($entries[0]->getRawOriginal('start_time'), 0, 5));
+            $this->assertSame('08:00', substr($entries[0]->getRawOriginal('end_time'), 0, 5));
+        }
+        $this->assertSame(2, ScheduleEntry::where('schedule_rule_id', $rule->id)->count());
+        $this->assertFalse(ScheduleEntry::where('schedule_rule_id', $rule->id)
+            ->whereHas('schedule', fn ($query) => $query->where('assistant_id', $other->id))->exists());
+    }
+
+    public static function lunchRuleCases(): array
+    {
+        $cases = [];
+        foreach (['mandatory', 'optional'] as $type) {
+            $cases[$type.' before lunch'] = [$type, '12:45:00', '13:45:00', 60, [['12:15', '12:45']]];
+            $cases[$type.' after lunch'] = [$type, '12:15:00', '13:15:00', 60, [['13:15', '13:30']]];
+            $cases[$type.' both sides'] = [$type, '12:45:00', '13:00:00', 15, [['12:15', '12:45'], ['13:00', '13:30']]];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('ruleTypes')]
+    public function test_partial_assignment_uses_only_complete_fifteen_minute_blocks(string $type): void
+    {
+        $susana = $this->createAssistantWithShift('Susana', 'S001', lunchEnabled: false);
+        $joana = $this->createAssistantWithShift('Joana', 'J001', entryTime: '08:20:00', lunchEnabled: false);
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->portaria->id,
+            'period_start' => '08:00', 'period_end' => '08:45', 'min' => 1,
+            'type' => $type, 'valid_from' => '2026-01-01', 'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach([$susana->id => ['priority' => 1], $joana->id => ['priority' => 2]]);
+
+        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+
+        $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)
+            ->whereHas('schedule', fn ($query) => $query->where('assistant_id', $joana->id))->get();
+        $this->assertCount(1, $entries);
+        $this->assertSame('08:30', substr($entries[0]->getRawOriginal('start_time'), 0, 5));
+        $this->assertSame('08:45', substr($entries[0]->getRawOriginal('end_time'), 0, 5));
+    }
+
+    #[DataProvider('lunchRuleCases')]
+    public function test_rule_assigns_available_blocks_around_lunch(
+        string $type, string $lunchStart, string $lunchEnd, int $duration, array $expected
+    ): void {
+        $assistant = $this->createAssistantWithShift(
+            'Joana', 'J001', lunchStart: $lunchStart, lunchEnd: $lunchEnd, lunchDuration: $duration
+        );
+        $rule = ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->vigilancia->id,
+            'period_start' => '12:15', 'period_end' => '13:30', 'min' => 1,
+            'type' => $type, 'valid_from' => '2026-01-01', 'days_of_week' => [0],
+        ]);
+        $rule->assistants()->attach($assistant->id, ['priority' => 1]);
+
+        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+
+        $actual = ScheduleEntry::where('schedule_rule_id', $rule->id)->orderBy('start_time')->get()
+            ->map(fn ($entry) => [substr($entry->getRawOriginal('start_time'), 0, 5), substr($entry->getRawOriginal('end_time'), 0, 5)])->all();
+        $this->assertSame($expected, $actual);
     }
 
     public function test_auto_seeds_fallback_activity_when_missing_and_blocks_invalid_lunch_window(): void

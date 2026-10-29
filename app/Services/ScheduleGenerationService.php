@@ -303,6 +303,11 @@ class ScheduleGenerationService
                 // -------------------------------------------------------------
                 // RONDA B: Partição em Sub-blocos de 15 min entre suplentes da fila
                 // -------------------------------------------------------------
+                $this->allocateAvailableRuleCandidates(
+                    $snapshot, $dayAssignments, $rule, $rondaACandidates,
+                    $schoolId, $date, $weekday, $schoolHours, $effStart, $effEnd, $insights
+                );
+
                 $gaps = $this->detectUncoveredSlices($dayAssignments, $rule, $effStart, $effEnd);
                 if (! empty($gaps)) {
                     $this->runRoundBSubBlockPartitioning(
@@ -452,6 +457,12 @@ class ScheduleGenerationService
                         $assignedOpt++;
                     }
                 }
+
+                $this->allocateAvailableRuleCandidates(
+                    $snapshot, $dayAssignments, $rule, $rondaACandidates,
+                    $schoolId, $date, $weekday, $schoolHours, $effStart, $effEnd, $insights
+                );
+                $assignedOpt = $this->countFullCoverageForRule($dayAssignments, $rule, $effStart, $effEnd);
 
                 if ($assignedOpt < $rule->min) {
                     $insights[] = [
@@ -1398,7 +1409,62 @@ class ScheduleGenerationService
     }
 
     /**
-     * Ronda B: Particiona as vagas em falta de uma Regra Obrigatória em sub-blocos de 15 min (mín. 60 min ou restante).
+     * Assign every rule candidate's free 15-minute blocks, even above minimum coverage.
+     */
+    private function allocateAvailableRuleCandidates(
+        array $snapshot,
+        array &$dayAssignments,
+        ScheduleRule $rule,
+        Collection $candidates,
+        string $schoolId,
+        string $date,
+        int $weekday,
+        array $schoolHours,
+        int $effStart,
+        int $effEnd,
+        array &$insights
+    ): void {
+        // The minimum measures coverage; it does not cap available rule candidates.
+        foreach ($candidates->unique('id') as $candidate) {
+            $added = [];
+            for ($start = $effStart; $start + 15 <= $effEnd; $start += 15) {
+                $end = $start + 15;
+                $eval = $this->evaluateCandidateForInterval(
+                    $snapshot, $dayAssignments, $candidate, $schoolId,
+                    $date, $weekday, $schoolHours, $start, $end
+                );
+
+                // Extra coverage must not displace another assignment.
+                if ($eval['status'] !== 'ok_free') {
+                    continue;
+                }
+
+                $entry = $this->makeAssignment(
+                    $candidate, $rule->activityType, $date, $start, $end,
+                    $rule->type, false, $rule->id, null, 'rule_availability'
+                );
+                $dayAssignments[] = $entry;
+                $added[] = $entry;
+            }
+
+            foreach ($this->mergeAdjacentEntries($added) as $entry) {
+                $insights[] = [
+                    'type' => 'partition_sub_block',
+                    'date' => $date,
+                    'rule_id' => $rule->id,
+                    'assistant_id' => $candidate->id,
+                    'start_time' => $entry['start_time'],
+                    'end_time' => $entry['end_time'],
+                    'message' => "{$date}: {$this->assistantDisplayName($candidate)} atribuído à regra no período disponível {$entry['start_time']}–{$entry['end_time']}.",
+                ];
+            }
+        }
+
+        $dayAssignments = $this->mergeAdjacentEntries($dayAssignments);
+    }
+
+    /**
+     * Fill mandatory coverage shortfalls using candidates from the rule.
      */
     private function runRoundBSubBlockPartitioning(
         array $snapshot,
