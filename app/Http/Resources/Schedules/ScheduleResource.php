@@ -30,6 +30,7 @@ class ScheduleResource extends JsonResource
         return [
             'id' => $this->id,
             'school_id' => $this->school_id,
+            'school_name' => $this->school?->name,
             'assistant_id' => $this->assistant_id,
             'assistant_name' => $assistantName,
             'is_temporary_transfer' => $isTemporaryTransfer,
