@@ -31,11 +31,21 @@ class AssistantScheduleProfileController extends Controller
 
         if ($user && ! $user->isAdmin()) {
             $assistant = $user->assistant;
+            if ($assistant) {
+                $this->scheduleProfileService->normalizeAssistantProfilesChain((string) $assistant->id);
+            }
             $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
         } elseif ($assistantId) {
+            $this->scheduleProfileService->normalizeAssistantProfilesChain((string) $assistantId);
             $query->where('assistant_id', $assistantId);
         } elseif ($assistantIds) {
             $ids = is_array($assistantIds) ? $assistantIds : explode(',', (string) $assistantIds);
+            foreach ($ids as $id) {
+                $cleanId = trim((string) $id);
+                if ($cleanId !== '') {
+                    $this->scheduleProfileService->normalizeAssistantProfilesChain($cleanId);
+                }
+            }
             $query->whereIn('assistant_id', $ids);
         } elseif ($schoolId) {
             $query->where(function ($q) use ($schoolId) {

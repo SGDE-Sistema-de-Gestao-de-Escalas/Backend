@@ -10,30 +10,83 @@ use Illuminate\Validation\ValidationException;
 class AssistantScheduleProfileService
 {
     /**
+     * Normaliza encadeamento histórico de perfis de um assistente caso existam
+     * perfis anteriores que ficaram sem `valid_until` fechado antes da correção.
+     */
+    public function normalizeAssistantProfilesChain(string $assistantId): void
+    {
+        $profiles = AssistantScheduleProfile::where('assistant_id', $assistantId)
+            ->orderBy('valid_from')
+            ->get()
+            ->values();
+
+        for ($i = 0; $i < $profiles->count() - 1; $i++) {
+            $current = $profiles[$i];
+            $next = $profiles[$i + 1];
+
+            if (! $current->valid_from || ! $next->valid_from) {
+                continue;
+            }
+
+            $nextFromStr = Carbon::parse($next->valid_from)->format('Y-m-d');
+            $expectedUntilStr = Carbon::parse($next->valid_from)->subDay()->format('Y-m-d');
+            $currentUntilStr = $current->valid_until ? Carbon::parse($current->valid_until)->format('Y-m-d') : null;
+
+            if ($currentUntilStr === null || $currentUntilStr >= $nextFromStr) {
+                $current->update(['valid_until' => $expectedUntilStr]);
+            }
+        }
+    }
+
+    /**
      * Cria um perfil de horário padrão e respetivos turnos e dias da semana.
-     * Se for um horário futuro (D > hoje), fecha atomicamente o horário em vigor anterior com valid_until = D - 1 dia.
+     * Sempre que é criado um novo perfil de horário para o assistente, fecha atomicamente
+     * o perfil anterior em vigor (ou sobreposto) com valid_until = D - 1 dia, e ajusta o
+     * valid_until do novo perfil caso já exista um perfil futuro posterior.
      */
     public function create(array $data): AssistantScheduleProfile
     {
         return DB::transaction(function () use ($data) {
             $assistantId = $data['assistant_id'];
+            $this->normalizeAssistantProfilesChain($assistantId);
+
             $newValidFrom = Carbon::parse($data['valid_from'])->startOfDay();
+            $newValidFromStr = $newValidFrom->format('Y-m-d');
 
-            // Ao criar um novo horário com início a D futuro, fecha a vigência do horário anterior em vigor com D - 1 dia
-            if ($newValidFrom->isAfter(Carbon::today())) {
-                $previousProfile = AssistantScheduleProfile::where('assistant_id', $assistantId)
-                    ->where('valid_from', '<', $newValidFrom)
-                    ->where(function ($q) use ($newValidFrom) {
-                        $q->whereNull('valid_until')
-                            ->orWhere('valid_until', '>=', $newValidFrom);
-                    })
-                    ->orderByDesc('valid_from')
-                    ->first();
+            // Impedir dois perfis de horário para o mesmo assistente com a mesma data de início
+            $duplicateStart = AssistantScheduleProfile::where('assistant_id', $assistantId)
+                ->whereDate('valid_from', $newValidFromStr)
+                ->exists();
 
-                if ($previousProfile) {
-                    $previousProfile->update([
-                        'valid_until' => $newValidFrom->copy()->subDay()->format('Y-m-d'),
-                    ]);
+            if ($duplicateStart) {
+                throw ValidationException::withMessages([
+                    'valid_from' => 'Já existe um perfil de horário para este assistente a começar nesta data.',
+                ]);
+            }
+
+            // 1. Fechar qualquer perfil anterior (valid_from < D) que estivesse aberto ou terminasse em/após D
+            $previousEndStr = $newValidFrom->copy()->subDay()->format('Y-m-d');
+            AssistantScheduleProfile::where('assistant_id', $assistantId)
+                ->whereDate('valid_from', '<', $newValidFromStr)
+                ->where(function ($q) use ($newValidFromStr) {
+                    $q->whereNull('valid_until')
+                        ->orWhereDate('valid_until', '>=', $newValidFromStr);
+                })
+                ->update([
+                    'valid_until' => $previousEndStr,
+                ]);
+
+            // 2. Se já existir um perfil futuro posterior (valid_from > D), o novo perfil termina na véspera dele
+            $nextProfile = AssistantScheduleProfile::where('assistant_id', $assistantId)
+                ->whereDate('valid_from', '>', $newValidFromStr)
+                ->orderBy('valid_from')
+                ->first();
+
+            $computedValidUntil = $data['valid_until'] ?? null;
+            if ($nextProfile && $nextProfile->valid_from) {
+                $maxValidUntil = Carbon::parse($nextProfile->valid_from)->subDay()->format('Y-m-d');
+                if ($computedValidUntil === null || $computedValidUntil > $maxValidUntil) {
+                    $computedValidUntil = $maxValidUntil;
                 }
             }
 
@@ -42,8 +95,8 @@ class AssistantScheduleProfileService
                 'type' => $data['type'],
                 'rotation_period' => $data['rotation_period'] ?? null,
                 'starts_with' => $data['starts_with'] ?? null,
-                'valid_from' => $data['valid_from'],
-                'valid_until' => $data['valid_until'] ?? null,
+                'valid_from' => $newValidFromStr,
+                'valid_until' => $computedValidUntil,
             ]);
 
             foreach ($data['shifts'] ?? [] as $shiftData) {
@@ -87,12 +140,24 @@ class AssistantScheduleProfileService
 
         return DB::transaction(function () use ($profile, $data, $oldValidFrom) {
             $newValidFrom = isset($data['valid_from']) ? Carbon::parse($data['valid_from'])->startOfDay() : $oldValidFrom;
+            $newValidFromStr = $newValidFrom->format('Y-m-d');
 
-            // Se alterou o início do novo horário de D1 para D2, ajusta o horário anterior para D2 - 1 dia
             if (! $newValidFrom->equalTo($oldValidFrom)) {
+                $duplicateStart = AssistantScheduleProfile::where('assistant_id', $profile->assistant_id)
+                    ->where('id', '!=', $profile->id)
+                    ->whereDate('valid_from', $newValidFromStr)
+                    ->exists();
+
+                if ($duplicateStart) {
+                    throw ValidationException::withMessages([
+                        'valid_from' => 'Já existe um perfil de horário para este assistente a começar nesta data.',
+                    ]);
+                }
+
+                // Se alterou o início do novo horário de D1 para D2, ajusta o horário anterior para D2 - 1 dia
                 $previousProfile = AssistantScheduleProfile::where('assistant_id', $profile->assistant_id)
                     ->where('id', '!=', $profile->id)
-                    ->where('valid_from', '<', $newValidFrom)
+                    ->whereDate('valid_from', '<', $newValidFromStr)
                     ->orderByDesc('valid_from')
                     ->first();
 
@@ -157,15 +222,27 @@ class AssistantScheduleProfileService
         }
 
         DB::transaction(function () use ($profile, $validFrom) {
-            // Se o admin cancelar o horário agendado, o horário anterior volta a ficar com vigência em aberto (valid_until = null)
+            $validFromStr = $validFrom->format('Y-m-d');
+
+            // Se o admin cancelar o horário agendado, o horário anterior ajusta o valid_until para a véspera do seguinte (ou null se não houver seguinte)
             $previousProfile = AssistantScheduleProfile::where('assistant_id', $profile->assistant_id)
                 ->where('id', '!=', $profile->id)
-                ->where('valid_from', '<', $validFrom)
+                ->whereDate('valid_from', '<', $validFromStr)
                 ->orderByDesc('valid_from')
                 ->first();
 
             if ($previousProfile) {
-                $previousProfile->update(['valid_until' => null]);
+                $nextProfile = AssistantScheduleProfile::where('assistant_id', $profile->assistant_id)
+                    ->where('id', '!=', $profile->id)
+                    ->whereDate('valid_from', '>', $validFromStr)
+                    ->orderBy('valid_from')
+                    ->first();
+
+                $restoredValidUntil = $nextProfile && $nextProfile->valid_from
+                    ? Carbon::parse($nextProfile->valid_from)->subDay()->format('Y-m-d')
+                    : null;
+
+                $previousProfile->update(['valid_until' => $restoredValidUntil]);
             }
 
             foreach ($profile->shifts as $shift) {
