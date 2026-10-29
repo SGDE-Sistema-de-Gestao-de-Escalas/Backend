@@ -181,6 +181,11 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
             ->name('schedules.pending-recalculations');
     });
 
+    // Exportação da escala em PDF (A4 Horizontal) ou CSV (UTF-8 BOM)
+    Route::get('/schedules/export', [ScheduleController::class, 'export'])
+        ->can('viewAny', Schedule::class)
+        ->name('schedules.export');
+
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
     Route::get('/schedules', [ScheduleController::class, 'index'])
         ->can('viewAny', Schedule::class)
