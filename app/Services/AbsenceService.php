@@ -39,7 +39,11 @@ class AbsenceService
                 $documentPath = $this->storeAbsenceDocument($document, $assistant);
             }
 
-            $status = $data['status'] ?? 'pending';
+            // Só o administrador decide o estado de uma falta. Um assistente cria-a
+            // sempre como pendente, mesmo que envie outro valor (o frontend envia "pending").
+            $status = ($user !== null && ! $user->isAdmin())
+                ? 'pending'
+                : ($data['status'] ?? 'pending');
             $justifiedByUserId = in_array($status, ['justified', 'unjustified'], true) ? $user?->id : null;
 
             $absence = Absence::create([
