@@ -300,6 +300,6 @@ class AbsenceController extends Controller
             abort(404, 'Ficheiro do documento comprovativo não encontrado no servidor.');
         }
 
-        return Storage::disk($disk)->response($absence->document_path);
+        return Storage::disk($disk)->response($absence->document_path, null, ['X-Content-Type-Options' => 'nosniff']);
     }
 }

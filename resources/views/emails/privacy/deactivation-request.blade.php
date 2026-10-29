@@ -1,24 +1,35 @@
 <x-mail::message>
 # Pedido de Desativação e Esquecimento (RGPD)
 
-Foi submetido um novo pedido de desativação / direito ao esquecimento através do portal SGDE.
+O(A) utilizador(a) **{{ $user->first_name }} {{ $user->last_name }}** submeteu um novo pedido de desativação / direito ao esquecimento através do portal **SGDE**.
 
-### Detalhes do Utilizador:
-- **Nome:** {{ $user->first_name }} {{ $user->last_name }}
-- **Email:** {{ $user->email }}
-- **Perfil:** {{ $user->role?->name ?? 'Utilizador' }}
-- **Escola / Estabelecimento:** {{ $schoolName }}
-
+<x-mail::panel>
+**Nome:** {{ $user->first_name }} {{ $user->last_name }}<br>
+**Email:** {{ $user->email }}<br>
+**Perfil:** {{ $user->role?->name ?? 'Utilizador' }}<br>
+**Escola / Estabelecimento:** {{ $schoolName }}
 @if ($reason)
-### Motivo Apresentado:
-> {{ $reason }}
+<br>**Motivo Apresentado:** {{ $reason }}
 @endif
+</x-mail::panel>
 
----
+@php
+$adminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/assistants';
+@endphp
 
-Por favor, aceda à plataforma para proceder à análise do pedido e posterior desativação ou anonimização da conta, garantindo o cumprimento do Regulamento Geral sobre a Proteção de Dados (RGPD).
+<x-mail::button :url="$adminUrl" color="primary">
+Analisar Pedido na Plataforma
+</x-mail::button>
 
-Obrigado,<br>
-Sistema de Gestão de Escalas — {{ config('app.name') }}
+<div class="link-fallback-label">
+Hiperligação direta de acesso:
+</div>
+
+<div class="link-fallback-box">
+<a href="{{ $adminUrl }}" target="_blank" rel="noopener">{{ $adminUrl }}</a>
+</div>
+
+<p class="help-note">
+Proceda à análise do pedido e posterior desativação ou anonimização da conta em conformidade com o Regulamento Geral sobre a Proteção de Dados (RGPD).
+</p>
 </x-mail::message>
-

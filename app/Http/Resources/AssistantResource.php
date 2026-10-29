@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AssistantResource extends JsonResource
@@ -102,12 +101,8 @@ class AssistantResource extends JsonResource
 
     private function getCriminalRecordUrl(string $path): string
     {
-        $disk = config('filesystems.documents_disk');
-
-        try {
-            return Storage::disk($disk)->url($path);
-        } catch (\Throwable) {
-            return route('assistants.criminal-record', ['assistant' => $this->id]);
-        }
+        // Os documentos têm dados pessoais: o único endereço é o da rota
+        // autenticada, nunca o URL direto do disco (F-02).
+        return route('assistants.criminal-record', ['assistant' => $this->id]);
     }
 }

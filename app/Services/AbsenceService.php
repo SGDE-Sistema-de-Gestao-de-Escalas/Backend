@@ -2,15 +2,21 @@
 
 namespace App\Services;
 
+use App\Mail\AbsenceJustificationSubmittedMail;
+use App\Mail\AbsenceRegisteredMail;
+use App\Mail\AbsenceStatusUpdatedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
+use App\Support\DocumentExtension;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AbsenceService
 {
@@ -19,7 +25,7 @@ class AbsenceService
      */
     public function create(array $data, ?UploadedFile $document = null, ?User $user = null): Absence
     {
-        return DB::transaction(function () use ($data, $document, $user) {
+        $absence = DB::transaction(function () use ($data, $document, $user) {
             $totalDays = $this->calculateTotalDays(
                 $data['valid_from'] ?? null,
                 $data['valid_until'] ?? null,
@@ -34,7 +40,11 @@ class AbsenceService
                 $documentPath = $this->storeAbsenceDocument($document, $assistant);
             }
 
-            $status = $data['status'] ?? 'pending';
+            // Só o administrador decide o estado de uma falta. Um assistente cria-a
+            // sempre como pendente, mesmo que envie outro valor (o frontend envia "pending").
+            $status = ($user !== null && ! $user->isAdmin())
+                ? 'pending'
+                : ($data['status'] ?? 'pending');
             $justifiedByUserId = in_array($status, ['justified', 'unjustified'], true) ? $user?->id : null;
 
             $absence = Absence::create([
@@ -54,8 +64,21 @@ class AbsenceService
                 'document_path' => $documentPath,
             ]);
 
-            return $absence->load(['assistant.user', 'absenceType', 'createdByUser', 'justifiedByUser']);
+            return $absence->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
         });
+
+        // Enviar email ao assistente quando o administrador regista uma falta em seu nome
+        if ($user && $user->isAdmin()) {
+            $this->sendAbsenceRegisteredEmail($absence);
+        } elseif (
+            $user &&
+            ! $user->isAdmin() &&
+            ($document !== null || trim((string) ($absence->justification ?? '')) !== '')
+        ) {
+            $this->sendAbsenceJustificationSubmittedEmail($absence);
+        }
+
+        return $absence;
     }
 
     /**
@@ -63,7 +86,10 @@ class AbsenceService
      */
     public function update(Absence $absence, array $data, ?UploadedFile $document = null, ?User $user = null): Absence
     {
-        return DB::transaction(function () use ($absence, $data, $document, $user) {
+        $previousStatus = (string) $absence->status;
+        $previousJustification = trim((string) ($absence->justification ?? ''));
+
+        $updated = DB::transaction(function () use ($absence, $data, $document, $user) {
             $validFrom = $data['valid_from'] ?? $absence->valid_from?->format('Y-m-d');
             $validUntil = array_key_exists('valid_until', $data) ? $data['valid_until'] : $absence->valid_until?->format('Y-m-d');
 
@@ -136,8 +162,113 @@ class AbsenceService
 
             $absence->update($updatePayload);
 
-            return $absence->fresh()->load(['assistant.user', 'absenceType', 'createdByUser', 'justifiedByUser']);
+            return $absence->fresh()->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
         });
+
+        // Enviar email ao assistente quando o administrador avalia a falta como Justificada ou Injustificada
+        if (
+            $user &&
+            $user->isAdmin() &&
+            $updated->status !== $previousStatus &&
+            in_array($updated->status, ['justified', 'unjustified'], true)
+        ) {
+            $this->sendAbsenceStatusUpdatedEmail($updated);
+        } elseif ($user && ! $user->isAdmin()) {
+            $currentJustification = trim((string) ($updated->justification ?? ''));
+            $hasNewJustification = $currentJustification !== '' && $currentJustification !== $previousJustification;
+
+            if ($document !== null || $hasNewJustification) {
+                $this->sendAbsenceJustificationSubmittedEmail($updated);
+            }
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Envia notificação por email aos administradores ativos quando um assistente submete
+     * uma justificação ou comprovativo de falta.
+     */
+    private function sendAbsenceJustificationSubmittedEmail(Absence $absence): void
+    {
+        $assistant = $absence->assistant;
+        $assistantUser = $assistant?->user;
+
+        if (! $assistant || $assistant->is_anonymized || ! $assistantUser) {
+            return;
+        }
+
+        $admins = User::query()
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
+            ->get();
+
+        if ($admins->isEmpty()) {
+            return;
+        }
+
+        $schoolName = $assistant->school?->name ?? 'Estabelecimento de Ensino';
+
+        try {
+            Mail::to($admins)->send(new AbsenceJustificationSubmittedMail(
+                absence: $absence,
+                assistantUser: $assistantUser,
+                schoolName: $schoolName,
+            ));
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Envia notificação por email ao assistente quando uma falta é registada pela administração.
+     */
+    private function sendAbsenceRegisteredEmail(Absence $absence): void
+    {
+        $assistant = $absence->assistant;
+        $recipient = $assistant?->user;
+
+        if (! $assistant || $assistant->is_anonymized || ! $recipient || ! $recipient->is_active || ! $recipient->email) {
+            return;
+        }
+
+        $schoolName = $assistant->school?->name ?? 'Estabelecimento de Ensino';
+
+        try {
+            Mail::to($recipient->email)->send(new AbsenceRegisteredMail(
+                absence: $absence,
+                user: $recipient,
+                schoolName: $schoolName,
+            ));
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Envia notificação por email ao assistente quando o estado da falta passa a Justificada ou Injustificada.
+     */
+    private function sendAbsenceStatusUpdatedEmail(Absence $absence): void
+    {
+        $assistant = $absence->assistant;
+        $recipient = $assistant?->user;
+
+        if (! $assistant || $assistant->is_anonymized || ! $recipient || ! $recipient->is_active || ! $recipient->email) {
+            return;
+        }
+
+        $schoolName = $assistant->school?->name ?? 'Estabelecimento de Ensino';
+
+        try {
+            Mail::to($recipient->email)->send(new AbsenceStatusUpdatedMail(
+                absence: $absence,
+                user: $recipient,
+                schoolName: $schoolName,
+            ));
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -202,7 +333,7 @@ class AbsenceService
     public function storeAbsenceDocument(UploadedFile $file, Assistant $assistant): string
     {
         $folder = $this->getAssistantAbsenceDirectory($assistant);
-        $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'pdf';
+        $extension = DocumentExtension::for($file); // do conteúdo, não do nome do cliente (F-03)
         $filename = 'ausencia_' . time() . '_' . Str::random(6) . ".{$extension}";
 
         $disk = $this->getDocumentDisk();

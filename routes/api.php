@@ -117,9 +117,6 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
         ->name('operating-calendar.index');
 
-    Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
-        ->name('dashboard.bootstrap');
-
     // Notificações do utilizador autenticado (sino). Pessoais: a NotificationPolicy
     // garante que cada um só acede às suas. `read-all` tem de vir antes de `{notification}`.
     Route::get('/notifications', [NotificationController::class, 'index'])
@@ -155,6 +152,11 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
+        // Arranque do dashboard: devolve os dados pessoais de todos os assistentes
+        // da escola, por isso é só para administradores (a UI de assistente não o usa).
+        Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
+            ->name('dashboard.bootstrap');
+
         // Importação e exportação em CSV. Têm de vir antes do apiResource,
         // senão "export" seria lido como o id de um assistente.
         Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])

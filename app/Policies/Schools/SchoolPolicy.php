@@ -4,10 +4,15 @@ namespace App\Policies\Schools;
 
 use App\Models\Schools\School;
 use App\Models\Auth\User;
+use App\Services\SchoolAccessService;
 use Illuminate\Auth\Access\Response;
 
 class SchoolPolicy
 {
+    public function __construct(
+        private readonly SchoolAccessService $schoolAccess
+    ) {}
+
     /**
      * Determine whether the user can view any models.
      */
@@ -17,11 +22,17 @@ class SchoolPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Administrador: qualquer escola. Assistente: só a sua escola ou aquela para
+     * onde tem uma cedência temporária em vigor (F-09).
      */
     public function view(User $user, School $school): bool
     {
-        return $user->isAdmin() || $user->isStaff();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->isStaff()
+            && $this->schoolAccess->canAccess($user, $school->id);
     }
 
     /**

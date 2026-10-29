@@ -354,7 +354,7 @@ class ScheduleRuleSeeder extends Seeder
             }
 
             $assistantsByInternalNumber = $assistants->keyBy('internal_number');
-            $isEspl = $school->acronym === 'ESPL' || str_contains((string) $school->name, 'EB1');
+            $isEspl = $school->acronym === 'ESPL';
             $rulesConfig = $isEspl ? self::ESPL_RULES : self::RULES;
             $keptRuleIds = [];
 
@@ -393,8 +393,7 @@ class ScheduleRuleSeeder extends Seeder
                     }
                 }
 
-                // Se os códigos internos não coincidirem (ex: ambiente de testes com factories),
-                // preenche sequencialmente todos os assistentes da escola.
+                // Fallback caso os números internos não coincidam (ex: testes com factories)
                 if (empty($syncData)) {
                     foreach ($assistants as $idx => $assistant) {
                         $syncData[$assistant->id] = ['priority' => $idx + 1];

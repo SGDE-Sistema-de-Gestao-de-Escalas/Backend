@@ -37,5 +37,12 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function (User $user, string $token) {
             return config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
         });
+
+        \Illuminate\Support\Facades\Event::listen(function (\Illuminate\Mail\Events\MessageSending $event) {
+            $iconPath = public_path('images/icon.png');
+            if (is_file($iconPath) && str_contains((string) $event->message->getHtmlBody(), 'cid:sgde-logo')) {
+                $event->message->embedFromPath($iconPath, 'sgde-logo', 'image/png');
+            }
+        });
     }
 }

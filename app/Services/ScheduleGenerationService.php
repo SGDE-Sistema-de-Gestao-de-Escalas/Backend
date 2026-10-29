@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\SchedulePublishedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
@@ -18,7 +19,9 @@ use Database\Seeders\ActivityTypeSeeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ScheduleGenerationService
 {
@@ -300,6 +303,11 @@ class ScheduleGenerationService
                 // -------------------------------------------------------------
                 // RONDA B: Partição em Sub-blocos de 15 min entre suplentes da fila
                 // -------------------------------------------------------------
+                $this->allocateAvailableRuleCandidates(
+                    $snapshot, $dayAssignments, $rule, $rondaACandidates,
+                    $schoolId, $date, $weekday, $schoolHours, $effStart, $effEnd, $insights
+                );
+
                 $gaps = $this->detectUncoveredSlices($dayAssignments, $rule, $effStart, $effEnd);
                 if (! empty($gaps)) {
                     $this->runRoundBSubBlockPartitioning(
@@ -450,6 +458,12 @@ class ScheduleGenerationService
                     }
                 }
 
+                $this->allocateAvailableRuleCandidates(
+                    $snapshot, $dayAssignments, $rule, $rondaACandidates,
+                    $schoolId, $date, $weekday, $schoolHours, $effStart, $effEnd, $insights
+                );
+                $assignedOpt = $this->countFullCoverageForRule($dayAssignments, $rule, $effStart, $effEnd);
+
                 if ($assignedOpt < $rule->min) {
                     $insights[] = [
                         'type' => 'optional_incomplete',
@@ -518,8 +532,7 @@ class ScheduleGenerationService
                 if (! $absenceCoversLunch && $shift['lunch_enabled'] && $shift['lunch_duration'] > 0) {
                     $occupiedForLunch = array_merge(
                         array_map(fn ($t) => [$t['start_min'], $t['end_min']], $currentTasks),
-                        $partialAbsences,
-                        $outgoingTransfers
+                        $partialAbsences
                     );
                     $lunchBlock = $this->chooseBalancedLunchBlock($shift, $occupiedForLunch, $lunchAlternator);
                     $lunchAlternator++;
@@ -654,12 +667,16 @@ class ScheduleGenerationService
     }
 
     /**
-     * Publica as escalas em rascunho de uma escola num intervalo de datas.
+     * Publica as escalas em rascunho de uma escola num intervalo de datas
+     * e envia um único email consolidado por assistente abrangido.
      */
     public function publish(string $schoolId, string $startDate, string $endDate): int
     {
-        return DB::transaction(function () use ($schoolId, $startDate, $endDate) {
-            $schedules = Schedule::where('school_id', $schoolId)
+        $notificationsByAssistant = [];
+
+        $publishedCount = DB::transaction(function () use ($schoolId, $startDate, $endDate, &$notificationsByAssistant) {
+            $schedules = Schedule::with(['assistant.user', 'school'])
+                ->where('school_id', $schoolId)
                 ->whereDate('week_start', '<=', $endDate)
                 ->whereDate('week_end', '>=', $startDate)
                 ->where('status', 'draft')
@@ -668,13 +685,47 @@ class ScheduleGenerationService
 
             $now = now();
             foreach ($schedules as $schedule) {
+                $wasPreviouslyPublished = $schedule->published_at !== null;
+
                 $schedule->status = 'published';
                 $schedule->published_at = $now;
                 $schedule->save();
+
+                $assistant = $schedule->assistant;
+                $user = $assistant?->user;
+
+                if ($assistant && ! $assistant->is_anonymized && $user && $user->is_active && $user->email) {
+                    $assistantId = (string) $assistant->id;
+                    if (! isset($notificationsByAssistant[$assistantId])) {
+                        $notificationsByAssistant[$assistantId] = [
+                            'user' => $user,
+                            'school_name' => $schedule->school?->name ?? 'Estabelecimento de Ensino',
+                            'is_update' => $wasPreviouslyPublished,
+                        ];
+                    } elseif ($wasPreviouslyPublished) {
+                        $notificationsByAssistant[$assistantId]['is_update'] = true;
+                    }
+                }
             }
 
             return $schedules->count();
         });
+
+        foreach ($notificationsByAssistant as $payload) {
+            try {
+                Mail::to($payload['user']->email)->send(new SchedulePublishedMail(
+                    user: $payload['user'],
+                    schoolName: $payload['school_name'],
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    isUpdate: $payload['is_update'],
+                ));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $publishedCount;
     }
 
     /**
@@ -1062,7 +1113,8 @@ class ScheduleGenerationService
                 ];
             }
 
-            return $this->clipShiftToSchoolWindow(
+            return $this->clipShiftForTransfer(
+                $snapshot, $assistantId, $date,
                 $this->toMinutes(substr((string) $rawStart, 0, 5)),
                 $this->toMinutes(substr((string) $rawEnd, 0, 5)),
                 (bool) $exc->lunch_enabled,
@@ -1129,35 +1181,6 @@ class ScheduleGenerationService
             ];
         }
 
-        // Se este assistente tiver uma transferência temporária de entrada com horário parcial nesta data e escola
-        $incomingTr = null;
-        if (! empty($snapshot['incoming_transfers'])) {
-            foreach ($snapshot['incoming_transfers'] as $tr) {
-                if ($tr->assistant_id === $assistantId) {
-                    $from = $tr->valid_from?->format('Y-m-d');
-                    $until = $tr->valid_until?->format('Y-m-d');
-                    if (($from === null || $from <= $date) && ($until === null || $until >= $date)) {
-                        $incomingTr = $tr;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if ($incomingTr && ! empty($incomingTr->start_time) && ! empty($incomingTr->end_time)) {
-            $trStart = $this->toMinutes(substr((string) $incomingTr->start_time, 0, 5));
-            $trEnd = $this->toMinutes(substr((string) $incomingTr->end_time, 0, 5));
-            return $this->clipShiftToSchoolWindow(
-                $trStart,
-                $trEnd,
-                false,
-                null,
-                null,
-                0,
-                $schoolHours
-            );
-        }
-
         $shiftLunchStart = $shift->lunch_start
             ? $this->toMinutes(substr((string) $shift->lunch_start, 0, 5))
             : ($schoolHours['lunch_start'] ?? null);
@@ -1166,7 +1189,8 @@ class ScheduleGenerationService
             : ($schoolHours['lunch_end'] ?? null);
         $shiftLunchDuration = (int) ($shift->lunch_duration_minutes ?? $schoolHours['lunch_duration'] ?? 60);
 
-        return $this->clipShiftToSchoolWindow(
+        return $this->clipShiftForTransfer(
+            $snapshot, $assistantId, $date,
             $this->toMinutes(substr((string) $shift->entry_time, 0, 5)),
             $this->toMinutes(substr((string) $shift->exit_time, 0, 5)),
             (bool) $shift->lunch_enabled,
@@ -1174,6 +1198,53 @@ class ScheduleGenerationService
             $shiftLunchEnd,
             $shiftLunchDuration,
             $schoolHours
+        );
+    }
+
+    /**
+     * Preserve one lunch interval across both schools on transfer days.
+     */
+    private function clipShiftForTransfer(
+        array $snapshot,
+        string $assistantId,
+        string $date,
+        int $entry,
+        int $exit,
+        bool $lunchEnabled,
+        ?int $lunchStart,
+        ?int $lunchEnd,
+        int $lunchDuration,
+        array $schoolHours
+    ): array {
+        $isActive = fn ($tr) => $tr->assistant_id === $assistantId
+            && ($tr->valid_from === null || $tr->valid_from->format('Y-m-d') <= $date)
+            && ($tr->valid_until === null || $tr->valid_until->format('Y-m-d') >= $date);
+        $incoming = collect($snapshot['incoming_transfers'] ?? [])->first($isActive);
+        $outgoing = ($snapshot['outgoing_transfers'] ?? collect())->get($assistantId, collect())->first($isActive);
+
+        if ($incoming !== null || $outgoing !== null) {
+            // A flexible lunch window must resolve to the same break in both schools.
+            if ($lunchEnabled && $lunchStart !== null && $lunchEnd !== null && $lunchDuration > 0) {
+                $lunchStart = max($lunchStart, $entry);
+                $lunchEnd = min($lunchEnd, $lunchStart + $lunchDuration, $exit);
+            }
+
+            if ($incoming !== null && $incoming->start_time && $incoming->end_time) {
+                $entry = max($entry, $this->toMinutes($incoming->start_time));
+                $exit = min($exit, $this->toMinutes($incoming->end_time));
+            }
+
+            if ($lunchEnabled && $lunchStart !== null && $lunchEnd !== null) {
+                // When a transfer cuts through lunch, reserve only the overlapping part here.
+                $lunchStart = max($lunchStart, $entry, $schoolHours['opening']);
+                $lunchEnd = min($lunchEnd, $exit, $schoolHours['closing']);
+                $lunchDuration = max(0, $lunchEnd - $lunchStart);
+                $lunchEnabled = $lunchDuration > 0;
+            }
+        }
+
+        return $this->clipShiftToSchoolWindow(
+            $entry, $exit, $lunchEnabled, $lunchStart, $lunchEnd, $lunchDuration, $schoolHours
         );
     }
 
@@ -1342,8 +1413,7 @@ class ScheduleGenerationService
         $occupied[] = [$newStart, $newEnd];
         $occupied = array_merge(
             $occupied,
-            $this->getPartialAbsenceIntervals($snapshot, $assistantId, $date, $lStart, $lEnd),
-            $this->getOutgoingTransferIntervals($snapshot, $assistantId, $schoolId, $date, $lStart, $lEnd)
+            $this->getPartialAbsenceIntervals($snapshot, $assistantId, $date, $lStart, $lEnd)
         );
 
         $freeInLunch = $this->subtractIntervals($lStart, $lEnd, $occupied);
@@ -1357,7 +1427,62 @@ class ScheduleGenerationService
     }
 
     /**
-     * Ronda B: Particiona as vagas em falta de uma Regra Obrigatória em sub-blocos de 15 min (mín. 60 min ou restante).
+     * Assign every rule candidate's free 15-minute blocks, even above minimum coverage.
+     */
+    private function allocateAvailableRuleCandidates(
+        array $snapshot,
+        array &$dayAssignments,
+        ScheduleRule $rule,
+        Collection $candidates,
+        string $schoolId,
+        string $date,
+        int $weekday,
+        array $schoolHours,
+        int $effStart,
+        int $effEnd,
+        array &$insights
+    ): void {
+        // The minimum measures coverage; it does not cap available rule candidates.
+        foreach ($candidates->unique('id') as $candidate) {
+            $added = [];
+            for ($start = $effStart; $start + 15 <= $effEnd; $start += 15) {
+                $end = $start + 15;
+                $eval = $this->evaluateCandidateForInterval(
+                    $snapshot, $dayAssignments, $candidate, $schoolId,
+                    $date, $weekday, $schoolHours, $start, $end
+                );
+
+                // Extra coverage must not displace another assignment.
+                if ($eval['status'] !== 'ok_free') {
+                    continue;
+                }
+
+                $entry = $this->makeAssignment(
+                    $candidate, $rule->activityType, $date, $start, $end,
+                    $rule->type, false, $rule->id, null, 'rule_availability'
+                );
+                $dayAssignments[] = $entry;
+                $added[] = $entry;
+            }
+
+            foreach ($this->mergeAdjacentEntries($added) as $entry) {
+                $insights[] = [
+                    'type' => 'partition_sub_block',
+                    'date' => $date,
+                    'rule_id' => $rule->id,
+                    'assistant_id' => $candidate->id,
+                    'start_time' => $entry['start_time'],
+                    'end_time' => $entry['end_time'],
+                    'message' => "{$date}: {$this->assistantDisplayName($candidate)} atribuído à regra no período disponível {$entry['start_time']}–{$entry['end_time']}.",
+                ];
+            }
+        }
+
+        $dayAssignments = $this->mergeAdjacentEntries($dayAssignments);
+    }
+
+    /**
+     * Fill mandatory coverage shortfalls using candidates from the rule.
      */
     private function runRoundBSubBlockPartitioning(
         array $snapshot,
@@ -2379,7 +2504,11 @@ class ScheduleGenerationService
                 continue;
             }
 
-            return 'different_school';
+            $transferStart = $tr->start_time ? $this->toMinutes($tr->start_time) : 0;
+            $transferEnd = $tr->end_time ? $this->toMinutes($tr->end_time) : 1440;
+            if ($this->intervalsOverlap($startMin, $endMin, $transferStart, $transferEnd)) {
+                return 'different_school';
+            }
         }
 
         return null;
