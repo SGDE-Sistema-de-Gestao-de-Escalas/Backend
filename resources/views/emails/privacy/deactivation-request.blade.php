@@ -1,7 +1,7 @@
 <x-mail::message>
 # Pedido de Desativação e Esquecimento (RGPD)
 
-Foi submetido um novo pedido de desativação / direito ao esquecimento através do portal **SGDE**.
+O(A) utilizador(a) **{{ $user->first_name }} {{ $user->last_name }}** submeteu um novo pedido de desativação / direito ao esquecimento através do portal **SGDE**.
 
 <x-mail::panel>
 **Nome:** {{ $user->first_name }} {{ $user->last_name }}<br>

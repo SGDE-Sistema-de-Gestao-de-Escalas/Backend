@@ -1,7 +1,7 @@
 <x-mail::message>
 # Nova Justificação de Falta Submetida
 
-Um assistente operacional submeteu uma justificação e/ou documento comprovativo referente a uma ausência pendente de validação.
+O(A) assistente operacional **{{ $assistantLabel }}** atualizou a sua falta pendente e submeteu uma justificação e/ou documento comprovativo para validação.
 
 <x-mail::panel>
 **Assistente:** {{ $assistantLabel }}<br>

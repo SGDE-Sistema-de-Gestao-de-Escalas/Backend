@@ -24,9 +24,11 @@ class CriminalRecordExpiryAlertMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $assistantName = trim("{$this->assistantUser->first_name} {$this->assistantUser->last_name}");
+
         $subject = $this->daysRemaining <= 0
-            ? 'SGDE - Alerta Crítico: Registo Criminal Expirado Hoje'
-            : "SGDE - Aviso de Validade: Registo Criminal expira em {$this->daysRemaining} dias";
+            ? "SGDE - Alerta Crítico: Registo Criminal de {$assistantName} Expirado Hoje"
+            : "SGDE - Aviso de Validade: Registo Criminal de {$assistantName} expira em {$this->daysRemaining} dias";
 
         return new Envelope(
             subject: $subject,
