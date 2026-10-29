@@ -14,6 +14,8 @@ use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleIntegrityService;
+use App\Services\ScheduleExportService;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\JsonResponse;
 use Carbon\CarbonImmutable;
 use App\Models\Schedules\ScheduleEntry;
@@ -26,6 +28,7 @@ class ScheduleController extends Controller
         private readonly ScheduleGenerationService $generationService,
         private readonly ScheduleIntegrityService $integrityService,
         private readonly NotificationService $notifications,
+        private readonly ScheduleExportService $exportService,
     ) {}
 
     /**
@@ -317,6 +320,103 @@ class ScheduleController extends Controller
             'status' => 'published',
             'published_schedules_count' => $count,
         ]);
+    }
+
+    /**
+     * Exporta a escala de serviço em PDF (A4 Horizontal) ou CSV (UTF-8 BOM para Excel).
+     * GET /api/schedules/export
+     */
+    public function export(Request $request): Response
+    {
+        $schoolId = (string) (
+            $request->attributes->get('currentSchoolId')
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->query('school_id')
+            ?? $request->user()?->school_id
+            ?? $request->user()?->assistant?->school_id
+        );
+
+        if ($schoolId === '') {
+            return response()->json([
+                'message' => 'O cabeçalho X-School-ID é obrigatório para exportar escalas.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date_format:Y-m-d'],
+            'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'format' => ['sometimes', 'string', 'in:pdf,csv'],
+            'model' => ['sometimes', 'string', 'in:wall,individual'],
+            'assistant_id' => ['nullable', 'string'],
+        ]);
+
+        $startDate = $validated['start_date'];
+        $endDate = $validated['end_date'];
+        $format = $validated['format'] ?? 'pdf';
+        $model = $validated['model'] ?? 'wall';
+        $assistantId = $validated['assistant_id'] ?? null;
+
+        $startCarbon = CarbonImmutable::parse($startDate)->startOfDay();
+        $endCarbon = CarbonImmutable::parse($endDate)->startOfDay();
+
+        // Limite máximo de 7 dias por exportação (inclusive: diffInDays <= 6 => 7 dias no total)
+        if ($startCarbon->diffInDays($endCarbon) >= 7) {
+            return response()->json([
+                'message' => 'O intervalo de datas para exportação não pode exceder 7 dias.',
+                'errors' => [
+                    'end_date' => ['O intervalo selecionado não pode ultrapassar 7 dias (1 semana).'],
+                ],
+            ], 422);
+        }
+
+        $user = $request->user();
+        if ($user && ! $user->isAdmin() && $user->assistant) {
+            if ($model === 'individual' || $model === 'monthly') {
+                $assistantId = (string) $user->assistant->id;
+            }
+        }
+
+        // Apenas escalas publicadas (status = 'published') podem ser impressas/exportadas
+        $publishError = $this->exportService->validateExportableSchedules(
+            $schoolId,
+            $startDate,
+            $endDate,
+            $model,
+            $assistantId
+        );
+        if ($publishError !== null) {
+            return response()->json([
+                'message' => $publishError,
+            ], 422);
+        }
+
+        $dateSuffix = $startDate === $endDate ? $startDate : "{$startDate}_a_{$endDate}";
+
+        if ($format === 'csv') {
+            $filename = $model === 'individual'
+                ? "horario_individual_{$dateSuffix}.csv"
+                : "escala_servico_{$dateSuffix}.csv";
+
+            return response()->streamDownload(function () use ($schoolId, $startDate, $endDate, $assistantId): void {
+                $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    return;
+                }
+                $this->exportService->writeCsv($out, $schoolId, $startDate, $endDate, $assistantId);
+                fclose($out);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $filename = $model === 'individual'
+            ? "horario_individual_{$dateSuffix}.pdf"
+            : "escala_diaria_{$dateSuffix}.pdf";
+
+        $pdf = $this->exportService->generatePdf($schoolId, $startDate, $endDate, $model, $assistantId);
+
+        return $pdf->download($filename);
     }
 
     /**
