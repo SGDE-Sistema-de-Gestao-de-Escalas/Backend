@@ -2,9 +2,9 @@
 # {{ $daysRemaining <= 0 ? 'Alerta Crítico: Registo Criminal Expirado' : 'Aviso de Validade de Registo Criminal' }}
 
 @if ($daysRemaining <= 0)
-O certificado de registo criminal do assistente abaixo atingiu hoje a sua **data limite de validade** e encontra-se expirado.
+O certificado de registo criminal de **{{ $assistantLabel }}** atingiu hoje a sua **data limite de validade** e encontra-se expirado.
 @else
-O certificado de registo criminal do assistente abaixo irá expirar dentro de **{{ $daysRemaining }} dias**.
+O certificado de registo criminal de **{{ $assistantLabel }}** irá expirar dentro de **{{ $daysRemaining }} dias**.
 @endif
 
 <x-mail::panel>

@@ -23,8 +23,10 @@ class AbsenceJustificationSubmittedMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $assistantName = trim("{$this->assistantUser->first_name} {$this->assistantUser->last_name}");
+
         return new Envelope(
-            subject: 'SGDE - Novo Comprovativo / Justificação de Falta Submetido',
+            subject: "SGDE - Justificação de Falta Submetida por {$assistantName}",
         );
     }
 
