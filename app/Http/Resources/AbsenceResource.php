@@ -5,7 +5,6 @@ namespace App\Http\Resources;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AbsenceResource extends JsonResource
@@ -153,13 +152,9 @@ class AbsenceResource extends JsonResource
 
     private function getDocumentUrl(string $path): string
     {
-        $disk = config('filesystems.documents_disk');
-
-        try {
-            return Storage::disk($disk)->url($path);
-        } catch (\Throwable) {
-            return route('absences.document', ['absence' => $this->id]);
-        }
+        // Os documentos têm dados pessoais: o único endereço é o da rota
+        // autenticada, nunca o URL direto do disco (F-02).
+        return route('absences.document', ['absence' => $this->id]);
     }
 }
 
