@@ -852,6 +852,101 @@ public function test_transfers_are_not_persisted_when_generation_fails(): void
             'assistant_id' => $externalAssistant->id,
         ]);
     }
+    public static function transferLunchCases(): array
+    {
+        return [
+            'whole day' => [null, null, ['12:45', '13:45'], false],
+            'across lunch' => ['10:00', '16:00', ['12:45', '13:45'], false],
+            'before lunch' => ['10:00', '12:00', null, false],
+            'after lunch' => ['14:00', '16:00', null, false],
+            'starts during lunch' => ['13:00', '16:00', ['13:00', '13:45'], false],
+            'ends during lunch' => ['10:00', '13:00', ['12:45', '13:00'], false],
+            'exception lunch' => ['10:00', '16:00', ['13:00', '13:30'], true],
+            'flexible lunch window' => ['10:00', '16:00', ['12:45', '13:45'], false, '14:45'],
+        ];
+    }
+
+    #[DataProvider('transferLunchCases')]
+    public function test_transfer_preserves_lunch_and_work_in_both_schools(
+        ?string $start, ?string $end, ?array $expectedLunch, bool $withException, string $profileLunchEnd = '13:45'
+    ): void {
+        $origin = School::create(['name' => 'Origem', 'acronym' => 'OR']);
+        $operatingRule = SchoolOperatingRule::create(['school_id' => $origin->id, 'valid_from' => '2026-01-01']);
+        SchoolOperatingRuleDay::create([
+            'school_operating_rule_id' => $operatingRule->id, 'day_of_week' => 0,
+            'opening_time' => '08:00', 'closing_time' => '18:00',
+            'lunch_start' => '12:00', 'lunch_end' => '14:30', 'lunch_duration_minutes' => 60,
+        ]);
+        $assistant = $this->createAssistantWithShift(
+            'Transferida', 'T001', lunchStart: '12:45', lunchEnd: $profileLunchEnd, school: $origin
+        );
+        $originActivity = ActivityType::create([
+            'school_id' => $origin->id, 'name' => 'Tarefa origem', 'color' => '#8B5CF6',
+            'active' => true, 'is_fallback' => false,
+        ]);
+        $originRule = ScheduleRule::create([
+            'school_id' => $origin->id, 'activity_type_id' => $originActivity->id,
+            'period_start' => '08:00', 'period_end' => '10:00', 'min' => 1,
+            'type' => 'mandatory', 'valid_from' => '2026-01-01', 'days_of_week' => [0],
+        ]);
+        $originRule->assistants()->attach($assistant->id, ['priority' => 1]);
+        if ($withException) {
+            \App\Models\Assistants\AssistantException::create([
+                'assistant_id' => $assistant->id, 'type' => 'schedule_change',
+                'valid_from' => '2026-11-02', 'valid_until' => '2026-11-02',
+                'start_time' => '08:00', 'end_time' => '16:00', 'days' => [0],
+                'lunch_enabled' => true, 'lunch_start' => '13:00', 'lunch_end' => '13:30',
+                'lunch_duration_minutes' => 30,
+            ]);
+        }
+        \App\Models\Assistants\AssistantTemporaryAssignments::create([
+            'assistant_id' => $assistant->id, 'origin_school_id' => $origin->id,
+            'destination_school_id' => $this->school->id,
+            'created_by_user_id' => $this->admin->id,
+            'validated_by_user_id' => $this->admin->id,
+            'valid_from' => '2026-11-02', 'valid_until' => '2026-11-02',
+            'start_time' => $start, 'end_time' => $end,
+        ]);
+        ScheduleRule::create([
+            'school_id' => $this->school->id, 'activity_type_id' => $this->vigilancia->id,
+            'period_start' => '10:00', 'period_end' => '16:00', 'min' => 1,
+            'type' => 'mandatory', 'valid_from' => '2026-01-01', 'days_of_week' => [0],
+        ]);
+
+        $service = app(\App\Services\ScheduleGenerationService::class);
+        $result = $service->generate($this->school->id, '2026-11-02', '2026-11-02');
+        $lunch = $result['lunch_blocks']['2026-11-02'][$assistant->id] ?? null;
+        $this->assertSame($expectedLunch, $lunch ? [$lunch['start_time'], $lunch['end_time']] : null);
+        $entries = ScheduleEntry::whereHas('schedule', fn ($q) => $q
+            ->where('assistant_id', $assistant->id)->where('school_id', $this->school->id))->get();
+        $this->assertNotEmpty($entries);
+        $lunchStart = $withException ? '13:00' : '12:45';
+        $lunchEnd = $withException ? '13:30' : '13:45';
+        foreach ($entries as $entry) {
+            $s = substr($entry->start_time, 0, 5);
+            $e = substr($entry->end_time, 0, 5);
+            $this->assertGreaterThanOrEqual($start ?? '08:00', $s);
+            $this->assertLessThanOrEqual($end ?? '16:00', $e);
+            $this->assertFalse($s < $lunchEnd && $e > $lunchStart);
+        }
+
+        $this->assertSame($origin->id, $originRule->fresh()->assistants->first()->school_id);
+        $originResult = $service->generate($origin->id, '2026-11-02', '2026-11-02');
+        $originEntries = ScheduleEntry::whereHas('schedule', fn ($q) => $q
+            ->where('assistant_id', $assistant->id)->where('school_id', $origin->id))->get();
+        if ($start !== null) {
+            $this->assertTrue($originEntries->contains('schedule_rule_id', $originRule->id));
+        }
+        foreach ($originEntries as $entry) {
+            $s = substr($entry->start_time, 0, 5);
+            $e = substr($entry->end_time, 0, 5);
+            $this->assertFalse($s < ($end ?? '16:00') && $e > ($start ?? '08:00'));
+            $this->assertFalse($s < $lunchEnd && $e > $lunchStart);
+        }
+        $originLunch = $originResult['lunch_blocks']['2026-11-02'][$assistant->id];
+        $this->assertSame([$lunchStart, $lunchEnd], [$originLunch['start_time'], $originLunch['end_time']]);
+    }
+
     public function test_partial_hours_transfer_allocates_only_transferred_window_and_adapts_lunch(): void
     {
         $otherSchool = School::create([
