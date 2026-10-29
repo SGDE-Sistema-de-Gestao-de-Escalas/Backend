@@ -11,6 +11,7 @@ use App\Services\AssistantScheduleProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class AssistantScheduleProfileController extends Controller
 {
@@ -66,6 +67,8 @@ class AssistantScheduleProfileController extends Controller
      */
     public function show(AssistantScheduleProfile $assistantScheduleProfile): AssistantScheduleProfileResource
     {
+        Gate::authorize('view', $assistantScheduleProfile);
+
         return new AssistantScheduleProfileResource($assistantScheduleProfile->load(['shifts.shiftDays']));
     }
 
@@ -84,6 +87,8 @@ class AssistantScheduleProfileController extends Controller
      */
     public function destroy(AssistantScheduleProfile $assistantScheduleProfile): JsonResponse
     {
+        Gate::authorize('delete', $assistantScheduleProfile);
+
         $this->scheduleProfileService->delete($assistantScheduleProfile);
 
         return response()->json([

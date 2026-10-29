@@ -340,7 +340,7 @@ class AssistantEmailNotificationsTest extends TestCase
     public function test_assistant_submitting_justification_or_document_sends_email_to_admins(): void
     {
         Mail::fake();
-        \Illuminate\Support\Facades\Storage::fake('public');
+        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
 
         $absence = Absence::create([
             'assistant_id' => $this->assistant->id,

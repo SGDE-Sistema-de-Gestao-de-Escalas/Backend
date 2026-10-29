@@ -8,6 +8,7 @@ use App\Http\Requests\System\UpdateActivityTypeRequest;
 use App\Http\Resources\ActivityTypeResource;
 use App\Models\System\ActivityType;
 use App\Services\ActivityTypeService;
+use App\Services\SchoolAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Gate;
 class ActivityTypeController extends Controller
 {
     public function __construct(
-        private readonly ActivityTypeService $activityTypeService
+        private readonly ActivityTypeService $activityTypeService,
+        private readonly SchoolAccessService $schoolAccess
     ) {}
 
     /**
@@ -29,9 +31,16 @@ class ActivityTypeController extends Controller
         Gate::authorize('viewAny', ActivityType::class);
 
         $schoolId = $request->attributes->get('school_id');
+        $user = $request->user();
 
         $activityTypes = ActivityType::withCount(ActivityTypeService::blockingCounts())
             ->when($schoolId, fn ($query) => $query->where('school_id', $schoolId))
+            // Sem cabeçalho, quem não é administrador só vê as atividades das
+            // escolas a que tem acesso, e não as de todas (F-09).
+            ->when(! $schoolId && $user && ! $user->isAdmin(), fn ($query) => $query->whereIn(
+                'school_id',
+                $this->schoolAccess->accessibleSchoolIds($user)
+            ))
             ->orderByDesc('is_fallback')
             ->orderBy('name')
             ->get();

@@ -134,7 +134,7 @@ class AssistantCrudTest extends TestCase
 
     public function test_admin_can_create_assistant_with_criminal_record_in_structured_public_folder(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.documents_disk'));
 
         $file = UploadedFile::fake()->create('registo_criminal_teste.pdf', 1024, 'application/pdf');
 
@@ -165,12 +165,12 @@ class AssistantCrudTest extends TestCase
         $this->assertStringStartsWith($expectedFolderPrefix, $data['criminal_record_path']);
         $this->assertStringContainsString('/criminal_record/registo_criminal_', $data['criminal_record_path']);
 
-        Storage::disk('public')->assertExists($data['criminal_record_path']);
+        Storage::disk(config('filesystems.documents_disk'))->assertExists($data['criminal_record_path']);
     }
 
     public function test_admin_can_download_assistant_criminal_record(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.documents_disk'));
 
         $file = UploadedFile::fake()->create('registo.pdf', 500, 'application/pdf');
 
@@ -197,7 +197,7 @@ class AssistantCrudTest extends TestCase
 
     public function test_admin_can_update_assistant_and_replace_criminal_record(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.documents_disk'));
 
         $file1 = UploadedFile::fake()->create('antigo.pdf', 500, 'application/pdf');
 
@@ -215,7 +215,7 @@ class AssistantCrudTest extends TestCase
 
         $assistantId = $createResponse->json('data.id');
         $oldPath = $createResponse->json('data.criminal_record_path');
-        Storage::disk('public')->assertExists($oldPath);
+        Storage::disk(config('filesystems.documents_disk'))->assertExists($oldPath);
 
         $file2 = UploadedFile::fake()->create('novo.pdf', 800, 'application/pdf');
 
@@ -232,13 +232,13 @@ class AssistantCrudTest extends TestCase
 
         $newPath = $updateResponse->json('data.criminal_record_path');
         $this->assertNotSame($oldPath, $newPath);
-        Storage::disk('public')->assertMissing($oldPath);
-        Storage::disk('public')->assertExists($newPath);
+        Storage::disk(config('filesystems.documents_disk'))->assertMissing($oldPath);
+        Storage::disk(config('filesystems.documents_disk'))->assertExists($newPath);
     }
 
     public function test_admin_can_remove_assistant_criminal_record(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.documents_disk'));
 
         $file = UploadedFile::fake()->create('doc.pdf', 500, 'application/pdf');
 
@@ -256,7 +256,7 @@ class AssistantCrudTest extends TestCase
 
         $assistantId = $createResponse->json('data.id');
         $path = $createResponse->json('data.criminal_record_path');
-        Storage::disk('public')->assertExists($path);
+        Storage::disk(config('filesystems.documents_disk'))->assertExists($path);
 
         $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
@@ -271,7 +271,7 @@ class AssistantCrudTest extends TestCase
             ->assertJsonPath('data.has_criminal_record', false)
             ->assertJsonPath('data.criminal_record_path', null);
 
-        Storage::disk('public')->assertMissing($path);
+        Storage::disk(config('filesystems.documents_disk'))->assertMissing($path);
     }
 
     public function test_admin_can_register_criminal_record_expiry_date_without_uploading_file(): void
