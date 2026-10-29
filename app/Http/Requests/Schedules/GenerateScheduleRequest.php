@@ -13,6 +13,19 @@ class GenerateScheduleRequest extends FormRequest
         return (bool) $this->user()?->isAdmin();
     }
 
+    /**
+     * Datas que não sejam texto (listas, objetos) tratam-se como em falta: a regra
+     * "after_or_equal" rebenta com um TypeError se receber uma lista.
+     */
+    protected function prepareForValidation(): void
+    {
+        foreach (['start_date', 'end_date'] as $field) {
+            if ($this->has($field) && ! is_string($this->input($field))) {
+                $this->merge([$field => null]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -40,7 +53,9 @@ class GenerateScheduleRequest extends FormRequest
 
             $start = $this->input('start_date');
             $end = $this->input('end_date');
-            if ($start && $end) {
+            // Só calcula o intervalo se as duas datas já passaram nas regras
+            // (o Carbon::parse rebenta com "abc" ou com o mês 13).
+            if ($start && $end && ! $validator->errors()->hasAny(['start_date', 'end_date'])) {
                 $days = CarbonImmutable::parse($start)->diffInDays(CarbonImmutable::parse($end), false);
                 if ($days > 31) {
                     $validator->errors()->add('end_date', 'O intervalo máximo de geração automática é de 31 dias.');
