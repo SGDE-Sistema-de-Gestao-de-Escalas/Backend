@@ -35,11 +35,19 @@ class UpdateUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
+                // Ignora a própria conta: sem isto, guardar o perfil com o email
+                // inalterado dava "o email já existe" (em /me a rota não tem {user}).
                 Rule::unique('users', 'email')
-                    ->ignore($this->route('user'))
+                    ->ignore($targetId)
                     ->whereNull('deleted_at'),
             ],
         ];
+
+        // F-08: mudar o email da PRÓPRIA conta exige a password atual. O email
+        // recebe a recuperação de password: uma sessão roubada não pode trocá-lo.
+        if ($this->changesOwnEmail($target)) {
+            $rules['current_password'] = ['required', 'string', 'current_password:sanctum'];
+        }
 
         if ($isAdmin) {
             $rules['role_id'] = [
@@ -60,9 +68,33 @@ class UpdateUserRequest extends FormRequest
         return $rules;
     }
 
+    /**
+     * É um pedido do próprio utilizador a mudar o seu email? (Um administrador a
+     * editar a conta de outra pessoa não conta.)
+     */
+    private function changesOwnEmail(mixed $target): bool
+    {
+        $user = $this->user();
+
+        if (! $user || ! $this->has('email')) {
+            return false;
+        }
+
+        $targetId = is_object($target) ? $target->getKey() : $target;
+
+        if ((string) $targetId !== (string) $user->getKey()) {
+            return false;
+        }
+
+        return mb_strtolower(trim((string) $this->input('email')))
+            !== mb_strtolower(trim((string) $user->email));
+    }
+
     public function messages(): array
     {
         return [
+            'current_password.required' => 'Indique a sua password atual para alterar o email.',
+            'current_password.current_password' => 'A password atual está incorreta.',
             'role_id.prohibited' => 'Não tem permissão para alterar o perfil de utilizador.',
             'is_active.prohibited' => 'Não tem permissão para alterar o estado da conta.',
             'school_id.prohibited' => 'Não tem permissão para alterar a associação de escola.',
