@@ -14,8 +14,8 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * F-04: um assistente não pode decidir o estado (justificada/injustificada)
- * da sua própria falta ao criá-la. Só o administrador o decide.
+ * F-04: um assistente não pode decidir o estado (justificada/injustificada) de
+ * uma falta, e desde a mudança de regras nem sequer as cria: só o administrador.
  */
 class AbsenceStatusTest extends TestCase
 {
@@ -68,35 +68,36 @@ class AbsenceStatusTest extends TestCase
             ->postJson('/api/absences', $this->payload($extra));
     }
 
-    public function test_staff_cannot_create_an_absence_already_justified(): void
+    public static function statusesSentByStaff(): array
     {
-        $this->create($this->staff, ['status' => 'justified'])->assertCreated();
-
-        $absence = Absence::firstOrFail();
-        $this->assertSame('pending', $absence->status);
-        $this->assertNull($absence->justified_by_user_id);
+        return [
+            'sem estado' => [null],
+            'pending (o que o antigo formulário enviava)' => ['pending'],
+            'justified' => ['justified'],
+            'unjustified' => ['unjustified'],
+        ];
     }
 
-    public function test_staff_cannot_create_an_absence_already_unjustified(): void
+    /**
+     * Mudança de regras: o assistente já não regista ausências (só o
+     * administrador). Isto fecha também o F-04 (um assistente a criar uma falta
+     * já justificada): não há forma de criar, qualquer que seja o estado enviado.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('statusesSentByStaff')]
+    public function test_staff_cannot_create_an_absence_in_any_state(?string $status): void
     {
-        $this->create($this->staff, ['status' => 'unjustified'])->assertCreated();
+        $extra = $status === null ? [] : ['status' => $status];
 
-        $this->assertSame('pending', Absence::firstOrFail()->status);
+        $this->create($this->staff, $extra)->assertForbidden();
+
+        $this->assertSame(0, Absence::count());
     }
 
-    public function test_staff_absence_without_status_is_pending(): void
+    public function test_staff_cannot_create_an_absence_for_a_colleague_either(): void
     {
-        $this->create($this->staff)->assertCreated();
+        $this->create($this->staff, ['assistant_id' => $this->assistant->id])->assertForbidden();
 
-        $this->assertSame('pending', Absence::firstOrFail()->status);
-    }
-
-    public function test_the_ui_value_pending_keeps_working_for_staff(): void
-    {
-        // O frontend do assistente envia sempre status = "pending".
-        $this->create($this->staff, ['status' => 'pending'])->assertCreated();
-
-        $this->assertSame('pending', Absence::firstOrFail()->status);
+        $this->assertSame(0, Absence::count());
     }
 
     public function test_admin_can_still_register_a_justified_absence(): void

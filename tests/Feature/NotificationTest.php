@@ -174,7 +174,7 @@ class NotificationTest extends TestCase
 
     // ------------------------------------------------------------------ eventos
 
-    public function test_absence_registered_by_assistant_notifies_admins_but_not_when_admin_registers(): void
+    public function test_assistants_cannot_register_absences_and_nobody_is_notified_when_the_admin_does(): void
     {
         $assistant = $this->makeAssistant('Maria');
         $payload = [
@@ -182,21 +182,12 @@ class NotificationTest extends TestCase
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->addDay()->toDateString(),
         ];
 
-        // registada pelo próprio assistente (staff)
-        $this->as($assistant->user)->postJson('/api/absences', $payload)->assertCreated();
-
-        foreach ([$this->admin, $this->admin2] as $admin) {
-            $n = Notification::where('user_id', $admin->id)->where('event', 'absence.registered')->first();
-            $this->assertNotNull($n, 'cada administrador recebe a notificação');
-            $this->assertSame('absence', $n->type);
-            $this->assertSame($this->school->id, $n->school_id);
-            $this->assertStringContainsString('Maria Op', $n->body);
-            $this->assertSame('/absences', $n->data['link']);
-        }
-        $this->assertSame(0, Notification::where('user_id', $assistant->user->id)->count(), 'o assistente não recebe nada');
+        // O assistente já não regista ausências (mudança de regras): 403 e nada é notificado.
+        $this->as($assistant->user)->postJson('/api/absences', $payload)->assertForbidden();
+        $this->assertSame(0, Absence::count());
+        $this->assertSame(0, Notification::where('event', 'absence.registered')->count());
 
         // registada por um administrador -> ninguém é notificado
-        Notification::query()->delete();
         $this->as($this->admin)->postJson('/api/absences', $payload)->assertCreated();
         $this->assertSame(0, Notification::where('event', 'absence.registered')->count());
     }
@@ -415,13 +406,19 @@ class NotificationTest extends TestCase
 
     public function test_a_failure_while_notifying_never_breaks_the_main_operation(): void
     {
-        // Força um erro na criação (coluna `type` inválida para a BD não existe, por isso removemos a tabela)
+        // Sem a tabela de notificações, notificar falha; o envio do documento tem de continuar a funcionar.
         $assistant = $this->makeAssistant('Maria');
+        $absence = Absence::create([
+            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
+            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(), 'total_days' => 1,
+        ]);
+        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
         \Illuminate\Support\Facades\Schema::drop('notifications');
 
-        $this->as($assistant->user)->postJson('/api/absences', [
-            'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
-            'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(),
-        ])->assertCreated();
+        $file = \Illuminate\Http\UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
+
+        $this->as($assistant->user)
+            ->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])
+            ->assertSuccessful();
     }
 }
