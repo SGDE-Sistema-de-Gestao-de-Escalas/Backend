@@ -145,6 +145,14 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
     Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
     Route::apiResource('schedule-rules', ScheduleRuleController::class);
+    // Importação e exportação em CSV (só administradores). Têm de vir ANTES do
+    // apiResource, senão "export" seria lido como o id de um assistente (404).
+    Route::middleware('can:manage-system')->group(function () {
+        Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
+            ->name('assistants.export');
+        Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
+            ->name('assistants.import');
+    });
     Route::apiResource('assistants', AssistantController::class)
         ->withTrashed(['show', 'update', 'destroy']);
     Route::get('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'index']);
@@ -157,14 +165,8 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
             ->name('dashboard.bootstrap');
 
-        // Importação e exportação em CSV. Têm de vir antes do apiResource,
-        // senão "export" seria lido como o id de um assistente.
         Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])
             ->name('reports.index');
-        Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
-            ->name('assistants.export');
-        Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
-            ->name('assistants.import');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
         Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
