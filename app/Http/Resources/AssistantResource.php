@@ -94,6 +94,22 @@ class AssistantResource extends JsonResource
                 ]),
             ])),
 
+            'assistant_exceptions' => $this->whenLoaded('assistantExceptions', fn () => $this->assistantExceptions->map(fn ($exc) => [
+                'id' => (string) $exc->id,
+                'assistant_id' => (string) $exc->assistant_id,
+                'type' => $exc->type,
+                'description' => $exc->description,
+                'valid_from' => is_string($exc->valid_from) ? substr($exc->valid_from, 0, 10) : $exc->valid_from?->format('Y-m-d'),
+                'valid_until' => is_string($exc->valid_until) ? substr($exc->valid_until, 0, 10) : $exc->valid_until?->format('Y-m-d'),
+                'start_time' => $exc->getRawOriginal('start_time') ? substr((string) $exc->getRawOriginal('start_time'), 0, 5) : null,
+                'end_time' => $exc->getRawOriginal('end_time') ? substr((string) $exc->getRawOriginal('end_time'), 0, 5) : null,
+                'days' => is_array($exc->days) ? array_values(array_map('intval', $exc->days)) : [],
+                'lunch_enabled' => (bool) $exc->lunch_enabled,
+                'lunch_start' => $exc->getRawOriginal('lunch_start') ? substr((string) $exc->getRawOriginal('lunch_start'), 0, 5) : null,
+                'lunch_end' => $exc->getRawOriginal('lunch_end') ? substr((string) $exc->getRawOriginal('lunch_end'), 0, 5) : null,
+                'lunch_duration_minutes' => $exc->lunch_duration_minutes !== null ? (int) $exc->lunch_duration_minutes : null,
+            ])),
+
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,

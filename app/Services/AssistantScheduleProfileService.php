@@ -3,12 +3,93 @@
 namespace App\Services;
 
 use App\Models\Schedules\AssistantScheduleProfile;
+use App\Models\Schedules\ScheduleEntry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AssistantScheduleProfileService
 {
+    /**
+     * Verifica se o perfil de horário já regeu escalas em datas passadas (< hoje).
+     */
+    public function hasPastSchedules(AssistantScheduleProfile $profile): bool
+    {
+        $todayStr = Carbon::today()->toDateString();
+        $validFromStr = $profile->valid_from ? Carbon::parse($profile->valid_from)->toDateString() : null;
+
+        if (! $validFromStr || $validFromStr >= $todayStr) {
+            return false;
+        }
+
+        $yesterdayStr = Carbon::yesterday()->toDateString();
+        $validUntilStr = $profile->valid_until ? Carbon::parse($profile->valid_until)->toDateString() : $yesterdayStr;
+        $pastEndStr = min($validUntilStr, $yesterdayStr);
+
+        return ScheduleEntry::query()
+            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $profile->assistant_id)->whereNull('deleted_at'))
+            ->whereDate('date', '>=', $validFromStr)
+            ->whereDate('date', '<=', $pastEndStr)
+            ->exists();
+    }
+
+    /**
+     * Verifica se o assistente tem outro perfil de horário anterior a este.
+     */
+    public function hasPreviousProfile(AssistantScheduleProfile $profile): bool
+    {
+        if (! $profile->valid_from) {
+            return false;
+        }
+
+        $validFromStr = Carbon::parse($profile->valid_from)->toDateString();
+
+        return AssistantScheduleProfile::where('assistant_id', $profile->assistant_id)
+            ->where('id', '!=', $profile->id)
+            ->whereDate('valid_from', '<', $validFromStr)
+            ->exists();
+    }
+
+    /**
+     * Verifica se o perfil pode ser editado:
+     * - Perfis terminados no passado (valid_until < hoje) nunca podem ser editados.
+     * - Perfis futuros ou em vigor podem ser editados desde que ainda não tenham regido escalas passadas (< hoje).
+     */
+    public function canEdit(AssistantScheduleProfile $profile): bool
+    {
+        $today = Carbon::today();
+        $validUntil = $profile->valid_until ? Carbon::parse($profile->valid_until)->startOfDay() : null;
+
+        if ($validUntil && $validUntil->isBefore($today)) {
+            return false;
+        }
+
+        return ! $this->hasPastSchedules($profile);
+    }
+
+    /**
+     * Verifica se o perfil pode ser eliminado:
+     * - Perfis futuros (valid_from > hoje) podem ser eliminados.
+     * - Perfis em vigor (valid_from <= hoje) podem ser eliminados se existir um perfil anterior para reabrir
+     *   e se ainda não tiverem regido escalas passadas (< hoje).
+     */
+    public function canDelete(AssistantScheduleProfile $profile): bool
+    {
+        $today = Carbon::today();
+        $validFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : null;
+        $validUntil = $profile->valid_until ? Carbon::parse($profile->valid_until)->startOfDay() : null;
+
+        if ($validUntil && $validUntil->isBefore($today)) {
+            return false;
+        }
+
+        if ($validFrom && $validFrom->isAfter($today)) {
+            return true;
+        }
+
+        return $this->hasPreviousProfile($profile) && ! $this->hasPastSchedules($profile);
+    }
+
     /**
      * Normaliza encadeamento histórico de perfis de um assistente caso existam
      * perfis anteriores que ficaram sem `valid_until` fechado antes da correção.
@@ -122,21 +203,18 @@ class AssistantScheduleProfileService
     }
 
     /**
-     * Atualiza um perfil de horário padrão agendado (futuro).
-     * Horários em vigor ou passados não podem ser editados.
+     * Atualiza um perfil de horário padrão (futuro ou em vigor sem escalas passadas).
      * Se alterar a data de início de D1 para D2, ajusta o término do horário anterior para D2 - 1 dia.
      */
     public function update(AssistantScheduleProfile $profile, array $data): AssistantScheduleProfile
     {
-        $today = Carbon::today();
-        $oldValidFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : null;
-
-        // Horários em vigor ou passados não podem ser editados
-        if (! $oldValidFrom || ! $oldValidFrom->isAfter($today)) {
+        if (! $this->canEdit($profile)) {
             throw ValidationException::withMessages([
-                'profile' => 'Não é possível editar um horário em vigor ou que já regeu escalas passadas.',
+                'profile' => 'Não é possível editar um horário que já regeu escalas passadas.',
             ]);
         }
+
+        $oldValidFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : Carbon::today();
 
         return DB::transaction(function () use ($profile, $data, $oldValidFrom) {
             $newValidFrom = isset($data['valid_from']) ? Carbon::parse($data['valid_from'])->startOfDay() : $oldValidFrom;
@@ -206,20 +284,20 @@ class AssistantScheduleProfileService
     }
 
     /**
-     * Remove um perfil de horário futuro.
-     * Horários em vigor ou passados não podem ser eliminados.
-     * Ao cancelar o horário agendado, o horário anterior em vigor volta a ter vigência aberta (valid_until = null).
+     * Remove um perfil de horário (futuro, ou em vigor se ainda não regeu escalas passadas e existir um anterior para reabrir).
+     * Ao eliminar o horário, o horário anterior volta a ter vigência aberta (valid_until = null) ou até à véspera do seguinte.
      */
     public function delete(AssistantScheduleProfile $profile): void
     {
-        $today = Carbon::today();
-        $validFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : null;
-
-        if (! $validFrom || ! $validFrom->isAfter($today)) {
+        if (! $this->canDelete($profile)) {
             throw ValidationException::withMessages([
-                'profile' => 'Não é possível eliminar um horário em vigor ou que já regeu escalas passadas.',
+                'profile' => $this->hasPreviousProfile($profile)
+                    ? 'Não é possível eliminar um horário que já regeu escalas passadas.'
+                    : 'Não é possível eliminar o único horário em vigor; o assistente tem de ter sempre um horário ativo.',
             ]);
         }
+
+        $validFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : Carbon::today();
 
         DB::transaction(function () use ($profile, $validFrom) {
             $validFromStr = $validFrom->format('Y-m-d');

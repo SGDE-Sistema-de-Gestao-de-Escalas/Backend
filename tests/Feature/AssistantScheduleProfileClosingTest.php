@@ -135,6 +135,28 @@ class AssistantScheduleProfileClosingTest extends TestCase
             $todayProfile->fresh()->valid_until?->format('Y-m-d'),
             'O perfil em vigor deve ser fechado com valid_until = D - 1 dia quando um perfil futuro é criado.'
         );
+
+        // 4. Eliminar o perfil futuro e depois eliminar o perfil de hoje -> o perfil inicial deve reabrir (valid_until = null)
+        $futureProfileId = $responseFuture->json('data.id');
+
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->deleteJson("/api/assistant-schedule-profiles/{$futureProfileId}")
+            ->assertStatus(200);
+
+        $this->assertNull($todayProfile->fresh()->valid_until);
+
+        // Eliminar o perfil que começou hoje (29/10/2026) -> deve permitir apagar e reabrir o perfil anterior (initialProfile)
+        $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->deleteJson("/api/assistant-schedule-profiles/{$todayProfileId}")
+            ->assertStatus(200);
+
+        $this->assertDatabaseMissing('assistant_schedule_profiles', ['id' => $todayProfileId]);
+        $this->assertNull(
+            $initialProfile->fresh()->valid_until,
+            'Ao eliminar o perfil criado hoje, o perfil anterior tem de voltar a ficar em aberto (valid_until = null).'
+        );
     }
 }
 

@@ -197,7 +197,26 @@ class ScheduleIntegrityService
             ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
             ->get();
 
-        // 1. Verificar conflito direto: assistente atribuído com ausência sobreposta
+        // Carregar exceções de assistentes ativas para a data nesta escola
+        $carbonDate = CarbonImmutable::parse($date);
+        $weekday = $carbonDate->dayOfWeekIso - 1; // 0 = Seg ... 6 = Dom
+
+        $assistantExceptions = AssistantException::query()
+            ->with('assistant.user')
+            ->whereHas('assistant', fn ($q) => $q->where('school_id', $schoolId))
+            ->whereDate('valid_from', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
+            ->get()
+            ->filter(function (AssistantException $exc) use ($weekday) {
+                $days = $exc->days;
+                if (is_array($days) && ! empty($days)) {
+                    return in_array($weekday, array_map('intval', $days), true);
+                }
+
+                return true;
+            });
+
+        // 1. Verificar conflito direto: assistente atribuído com ausência sobreposta ou fora do horário de exceção
         $absentAssistantsInEntries = [];
         foreach ($entries as $entry) {
             $assistant = $entry->schedule?->assistant;
@@ -231,11 +250,38 @@ class ScheduleIntegrityService
                     }
                 }
             }
+
+            $activeExc = $assistantExceptions->firstWhere('assistant_id', $assistant->id);
+            if ($activeExc) {
+                $rawExcStart = $activeExc->getRawOriginal('start_time');
+                $rawExcEnd = $activeExc->getRawOriginal('end_time');
+                $isUnavailableExc = $activeExc->type === 'unavailable' || empty($rawExcStart) || empty($rawExcEnd);
+                $outsideExcHours = ! $isUnavailableExc && (
+                    $entryStart < $this->toMinutes(substr((string) $rawExcStart, 0, 5))
+                    || $entryEnd > $this->toMinutes(substr((string) $rawExcEnd, 0, 5))
+                );
+
+                if ($isUnavailableExc || $outsideExcHours) {
+                    $userName = $assistant->user ? trim($assistant->user->first_name . ' ' . $assistant->user->last_name) : 'Assistente';
+                    $conflictKey = "exc_{$assistant->id}_{$entry->id}";
+                    if (! isset($absentAssistantsInEntries[$conflictKey])) {
+                        $absentAssistantsInEntries[$conflictKey] = true;
+                        $conflicts[] = [
+                            'date' => $date,
+                            'type' => 'assigned_assistant_exception_conflict',
+                            'assistant_id' => $assistant->id,
+                            'assistant_name' => $userName,
+                            'start_time' => substr((string) $entry->start_time, 0, 5),
+                            'end_time' => substr((string) $entry->end_time, 0, 5),
+                            'activity_name' => $entry->activity_name ?? $entry->activityType?->name ?? 'Atividade',
+                            'message' => "O assistente {$userName} tem tarefa '{$entry->activity_name}' agendada ({$entry->start_time} - {$entry->end_time}) fora da sua exceção de horário atual.",
+                        ];
+                    }
+                }
+            }
         }
 
         // 2. Verificar regras obrigatórias ativas nesta data
-        $carbonDate = CarbonImmutable::parse($date);
-        $weekday = $carbonDate->dayOfWeekIso - 1; // 0 = Seg ... 6 = Dom
 
         $rules = ScheduleRule::query()
             ->with(['activityType', 'assistants.user'])
