@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
+use App\Rules\NoHtmlCharacters;
 use App\Models\Schools\SchoolOperatingException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,7 +40,7 @@ class StoreSchoolOperatingExceptionRequest extends FormRequest
 
         return [
             'school_id' => ['required', 'uuid', 'exists:schools,id'],
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
             'is_closed' => ['required', 'boolean'],
             'opening_time' => [$open, 'nullable', 'date_format:H:i'],
             'closing_time' => [$open, 'nullable', 'date_format:H:i'],

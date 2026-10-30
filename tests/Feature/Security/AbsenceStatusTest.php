@@ -78,11 +78,6 @@ class AbsenceStatusTest extends TestCase
         ];
     }
 
-    /**
-     * Mudança de regras: o assistente já não regista ausências (só o
-     * administrador). Isto fecha também o F-04 (um assistente a criar uma falta
-     * já justificada): não há forma de criar, qualquer que seja o estado enviado.
-     */
     #[\PHPUnit\Framework\Attributes\DataProvider('statusesSentByStaff')]
     public function test_staff_cannot_create_an_absence_in_any_state(?string $status): void
     {

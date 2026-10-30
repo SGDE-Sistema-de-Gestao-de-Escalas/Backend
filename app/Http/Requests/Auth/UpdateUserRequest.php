@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,8 +29,8 @@ class UpdateUserRequest extends FormRequest
         $presenceRule = $this->isMethod('PUT') ? 'required' : 'sometimes';
 
         $rules = [
-            'first_name' => [$presenceRule, 'string', 'max:255'],
-            'last_name' => [$presenceRule, 'string', 'max:255'],
+            'first_name' => [$presenceRule, 'string', 'max:255', new NoHtmlCharacters],
+            'last_name' => [$presenceRule, 'string', 'max:255', new NoHtmlCharacters],
             'email' => [
                 $presenceRule,
                 'string',

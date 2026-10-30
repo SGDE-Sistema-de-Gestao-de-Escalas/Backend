@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\System;
 
+use App\Rules\NoHtmlCharacters;
 use App\Models\System\ActivityType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -36,7 +37,7 @@ class StoreActivityTypeRequest extends FormRequest
         return [
             'school_id' => ['required', 'uuid', 'exists:schools,id'],
             'name' => [
-                'required', 'string', 'max:255',
+                'required', 'string', 'max:255', new NoHtmlCharacters,
                 Rule::unique('activity_types', 'name')->where('school_id', $this->input('school_id')),
             ],
             'color' => ['sometimes', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],

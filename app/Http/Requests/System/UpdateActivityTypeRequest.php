@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\System;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,7 +30,7 @@ class UpdateActivityTypeRequest extends FormRequest
 
         return [
             'name' => [
-                'sometimes', 'required', 'string', 'max:255',
+                'sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters,
                 Rule::unique('activity_types', 'name')
                     ->where('school_id', $activityType->school_id)
                     ->ignore($activityType),

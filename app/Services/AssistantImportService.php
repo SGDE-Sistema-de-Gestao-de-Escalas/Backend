@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Rules\NoHtmlCharacters;
 use App\Http\Requests\Assistants\StoreAssistantRequest;
 use App\Models\Assistants\Assistant;
 use App\Support\AssistantCsv;
@@ -191,8 +192,8 @@ class AssistantImportService
         $assistantId = $existing?->getKey();
 
         return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
+            'last_name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
             'email' => ['required', 'email', 'max:255', $unique('users', 'email', $existing?->user_id)],
 
             'internal_number' => ['required', 'string', 'max:50', $unique('assistants', 'internal_number', $assistantId)],

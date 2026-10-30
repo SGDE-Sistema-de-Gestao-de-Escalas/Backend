@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class UpdateHolidayRequest extends FormRequest
         $holiday = $this->route('holiday');
 
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
             'date' => ['sometimes', 'required', 'date_format:Y-m-d', Rule::unique('holidays', 'date')->ignore($holiday)],
             'description' => ['sometimes', 'nullable', 'string'],
         ];
