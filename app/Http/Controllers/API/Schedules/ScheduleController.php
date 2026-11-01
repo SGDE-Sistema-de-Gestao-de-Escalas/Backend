@@ -13,6 +13,7 @@ use App\Models\Schedules\Schedule;
 use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use App\Services\ScheduleIntegrityService;
 use App\Services\ScheduleExportService;
 use Symfony\Component\HttpFoundation\Response;
@@ -328,6 +329,8 @@ class ScheduleController extends Controller
      */
     public function export(Request $request): Response
     {
+        Gate::authorize('export', Schedule::class);
+
         $schoolId = (string) (
             $request->attributes->get('currentSchoolId')
             ?? $request->attributes->get('school_id')

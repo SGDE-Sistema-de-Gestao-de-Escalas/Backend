@@ -35,6 +35,14 @@ class SchedulePolicy
     }
 
     /**
+     * Determine whether the user can export schedule files.
+     */
+    public function export(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * Determine whether the user can create models.
      */
     public function create(User $user): bool
