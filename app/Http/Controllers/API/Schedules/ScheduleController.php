@@ -53,7 +53,9 @@ class ScheduleController extends Controller
         // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
         // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
         if ($user->isAdmin()) {
-            if ($schoolId) {
+            if ($request->filled('school_id')) {
+                $query->where('school_id', $request->query('school_id'));
+            } elseif ($schoolId && ! $request->filled('assistant_id')) {
                 $query->where('school_id', $schoolId);
             }
         } else {
