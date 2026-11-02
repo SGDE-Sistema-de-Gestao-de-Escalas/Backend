@@ -12,7 +12,11 @@ use App\Mail\ResetPasswordMail;
 
 class AuthService
 {
-    public function attemptLogin(array $credentials): array
+    public const SESSION_MINUTES = 60 * 24;
+
+    public const REMEMBER_MINUTES = 60 * 24 * 30;
+
+    public function attemptLogin(array $credentials, int $minutes = self::SESSION_MINUTES): array
     {
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
@@ -28,7 +32,7 @@ class AuthService
 
         $user->tokens()->delete();
 
-        $token = $user->createToken('sgde-access-token')->plainTextToken;
+        $token = $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
 
         return [
             'user' => $user,
@@ -56,7 +60,7 @@ class AuthService
         }
     }
 
-    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser): string
+    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser, int $minutes = self::REMEMBER_MINUTES): string
     {
         $user = User::where('email', $socialUser->getEmail())->first();
 
@@ -90,7 +94,7 @@ class AuthService
 
         $user->tokens()->delete();
         
-        return $user->createToken('sgde-access-token')->plainTextToken;
+        return $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
     }
 
     public function createUserAndSendResetLink(array $data): User
