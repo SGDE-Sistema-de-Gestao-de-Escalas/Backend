@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Password;
@@ -37,11 +38,13 @@ class AuthService
 
     public function updatePassword(User $user, string $newPassword): void
     {
-        $user->update([
-            'password' => Hash::make($newPassword),
-        ]);
+        DB::transaction(function () use ($user, $newPassword) {
+            $user->update([
+                'password' => Hash::make($newPassword),
+            ]);
 
-        $user->tokens()->delete();
+            $user->tokens()->delete();
+        });
     }
 
     public function logout(User $user): void
@@ -115,13 +118,15 @@ class AuthService
         $status = Password::broker()->reset(
             $data,
             function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password)
-                ])->setRememberToken(\Illuminate\Support\Str::random(60));
+                DB::transaction(function () use ($user, $password) {
+                    $user->forceFill([
+                        'password' => Hash::make($password)
+                    ])->setRememberToken(\Illuminate\Support\Str::random(60));
 
-                $user->save();
+                    $user->save();
 
-                $user->tokens()->delete();
+                    $user->tokens()->delete();
+                });
             }
         );
 
