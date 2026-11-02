@@ -637,7 +637,129 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonCount(1, 'conflicts')
             ->assertJsonPath('conflicts.0.transfer_candidates.0.assistant_id', $externalAssistant->id)
             ->assertJsonPath('conflicts.0.transfer_candidates.0.causes_origin_shortfall', false)
-            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96);
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96)
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_start', '08:00')
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_end', '16:00')
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_covers_deficit', 'full');
+    }
+
+    public function test_suggests_external_transfer_candidate_resolves_active_rotating_shift(): void
+    {
+        // Assistente da escola principal ausente na segunda-feira 2026-11-09
+        $a1 = $this->createAssistantWithShift(
+            name: 'Assistente Ausente Rotativo',
+            internalNumber: 'A002',
+            entryTime: '08:00:00',
+            exitTime: '12:00:00',
+            lunchEnabled: false,
+            lunchStart: null,
+            lunchEnd: null,
+            lunchDuration: null,
+            days: [0]
+        );
+
+        $absenceTypeId = (string) Str::uuid();
+        DB::table('absence_types')->insert(['id' => $absenceTypeId, 'name' => 'Férias']);
+        Absence::create([
+            'assistant_id' => $a1->id,
+            'absence_type_id' => $absenceTypeId,
+            'valid_from' => '2026-11-09',
+            'valid_until' => '2026-11-09',
+            'total_days' => 1,
+            'status' => 'justified',
+        ]);
+
+        // Outra escola com assistente em horário rotativo quinzenal
+        // Início: 2026-10-26 (Turno A: 07:30–15:30, Turno B: 10:00–17:00). Starts with A.
+        // Semana 1 (26 Out - 01 Nov): Turno A
+        // Semana 2 (02 Nov - 08 Nov): Turno A
+        // Semana 3 (09 Nov - 15 Nov): Turno B!
+        $otherSchool = School::create([
+            'name' => 'Escola Básica de Teste',
+            'acronym' => 'EBT',
+            'active' => true,
+        ]);
+
+        $role = Role::where('slug', 'assistant')->first();
+        $user = User::factory()->create([
+            'first_name' => 'Rotativo',
+            'last_name' => 'Externo',
+            'role_id' => $role->id,
+            'is_active' => true,
+        ]);
+
+        $rotAssistant = Assistant::create([
+            'school_id' => $otherSchool->id,
+            'user_id' => $user->id,
+            'internal_number' => 'ROT1',
+            'available_for_transfer' => true,
+        ]);
+
+        $profile = AssistantScheduleProfile::create([
+            'assistant_id' => $rotAssistant->id,
+            'type' => 'rotativo',
+            'rotation_period' => 'biweekly',
+            'starts_with' => 'A',
+            'valid_from' => '2026-10-26',
+            'valid_until' => null,
+        ]);
+
+        $shiftA = AssistantScheduleShift::create([
+            'assistant_schedule_profile_id' => $profile->id,
+            'shift_label' => 'A',
+            'entry_time' => '07:30:00',
+            'exit_time' => '15:30:00',
+            'lunch_enabled' => true,
+            'lunch_start' => '12:00:00',
+            'lunch_end' => '13:00:00',
+            'lunch_duration_minutes' => 60,
+        ]);
+        AssistantScheduleShiftDay::create(['assistant_schedule_shift_id' => $shiftA->id, 'day_of_week' => 0]);
+
+        $shiftB = AssistantScheduleShift::create([
+            'assistant_schedule_profile_id' => $profile->id,
+            'shift_label' => 'B',
+            'entry_time' => '10:00:00',
+            'exit_time' => '17:00:00',
+            'lunch_enabled' => true,
+            'lunch_start' => '13:00:00',
+            'lunch_end' => '14:00:00',
+            'lunch_duration_minutes' => 60,
+        ]);
+        AssistantScheduleShiftDay::create(['assistant_schedule_shift_id' => $shiftB->id, 'day_of_week' => 0]);
+
+        // Regra obrigatória na escola principal para 09 Nov (10:00–12:00)
+        ScheduleRule::create([
+            'school_id' => $this->school->id,
+            'activity_type_id' => $this->portaria->id,
+            'period_start' => '10:00',
+            'period_end' => '12:00',
+            'min' => 1,
+            'type' => 'mandatory',
+            'valid_from' => '2026-01-01',
+            'days_of_week' => [0],
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/schedules/generate', [
+                'start_date' => '2026-11-09',
+                'end_date' => '2026-11-09',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('resolution_status', 'draft_with_deficit')
+            ->assertJsonCount(1, 'conflicts');
+
+        $candidates = $response->json('conflicts.0.transfer_candidates');
+        $this->assertNotEmpty($candidates);
+        $candidate = collect($candidates)->firstWhere('assistant_id', $rotAssistant->id);
+        $this->assertNotNull($candidate);
+        // Em 09 Nov (Semana 3), o turno ativo tem de ser Turno B (10:00–17:00), e NÃO Turno A (07:30–15:30)
+        $this->assertEquals('10:00', $candidate['shift_start']);
+        $this->assertEquals('17:00', $candidate['shift_end']);
+        $this->assertEquals('full', $candidate['shift_covers_deficit']);
+        $this->assertTrue($candidate['works_today']);
     }
 
     public function test_idempotency_key_reused_with_other_range_generates_fresh_schedule(): void

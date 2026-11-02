@@ -152,7 +152,14 @@ class DashboardBootstrapController extends Controller
 
         // 8. Transferências Temporárias
         $tempAssignments = AssistantTemporaryAssignments::query()
-            ->with(['assistant.user', 'originSchool', 'destinationSchool'])
+            ->with([
+                'assistant.user',
+                'assistant.school',
+                'assistant.assistantScheduleProfiles.shifts.shiftDays',
+                'assistant.assistantExceptions',
+                'originSchool',
+                'destinationSchool',
+            ])
             ->when($schoolId !== '', function ($q) use ($schoolId) {
                 $q->where(fn ($sub) => $sub->where('origin_school_id', $schoolId)->orWhere('destination_school_id', $schoolId));
             })
@@ -160,7 +167,15 @@ class DashboardBootstrapController extends Controller
                 $q->whereDate('valid_from', '<=', $endDate)
                     ->where(fn ($sub) => $sub->whereNull('valid_until')->orWhereDate('valid_until', '>=', $startDate));
             })
-            ->get();
+            ->get()
+            ->map(function ($assignment) use ($request) {
+                $data = $assignment->toArray();
+                if ($assignment->relationLoaded('assistant') && $assignment->assistant) {
+                    $data['assistant'] = (new AssistantResource($assignment->assistant))->toArray($request);
+                }
+
+                return $data;
+            });
 
         // 9. Recálculos Pendentes
         $pendingRecalculations = $schoolId !== ''

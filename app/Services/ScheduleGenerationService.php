@@ -1717,7 +1717,12 @@ class ScheduleGenerationService
         $startStr = $this->toTimeStr($startMin);
         $endStr = $this->toTimeStr($endMin);
 
-        $candidates = Assistant::with(['user', 'school'])
+        $candidates = Assistant::with([
+            'user',
+            'school',
+            'assistantScheduleProfiles.shifts.shiftDays',
+            'assistantExceptions',
+        ])
             ->where('school_id', '!=', $destinationSchoolId)
             ->where('available_for_transfer', true)
             ->whereNull('deleted_at')
@@ -1730,19 +1735,132 @@ class ScheduleGenerationService
         $results = [];
         foreach ($candidates as $candidate) {
             // Verificar falta na data
-            $hasAbsence = Absence::where('assistant_id', $candidate->id)
+            $absences = Absence::where('assistant_id', $candidate->id)
                 ->whereDate('valid_from', '<=', $date)
                 ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
-                ->get()
-                ->contains(function (Absence $abs) use ($startMin, $endMin) {
-                    $aStart = $abs->start_time ? $this->toMinutes(substr((string) $abs->start_time, 0, 5)) : 0;
-                    $aEnd = $abs->end_time ? $this->toMinutes(substr((string) $abs->end_time, 0, 5)) : 1440;
+                ->get();
 
-                    return $this->intervalsOverlap($startMin, $endMin, $aStart, $aEnd);
-                });
+            $hasAbsence = $absences->contains(function (Absence $abs) use ($startMin, $endMin) {
+                $aStart = $abs->start_time ? $this->toMinutes(substr((string) $abs->start_time, 0, 5)) : 0;
+                $aEnd = $abs->end_time ? $this->toMinutes(substr((string) $abs->end_time, 0, 5)) : 1440;
+
+                return $this->intervalsOverlap($startMin, $endMin, $aStart, $aEnd);
+            });
 
             if ($hasAbsence) {
                 continue;
+            }
+
+            $partialAbsenceDetail = null;
+            foreach ($absences as $abs) {
+                if ($abs->start_time && $abs->end_time) {
+                    $s = substr((string) $abs->start_time, 0, 5);
+                    $e = substr((string) $abs->end_time, 0, 5);
+                    $partialAbsenceDetail = "Ausência: {$s}–{$e}";
+                }
+            }
+
+            // Resolver o turno ativo na data e dia da semana (respeitando exceções e perfis rotativos/fixos)
+            $activeException = $candidate->assistantExceptions->first(function ($exc) use ($date, $weekday) {
+                $from = $exc->valid_from?->format('Y-m-d');
+                $until = $exc->valid_until?->format('Y-m-d');
+                if ($from && $date < $from) {
+                    return false;
+                }
+                if ($until && $date > $until) {
+                    return false;
+                }
+                $days = $exc->days;
+                if (is_array($days) && ! empty($days) && ! in_array($weekday, array_map('intval', $days), true)) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            $shiftStart = null;
+            $shiftEnd = null;
+            $lunchStart = null;
+            $lunchEnd = null;
+            $lunchDuration = 60;
+            $worksToday = false;
+
+            if ($activeException) {
+                if ($activeException->type !== 'unavailable' && $activeException->getRawOriginal('start_time') && $activeException->getRawOriginal('end_time')) {
+                    $worksToday = true;
+                    $shiftStart = substr((string) $activeException->getRawOriginal('start_time'), 0, 5);
+                    $shiftEnd = substr((string) $activeException->getRawOriginal('end_time'), 0, 5);
+                    if ($activeException->lunch_enabled) {
+                        $lunchStart = $activeException->getRawOriginal('lunch_start') ? substr((string) $activeException->getRawOriginal('lunch_start'), 0, 5) : null;
+                        $lunchEnd = $activeException->getRawOriginal('lunch_end') ? substr((string) $activeException->getRawOriginal('lunch_end'), 0, 5) : null;
+                        $lunchDuration = (int) ($activeException->lunch_duration_minutes ?? 60);
+                    }
+                }
+            } else {
+                $profile = $candidate->assistantScheduleProfiles->first(function (AssistantScheduleProfile $p) use ($date) {
+                    $from = $p->valid_from?->format('Y-m-d');
+                    $until = $p->valid_until?->format('Y-m-d');
+
+                    return ($from === null || $from <= $date) && ($until === null || $until >= $date);
+                });
+
+                if ($profile) {
+                    $targetLabel = 'A';
+                    if ($profile->type === 'rotativo') {
+                        $anchorDate = CarbonImmutable::parse($profile->valid_from->format('Y-m-d'));
+                        $currentDate = CarbonImmutable::parse($date);
+                        $startsWith = $profile->starts_with === 'B' ? 'B' : 'A';
+                        $opposite = $startsWith === 'A' ? 'B' : 'A';
+
+                        if ($profile->rotation_period === 'monthly') {
+                            $monthsDiff = (($currentDate->year - $anchorDate->year) * 12) + ($currentDate->month - $anchorDate->month);
+                            $index = abs($monthsDiff) % 2;
+                        } elseif ($profile->rotation_period === 'biweekly') {
+                            $weeksDiff = (int) floor($anchorDate->startOfWeek()->diffInDays($currentDate->startOfWeek(), false) / 7);
+                            $index = intdiv(abs($weeksDiff), 2) % 2;
+                        } else {
+                            $weeksDiff = (int) floor($anchorDate->startOfWeek()->diffInDays($currentDate->startOfWeek(), false) / 7);
+                            $index = abs($weeksDiff) % 2;
+                        }
+
+                        $targetLabel = $index === 0 ? $startsWith : $opposite;
+                    }
+
+                    $shift = $profile->shifts->firstWhere('shift_label', $targetLabel) ?? $profile->shifts->first();
+                    if ($shift) {
+                        $worksToday = $shift->shiftDays->contains(fn ($d) => (int) $d->day_of_week === $weekday);
+                        if ($worksToday) {
+                            $shiftStart = substr((string) $shift->entry_time, 0, 5);
+                            $shiftEnd = substr((string) $shift->exit_time, 0, 5);
+                            if ($shift->lunch_enabled) {
+                                $lunchStart = $shift->lunch_start ? substr((string) $shift->lunch_start, 0, 5) : null;
+                                $lunchEnd = $shift->lunch_end ? substr((string) $shift->lunch_end, 0, 5) : null;
+                                $lunchDuration = (int) ($shift->lunch_duration_minutes ?? 60);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Avaliar sobreposição e cobertura do défice
+            $shiftCoversDeficit = 'outside';
+            $overlapMinutes = 0;
+
+            if ($worksToday && $shiftStart && $shiftEnd) {
+                $sStartMin = $this->toMinutes($shiftStart);
+                $sEndMin = $this->toMinutes($shiftEnd);
+
+                $overlapStart = max($sStartMin, $startMin);
+                $overlapEnd = min($sEndMin, $endMin);
+                $overlapMinutes = max(0, $overlapEnd - $overlapStart);
+
+                if ($sStartMin <= $startMin && $sEndMin >= $endMin) {
+                    $shiftCoversDeficit = 'full';
+                } elseif ($overlapMinutes > 0) {
+                    $shiftCoversDeficit = 'partial';
+                } else {
+                    $shiftCoversDeficit = 'outside';
+                }
             }
 
             // Verificar se causa rutura de mínimos em alguma regra obrigatória da escola de origem
@@ -1783,6 +1901,17 @@ class ScheduleGenerationService
                 'selectable' => ! $causesOriginShortfall,
                 'score' => $causesOriginShortfall ? 72 : 96,
                 'origin_impact_detail' => $originImpactDetail,
+                'shift_start' => $shiftStart,
+                'shift_end' => $shiftEnd,
+                'lunch_start' => $lunchStart,
+                'lunch_end' => $lunchEnd,
+                'lunch_duration' => $lunchDuration,
+                'works_today' => $worksToday,
+                'shift_covers_deficit' => $shiftCoversDeficit,
+                'overlap_minutes' => $overlapMinutes,
+                'deficit_duration_minutes' => max(0, $endMin - $startMin),
+                'is_absent' => false,
+                'partial_absence' => $partialAbsenceDetail,
             ];
         }
 
