@@ -7,6 +7,7 @@ use App\Models\Assistants\Assistant;
 use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
+use App\Support\AssistantCsv;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdfInstance;
 use Carbon\Carbon;
@@ -294,7 +295,7 @@ class ScheduleExportService
 
         fwrite($stream, "\xEF\xBB\xBF");
 
-        fputcsv($stream, [
+        $this->writeCsvRow($stream, [
             'Escola',
             'Data',
             'Dia da Semana',
@@ -304,13 +305,13 @@ class ScheduleExportService
             'Almoço',
             'Atividades Atribuídas',
             'Estado',
-        ], ';');
+        ]);
 
         $days = $this->buildDaysData($schoolModel, $startDate, $endDate, $assistantFilterId);
 
         foreach ($days as $day) {
             if (! $day['is_open']) {
-                fputcsv($stream, [
+                $this->writeCsvRow($stream, [
                     $schoolModel->name,
                     $day['date'],
                     $day['day_name'],
@@ -320,14 +321,14 @@ class ScheduleExportService
                     '--',
                     $day['closed_reason'] ?: 'Folga / Estabelecimento Encerrado',
                     'Folga / Encerrado',
-                ], ';');
+                ]);
 
                 continue;
             }
 
             foreach ($day['rows'] as $row) {
                 if ($row['is_absent']) {
-                    fputcsv($stream, [
+                    $this->writeCsvRow($stream, [
                         $schoolModel->name,
                         $day['date'],
                         $day['day_name'],
@@ -337,7 +338,7 @@ class ScheduleExportService
                         '--',
                         '--',
                         'Ausente',
-                    ], ';');
+                    ]);
 
                     continue;
                 }
@@ -347,7 +348,7 @@ class ScheduleExportService
                     $row['work_blocks']
                 ));
 
-                fputcsv($stream, [
+                $this->writeCsvRow($stream, [
                     $schoolModel->name,
                     $day['date'],
                     $day['day_name'],
@@ -357,9 +358,17 @@ class ScheduleExportService
                     $row['lunch'] ?: 'Sem pausa almoço',
                     $tasksSummary ?: 'Apoio Geral',
                     'Em Serviço',
-                ], ';');
+                ]);
             }
         }
+    }
+
+    private function writeCsvRow($stream, array $cells): void
+    {
+        fputcsv($stream, array_map(
+            fn ($cell) => $cell === '--' ? '--' : AssistantCsv::safeCell($cell),
+            $cells
+        ), ';');
     }
 
     /**
