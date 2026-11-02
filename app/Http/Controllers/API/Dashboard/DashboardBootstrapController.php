@@ -147,7 +147,14 @@ class DashboardBootstrapController extends Controller
             : collect();
 
         // 7. Dados Globais Estáticos (Tipos de Atividade e Feriados)
-        $activityTypes = ActivityType::orderBy('name')->get();
+        $activityTypes = ActivityType::query()
+            ->when($schoolId !== '', function ($q) use ($schoolId) {
+                $q->where(function ($sub) use ($schoolId) {
+                    $sub->where('school_id', $schoolId)->orWhereNull('school_id');
+                });
+            })
+            ->orderBy('name')
+            ->get();
         $holidays = Holiday::orderBy('date')->get();
 
         // 8. Transferências Temporárias

@@ -345,6 +345,8 @@ class UserService
             ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
             ->get();
 
+        app(NotificationService::class)->deactivationRequested($user, $reason);
+
         if ($admins->isNotEmpty()) {
             Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
                 user: $user,

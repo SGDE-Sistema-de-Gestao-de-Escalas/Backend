@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use App\Support\DocumentExtension;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -146,7 +147,7 @@ class AssistantService
     public function storeCriminalRecordFile(UploadedFile $file, string $firstName, string $lastName, string $internalNumber): string
     {
         $folder = $this->getAssistantCriminalRecordDirectory($firstName, $lastName, $internalNumber);
-        $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'pdf';
+        $extension = DocumentExtension::for($file); // do conteúdo, não do nome do cliente (F-03)
         $filename = "registo_criminal_" . time() . '_' . Str::random(6) . ".{$extension}";
 
         $disk = $this->getDocumentDisk();

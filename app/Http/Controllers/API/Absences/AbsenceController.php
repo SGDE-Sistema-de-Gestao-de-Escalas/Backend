@@ -8,6 +8,7 @@ use App\Http\Requests\Absences\UpdateAbsenceRequest;
 use App\Http\Resources\AbsenceResource;
 use App\Models\Absences\Absence;
 use App\Services\AbsenceService;
+use App\Services\NotificationService;
 use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class AbsenceController extends Controller
     public function __construct(
         private readonly AbsenceService $absenceService,
         private readonly ScheduleIntegrityService $scheduleIntegrityService,
+        private readonly NotificationService $notifications,
     ) {}
 
     /**
@@ -167,6 +169,18 @@ class AbsenceController extends Controller
             );
         }
 
+        // Notificações para os administradores (nunca falham a operação principal).
+        $this->notifications->absenceRegistered($absence, $request->user());
+        if ($schoolId && $impact) {
+            $this->notifications->scheduleRecalculationRequired(
+                (string) $schoolId,
+                $impact,
+                $absence->assistant?->user?->name,
+                'falta',
+                $request->user()
+            );
+        }
+
         $missingDocument = (bool) ($absence->absenceType?->requires_document ?? false) && empty($absence->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
@@ -226,6 +240,20 @@ class AbsenceController extends Controller
             );
         }
 
+        // Notificações para os administradores (nunca falham a operação principal).
+        if ($document) {
+            $this->notifications->absenceDocumentUploaded($updated, $request->user());
+        }
+        if ($schoolId && $impact) {
+            $this->notifications->scheduleRecalculationRequired(
+                (string) $schoolId,
+                $impact,
+                $updated->assistant?->user?->name,
+                'falta',
+                $request->user()
+            );
+        }
+
         $missingDocument = (bool) ($updated->absenceType?->requires_document ?? false) && empty($updated->document_path);
         $warning = $missingDocument
             ? 'Este tipo de ausência requer a apresentação de documento comprovativo.'
@@ -272,6 +300,6 @@ class AbsenceController extends Controller
             abort(404, 'Ficheiro do documento comprovativo não encontrado no servidor.');
         }
 
-        return Storage::disk($disk)->response($absence->document_path);
+        return Storage::disk($disk)->response($absence->document_path, null, ['X-Content-Type-Options' => 'nosniff']);
     }
 }

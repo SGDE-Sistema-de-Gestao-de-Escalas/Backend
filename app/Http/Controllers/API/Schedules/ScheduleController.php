@@ -10,8 +10,12 @@ use App\Http\Resources\Schedules\ScheduleResource;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
+use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleIntegrityService;
+use App\Services\ScheduleExportService;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\JsonResponse;
 use Carbon\CarbonImmutable;
 use App\Models\Schedules\ScheduleEntry;
@@ -23,6 +27,8 @@ class ScheduleController extends Controller
     public function __construct(
         private readonly ScheduleGenerationService $generationService,
         private readonly ScheduleIntegrityService $integrityService,
+        private readonly NotificationService $notifications,
+        private readonly ScheduleExportService $exportService,
     ) {}
 
     /**
@@ -36,18 +42,20 @@ class ScheduleController extends Controller
         $query = Schedule::query()
             ->with([
                 'assistant.user',
+                'school',
                 'assistant.school',
                 'scheduleEntries.activityType',
                 'scheduleEntries.scheduleRule',
                 'scheduleEntries.replacedAssistant.user',
             ]);
 
-        if ($schoolId) {
-            $query->where('school_id', $schoolId);
-        }
-
-        // Limita a listagem às escalas do próprio assistente caso não seja administrador.
-        if (! $user->isAdmin()) {
+        // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
+        // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
+        if ($user->isAdmin()) {
+            if ($schoolId) {
+                $query->where('school_id', $schoolId);
+            }
+        } else {
             $query->whereHas('assistant', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -108,40 +116,63 @@ class ScheduleController extends Controller
         $schoolId = (string) ($request->attributes->get('currentSchoolId') ?? $request->header('X-School-ID'));
         $validated = $request->validated();
 
-        // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
-        // registar os AssistantTemporaryAssignments antes de recalcular a escala.
-        if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
-            $userId = $request->user()?->id;
-            foreach ($validated['transfers'] as $tr) {
-                $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
-                if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
-                    continue;
+        // Assegurar previamente que a atividade base/fallback existe para a escola
+        $this->generationService->ensureFallbackActivity($schoolId);
+
+        $result = DB::transaction(function () use ($request, $schoolId, $validated) {
+            // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
+            // registar os AssistantTemporaryAssignments atomicamente junto com a geração da escala.
+            if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
+                $userId = $request->user()?->id;
+                foreach ($validated['transfers'] as $tr) {
+                    $extAssistant = Assistant::find($tr['assistant_id'] ?? null);
+                    if (! $extAssistant || (string) $extAssistant->school_id === $schoolId) {
+                        continue;
+                    }
+
+                    $trStart = ! empty($tr['start_time']) ? substr($tr['start_time'], 0, 5) : null;
+                    $trEnd = ! empty($tr['end_time']) ? substr($tr['end_time'], 0, 5) : null;
+
+                    $assignment = AssistantTemporaryAssignments::firstOrCreate(
+                        [
+                            'assistant_id' => $extAssistant->id,
+                            'origin_school_id' => $extAssistant->school_id,
+                            'destination_school_id' => $schoolId,
+                            'valid_from' => $tr['date'],
+                            'valid_until' => $tr['date'],
+                            'start_time' => $trStart,
+                            'end_time' => $trEnd,
+                        ],
+                        [
+                            'created_by_user_id' => $userId,
+                            'validated_by_user_id' => $userId,
+                            'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
+                        ]
+                    );
+
+                    if ($assignment->wasRecentlyCreated) {
+                        $this->notifications->transferAssigned($assignment, $request->user());
+                    }
                 }
-
-                AssistantTemporaryAssignments::firstOrCreate(
-                    [
-                        'assistant_id' => $extAssistant->id,
-                        'origin_school_id' => $extAssistant->school_id,
-                        'destination_school_id' => $schoolId,
-                        'valid_from' => $tr['date'],
-                        'valid_until' => $tr['date'],
-                    ],
-                    [
-                        'created_by_user_id' => $userId,
-                        'validated_by_user_id' => $userId,
-                        'notes' => $tr['notes'] ?? 'Designação de cobertura inter-escolar via geração de escala.',
-                    ]
-                );
             }
-        }
 
-        $result = $this->generationService->generate(
-            schoolId: $schoolId,
-            startDate: $validated['start_date'],
-            endDate: $validated['end_date'],
-            preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
-            idempotencyKey: $validated['idempotency_key'] ?? null,
-        );
+            return $this->generationService->generate(
+                schoolId: $schoolId,
+                startDate: $validated['start_date'],
+                endDate: $validated['end_date'],
+                preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
+                idempotencyKey: $validated['idempotency_key'] ?? null,
+            );
+        });
+
+        // Notificações para os administradores (nunca falham a operação principal).
+        $actor = $request->user();
+        if (! empty($result['conflicts'])) {
+            $this->notifications->scheduleGenerationDeficit($schoolId, $result, $actor);
+        } else {
+            $this->notifications->scheduleGenerated($schoolId, $result, $actor);
+        }
+        $this->notifications->assistantsMissingProfile($schoolId, $result, $actor);
 
         return response()->json($result, 200);
     }
@@ -217,6 +248,7 @@ class ScheduleController extends Controller
                 // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
                 if ($schedule->status !== 'draft') {
                     $schedule->status = 'draft';
+                    $schedule->published_at = null;
                     $schedule->save();
                 }
 
@@ -276,10 +308,128 @@ class ScheduleController extends Controller
             endDate: $validated['end_date'],
         );
 
+        $this->notifications->schedulePublished(
+            $schoolId,
+            $validated['start_date'],
+            $validated['end_date'],
+            $count,
+            $request->user()
+        );
+
         return response()->json([
             'status' => 'published',
             'published_schedules_count' => $count,
         ]);
+    }
+
+    /**
+     * Exporta a escala de serviço em PDF (A4 Horizontal) ou CSV (UTF-8 BOM para Excel).
+     * GET /api/schedules/export
+     */
+    public function export(Request $request): Response
+    {
+        $schoolId = (string) (
+            $request->attributes->get('currentSchoolId')
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID')
+            ?? $request->query('school_id')
+            ?? $request->user()?->school_id
+            ?? $request->user()?->assistant?->school_id
+        );
+
+        if ($schoolId === '') {
+            return response()->json([
+                'message' => 'O cabeçalho X-School-ID é obrigatório para exportar escalas.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date_format:Y-m-d'],
+            'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'format' => ['sometimes', 'string', 'in:pdf,csv'],
+            'model' => ['sometimes', 'string', 'in:wall,individual,monthly'],
+            'assistant_id' => ['nullable', 'string'],
+        ]);
+
+        $startDate = $validated['start_date'];
+        $endDate = $validated['end_date'];
+        $format = $validated['format'] ?? 'pdf';
+        $model = $validated['model'] ?? 'wall';
+        $assistantId = $validated['assistant_id'] ?? null;
+
+        $startCarbon = CarbonImmutable::parse($startDate)->startOfDay();
+        $endCarbon = CarbonImmutable::parse($endDate)->startOfDay();
+
+        // Limite máximo de 7 dias para Escala Diária e Horário Semanal; até 45 dias para Horário Mensal
+        if ($model === 'monthly') {
+            if ($startCarbon->diffInDays($endCarbon) > 45) {
+                return response()->json([
+                    'message' => 'O intervalo de datas para o mapa mensal não pode exceder 1 mês.',
+                    'errors' => [
+                        'end_date' => ['O intervalo selecionado para o mapa mensal não pode ultrapassar 1 mês.'],
+                    ],
+                ], 422);
+            }
+        } elseif ($startCarbon->diffInDays($endCarbon) >= 7) {
+            return response()->json([
+                'message' => 'O intervalo de datas para exportação não pode exceder 7 dias.',
+                'errors' => [
+                    'end_date' => ['O intervalo selecionado não pode ultrapassar 7 dias (1 semana).'],
+                ],
+            ], 422);
+        }
+
+        $user = $request->user();
+        if ($user && ! $user->isAdmin() && $user->assistant) {
+            if ($model === 'individual' || $model === 'monthly') {
+                $assistantId = (string) $user->assistant->id;
+            }
+        }
+
+        // Apenas escalas publicadas (status = 'published') podem ser impressas/exportadas
+        $publishError = $this->exportService->validateExportableSchedules(
+            $schoolId,
+            $startDate,
+            $endDate,
+            $model,
+            $assistantId
+        );
+        if ($publishError !== null) {
+            return response()->json([
+                'message' => $publishError,
+            ], 422);
+        }
+
+        $dateSuffix = $startDate === $endDate ? $startDate : "{$startDate}_a_{$endDate}";
+
+        if ($format === 'csv') {
+            $filename = match ($model) {
+                'monthly' => "horario_mensal_{$dateSuffix}.csv",
+                'individual' => "horario_individual_{$dateSuffix}.csv",
+                default => "escala_servico_{$dateSuffix}.csv",
+            };
+
+            return response()->streamDownload(function () use ($schoolId, $startDate, $endDate, $assistantId, $model): void {
+                $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    return;
+                }
+                $this->exportService->writeCsv($out, $schoolId, $startDate, $endDate, $assistantId, $model);
+                fclose($out);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $filename = match ($model) {
+            'monthly' => "horario_mensal_{$dateSuffix}.pdf",
+            'individual' => "horario_individual_{$dateSuffix}.pdf",
+            default => "escala_diaria_{$dateSuffix}.pdf",
+        };
+
+        $pdf = $this->exportService->generatePdf($schoolId, $startDate, $endDate, $model, $assistantId);
+
+        return $pdf->download($filename);
     }
 
     /**
@@ -297,7 +447,8 @@ class ScheduleController extends Controller
     {
         $schedule->load([
             'assistant.user',
-            'assistant.school',
+            'school',
+                'assistant.school',
             'scheduleEntries.activityType',
             'scheduleEntries.scheduleRule',
             'scheduleEntries.replacedAssistant.user',

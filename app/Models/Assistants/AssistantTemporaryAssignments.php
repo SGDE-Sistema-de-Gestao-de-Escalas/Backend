@@ -23,6 +23,8 @@ class AssistantTemporaryAssignments extends Model
         'notes',
         'start_date',
         'end_date',
+        'start_time',
+        'end_time',
     ];
 
     protected function casts(): array

@@ -253,6 +253,7 @@ class UserUpdateTest extends TestCase
             'first_name' => 'Carlos Daniel',
             'last_name' => 'Ferreira Santos',
             'email' => 'carlos.santos@example.com',
+            'current_password' => 'password', // mudar o próprio email exige a password atual (F-08)
         ]);
 
         $response
@@ -285,6 +286,7 @@ class UserUpdateTest extends TestCase
             'first_name' => 'Maria João',
             'last_name' => 'Sousa',
             'email' => 'maria.joao@example.com',
+            'current_password' => 'password', // mudar o próprio email exige a password atual (F-08)
         ]);
 
         $response

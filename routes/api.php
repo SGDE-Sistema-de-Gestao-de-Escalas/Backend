@@ -12,6 +12,7 @@ use App\Http\Controllers\API\Schools\OperatingCalendarController;
 use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
 use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
+use App\Http\Controllers\API\System\NotificationController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\UserController;
 use App\Http\Controllers\API\Assistants\AssistantExceptionController;
@@ -28,30 +29,33 @@ Route::get('/teste', function () {
         ]);
 });
 
-// Login público, limitado a 5 pedidos por minuto.
+// Login público, limitado por email + IP (e por IP): ver config/rate_limits.php.
 Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:login')
     ->name('auth.login');
 
 Route::post('/password/forgot', [AuthController::class, 'requestPasswordReset'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:password-forgot')
     ->name('password.email');
 
 // Repor Password (utilizado após receber o email)
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:password-reset')
     ->name('password.update');
 
 // Rotas OAuth
 Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthController::class, 'redirect'])
+    ->middleware('throttle:oauth')
     ->name('oauth.redirect');
 Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'externalLoginCallback'])
+    ->middleware('throttle:oauth')
     ->name('oauth.callback');
 
 // Exige autenticação e uma conta ativa em todas as rotas deste grupo.
 // Estas rotas são globais (não dependem de uma escola) e NÃO usam o
 // school.context: um X-School-ID antigo ou inválido não as pode bloquear.
-Route::middleware(['auth:sanctum', 'active'])->group(function () {
+// O limite geral (throttle:api) vem depois do auth:sanctum para contar por utilizador.
+Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
 
     // Devolve os dados do utilizador autenticado.
     Route::get('/me', [AuthController::class, 'me'])
@@ -101,7 +105,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
 // Rotas que dependem de uma escola. O school.context lê o cabeçalho opcional
 // X-School-ID e valida a existência e o acesso (ver SetSchoolContext).
-Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])->group(function () {
 
     // Horário de funcionamento da escola: o administrador gere, os assistentes
     // só consultam. As permissões vêm da SchoolOperatingRulePolicy e das
@@ -116,8 +120,18 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::get('/operating-calendar', [OperatingCalendarController::class, 'index'])
         ->name('operating-calendar.index');
 
-    Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
-        ->name('dashboard.bootstrap');
+    // Notificações do utilizador autenticado (sino). Pessoais: a NotificationPolicy
+    // garante que cada um só acede às suas. `read-all` tem de vir antes de `{notification}`.
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show'])
+        ->name('notifications.show');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])
+        ->name('notifications.destroy');
 
     // Ausências: administradores gerem todas; assistentes consultam e submetem/anexam documentos às suas faltas.
     // Permissões via AbsencePolicy e FormRequests.
@@ -134,21 +148,38 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
     Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
     Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
     Route::apiResource('schedule-rules', ScheduleRuleController::class);
+    // Importação e exportação em CSV (só administradores). Têm de vir ANTES do
+    // apiResource, senão "export" seria lido como o id de um assistente (404).
+    Route::middleware('can:manage-system')->group(function () {
+        Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
+            ->middleware('throttle:heavy')
+            ->name('assistants.export');
+        Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
+            ->middleware('throttle:heavy')
+            ->name('assistants.import');
+    });
     Route::apiResource('assistants', AssistantController::class)
         ->withTrashed(['show', 'update', 'destroy']);
+    Route::get('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'index']);
+    Route::get('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'show']);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
-        // Importação e exportação em CSV. Têm de vir antes do apiResource,
-        // senão "export" seria lido como o id de um assistente.
-        Route::get('/assistants/export', [AssistantCsvController::class, 'export'])
-            ->name('assistants.export');
-        Route::post('/assistants/import', [AssistantCsvController::class, 'import'])
-            ->name('assistants.import');
+        // Arranque do dashboard: devolve os dados pessoais de todos os assistentes
+        // da escola, por isso é só para administradores (a UI de assistente não o usa).
+        Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
+            ->name('dashboard.bootstrap');
+
+        Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])
+            ->name('reports.index');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
-        Route::apiResource('assistant-temporary-assignments', \App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class);
+        Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
+        Route::post('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'store']);
+        Route::put('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
+        Route::patch('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
+            ->middleware('throttle:heavy')
             ->name('schedules.generate');
         Route::post('/schedules/publish', [ScheduleController::class, 'publish'])
             ->name('schedules.publish');
@@ -157,6 +188,11 @@ Route::middleware(['auth:sanctum', 'active', 'school.context'])->group(function 
         Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
             ->name('schedules.pending-recalculations');
     });
+
+    // Exportação da escala em PDF (A4 Horizontal) ou CSV (UTF-8 BOM)
+    Route::get('/schedules/export', [ScheduleController::class, 'export'])
+        ->can('viewAny', Schedule::class)
+        ->name('schedules.export');
 
     // Autoriza a listagem de escalas; o controller deve filtrar os resultados.
     Route::get('/schedules', [ScheduleController::class, 'index'])

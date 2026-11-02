@@ -35,7 +35,7 @@ class AssistantScheduleProfilePolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -43,7 +43,7 @@ class AssistantScheduleProfilePolicy
      */
     public function update(User $user, AssistantScheduleProfile $assistantScheduleProfile): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -51,7 +51,7 @@ class AssistantScheduleProfilePolicy
      */
     public function delete(User $user, AssistantScheduleProfile $assistantScheduleProfile): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**

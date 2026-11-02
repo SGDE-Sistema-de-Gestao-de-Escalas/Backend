@@ -8,6 +8,7 @@ use App\Models\Auth\User;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
+use Database\Seeders\ScheduleRuleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,6 +16,30 @@ use Tests\TestCase;
 class ScheduleRulePersistenceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_seeder_selects_espl_rules_by_school_acronym(): void
+    {
+        $espl = School::create(['name' => 'EB1 Miosotis', 'acronym' => 'ESPL']);
+        $other = School::create(['name' => 'JI Miosotis', 'acronym' => 'EB23S']);
+
+        $this->seed(ScheduleRuleSeeder::class);
+        $this->seed(ScheduleRuleSeeder::class);
+
+        $this->assertSame(count(ScheduleRuleSeeder::ESPL_RULES), $espl->scheduleRules()->count());
+        $this->assertSame(count(ScheduleRuleSeeder::RULES), $other->scheduleRules()->count());
+        $this->assertDatabaseHas('schedule_rules', [
+            'school_id' => $espl->id, 'period_start' => '07:45', 'period_end' => '08:30',
+            'type' => 'mandatory', 'min' => 3,
+        ]);
+        $this->assertDatabaseHas('schedule_rules', [
+            'school_id' => $espl->id, 'period_start' => '12:15', 'period_end' => '13:30',
+            'type' => 'mandatory', 'min' => 4,
+        ]);
+        $this->assertDatabaseHas('schedule_rules', [
+            'school_id' => $other->id, 'period_start' => '12:15', 'period_end' => '13:30',
+            'type' => 'optional', 'min' => 1,
+        ]);
+    }
 
     private function createRule(): ScheduleRule
     {
