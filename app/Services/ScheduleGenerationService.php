@@ -1442,8 +1442,15 @@ class ScheduleGenerationService
         int $effEnd,
         array &$insights
     ): void {
-        // The minimum measures coverage; it does not cap available rule candidates.
+        $titularIds = $rule->assistants->take($rule->min)->pluck('id')->all();
+
+        // Apenas titulares podem ser alocados a blocos disponíveis.
+        // Suplentes (prioridade > min ou fora dos titulares) só cobrem ausências ou défices.
         foreach ($candidates->unique('id') as $candidate) {
+            $priority = (int) ($candidate->pivot?->priority ?? 999);
+            if (! in_array($candidate->id, $titularIds, true) || $priority > $rule->min) {
+                continue;
+            }
             $added = [];
             for ($start = $effStart; $start + 15 <= $effEnd; $start += 15) {
                 $end = $start + 15;

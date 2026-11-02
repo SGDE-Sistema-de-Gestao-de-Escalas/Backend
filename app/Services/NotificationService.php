@@ -121,7 +121,7 @@ class NotificationService
             'Escala precisa de recálculo',
             "A {$cause}{$who} afeta a escala já gerada em {$count} dia(s)".($range ? " ({$range})" : '').'. Recalcule o horário.',
             $schoolId,
-            ['affected_dates' => $dates, 'link' => '/dashboard'],
+            ['affected_dates' => $dates, 'link' => count($dates) > 0 ? '/dashboard?date='.$dates[0] : '/dashboard'],
             actor: $actor,
         );
     }
@@ -146,7 +146,7 @@ class NotificationService
             'Geração com défice de cobertura',
             "A geração de {$this->period($start, $end)} terminou com {$conflicts} conflito(s) de cobertura obrigatória por resolver.",
             $schoolId,
-            ['start_date' => $start, 'end_date' => $end, 'conflicts_count' => $conflicts, 'link' => '/dashboard'],
+            ['start_date' => $start, 'end_date' => $end, 'conflicts_count' => $conflicts, 'link' => $start ? '/dashboard?date='.$start : '/dashboard'],
             actor: $actor,
         );
     }
@@ -211,7 +211,7 @@ class NotificationService
             "{$this->assistantName($absence)} registou ausência".($absence->absenceType ? " ({$absence->absenceType->name})" : '')
                 ." {$this->absencePeriod($absence)}.",
             $absence->assistant?->school_id,
-            ['absence_id' => $absence->id, 'assistant_id' => $absence->assistant_id, 'link' => '/absences'],
+            ['absence_id' => $absence->id, 'assistant_id' => $absence->assistant_id, 'link' => '/absences?absenceId='.$absence->id],
             actor: $actor,
         );
     }
@@ -232,7 +232,7 @@ class NotificationService
             'Comprovativo de falta anexado',
             "{$this->assistantName($absence)} anexou um comprovativo à ausência {$this->absencePeriod($absence)}. Valide e justifique a falta.",
             $absence->assistant?->school_id,
-            ['absence_id' => $absence->id, 'assistant_id' => $absence->assistant_id, 'link' => '/absences'],
+            ['absence_id' => $absence->id, 'assistant_id' => $absence->assistant_id, 'link' => '/absences?absenceId='.$absence->id],
             actor: $actor,
         );
     }
@@ -270,7 +270,7 @@ class NotificationService
             'Exceção de funcionamento a terminar',
             "A exceção \"{$exception->name}\" ({$what}) termina {$this->inDays($days)} ({$this->fmt($until)}); a escola volta ao horário fixo.",
             $exception->school_id,
-            ['operating_exception_id' => $exception->id, 'is_closed' => (bool) $exception->is_closed, 'valid_until' => $until->toDateString(), 'link' => '/config'],
+            ['operating_exception_id' => $exception->id, 'is_closed' => (bool) $exception->is_closed, 'valid_until' => $until->toDateString(), 'link' => '/config?tab=operating'],
             dedupeKey: "operating-exception:{$exception->id}:{$until->toDateString()}",
         );
     }
@@ -303,7 +303,7 @@ class NotificationService
             'Regra de escala a expirar',
             "A regra de escala \"{$activity}\" ({$rule->period_start}–{$rule->period_end}) termina {$this->inDays($days)} ({$this->fmt($until)}).",
             $rule->school_id,
-            ['rule_id' => $rule->id, 'valid_until' => $until->toDateString(), 'link' => '/config'],
+            ['rule_id' => $rule->id, 'valid_until' => $until->toDateString(), 'link' => '/config?tab=rules'],
             dedupeKey: "rule:{$rule->id}:{$until->toDateString()}",
         );
     }
@@ -331,7 +331,7 @@ class NotificationService
                 'Cedência a terminar',
                 $body,
                 $schoolId,
-                ['transfer_id' => $transfer->id, 'assistant_id' => $transfer->assistant_id, 'valid_until' => $until->toDateString(), 'link' => '/dashboard'],
+                ['transfer_id' => $transfer->id, 'assistant_id' => $transfer->assistant_id, 'valid_until' => $until->toDateString(), 'link' => null],
                 dedupeKey: "transfer:{$transfer->id}:{$side}:{$until->toDateString()}",
             );
         }
@@ -351,7 +351,7 @@ class NotificationService
             'Faltas por justificar',
             "Existem {$count} falta(s) pendentes há mais de ".self::PENDING_ABSENCE_DAYS." dias".($oldestFrom ? " (a mais antiga desde {$this->fmt($oldestFrom)})" : '').'.',
             $schoolId,
-            ['pending_count' => $count, 'link' => '/absences'],
+            ['pending_count' => $count, 'link' => '/absences?status=pending'],
             dedupeKey: "pending-review:{$schoolId}:{$week}",
         );
     }
@@ -368,7 +368,7 @@ class NotificationService
             'Escala gerada',
             "A escala de {$this->period($result['start_date'] ?? null, $result['end_date'] ?? null)} foi gerada e validada".($actor ? " por {$actor->name}" : '').'.',
             $schoolId,
-            ['start_date' => $result['start_date'] ?? null, 'end_date' => $result['end_date'] ?? null, 'link' => '/dashboard'],
+            ['start_date' => $result['start_date'] ?? null, 'end_date' => $result['end_date'] ?? null, 'link' => null],
             actor: $actor,
             excludeActor: true,
         );
@@ -385,7 +385,7 @@ class NotificationService
             'Escala publicada',
             "{$count} escala(s) de {$this->period($startDate, $endDate)} foram publicadas".($actor ? " por {$actor->name}" : '').'.',
             $schoolId,
-            ['start_date' => $startDate, 'end_date' => $endDate, 'published_count' => $count, 'link' => '/dashboard'],
+            ['start_date' => $startDate, 'end_date' => $endDate, 'published_count' => $count, 'link' => null],
             actor: $actor,
             excludeActor: true,
         );
@@ -401,7 +401,7 @@ class NotificationService
             'Cedência atribuída',
             "{$this->nameOf($transfer->assistant)} (de {$originName}) foi cedido(a) a esta escola em {$this->fmt($transfer->valid_from)}.",
             $transfer->destination_school_id,
-            ['transfer_id' => $transfer->id, 'assistant_id' => $transfer->assistant_id, 'link' => '/dashboard'],
+            ['transfer_id' => $transfer->id, 'assistant_id' => $transfer->assistant_id, 'link' => null],
             actor: $actor,
             excludeActor: true,
         );
@@ -549,6 +549,29 @@ class NotificationService
         return $counts;
     }
 
+    /**
+     * Contagem de não lidas agrupada por school_id (ou 'global' se null).
+     *
+     * @return array<string, int>
+     */
+    public function unreadCountsBySchool(User $user): array
+    {
+        $rows = Notification::query()
+            ->where('user_id', $user->getKey())
+            ->whereNull('read_at')
+            ->selectRaw('school_id, count(*) as total')
+            ->groupBy('school_id')
+            ->get();
+
+        $bySchool = [];
+        foreach ($rows as $row) {
+            $key = $row->school_id ?? 'global';
+            $bySchool[$key] = (int) $row->total;
+        }
+
+        return $bySchool;
+    }
+
     public function markAsRead(Notification $notification): Notification
     {
         if ($notification->read_at === null) {
@@ -575,7 +598,7 @@ class NotificationService
 
     private function baseQuery(User $user, ?string $schoolId): Builder
     {
-        return Notification::query()->where('user_id', $user->getKey())->forSchool($schoolId);
+        return Notification::query()->with('school:id,name')->where('user_id', $user->getKey())->forSchool($schoolId);
     }
 
     /**

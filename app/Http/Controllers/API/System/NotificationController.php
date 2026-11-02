@@ -27,7 +27,16 @@ class NotificationController extends Controller
         Gate::authorize('viewAny', Notification::class);
 
         $user = $request->user();
-        $schoolId = $request->attributes->get('school_id');
+        $activeSchoolId = $request->attributes->get('school_id');
+        $schoolFilter = $request->query('school_id');
+
+        if ($schoolFilter === 'all') {
+            $schoolId = null;
+        } elseif ($request->has('school_id')) {
+            $schoolId = $schoolFilter ?: null;
+        } else {
+            $schoolId = $activeSchoolId;
+        }
 
         $paginator = $this->notifications->paginateFor($user, $schoolId, [
             'type' => $request->query('type'),
@@ -36,7 +45,11 @@ class NotificationController extends Controller
         ]);
 
         return NotificationResource::collection($paginator)->additional([
-            'meta' => ['unread_counts' => $this->notifications->unreadCounts($user, $schoolId)],
+            'meta' => [
+                'unread_counts' => $this->notifications->unreadCounts($user, $schoolId),
+                'global_unread_counts' => $this->notifications->unreadCounts($user, null),
+                'unread_by_school' => $this->notifications->unreadCountsBySchool($user),
+            ],
         ]);
     }
 
