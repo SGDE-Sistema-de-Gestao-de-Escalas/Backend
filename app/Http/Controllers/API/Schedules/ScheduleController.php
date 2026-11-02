@@ -13,6 +13,7 @@ use App\Models\Schedules\Schedule;
 use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use App\Services\ScheduleIntegrityService;
 use App\Services\ScheduleExportService;
 use Symfony\Component\HttpFoundation\Response;
@@ -52,7 +53,9 @@ class ScheduleController extends Controller
         // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
         // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
         if ($user->isAdmin()) {
-            if ($schoolId) {
+            if ($request->filled('school_id')) {
+                $query->where('school_id', $request->query('school_id'));
+            } elseif ($schoolId && ! $request->filled('assistant_id')) {
                 $query->where('school_id', $schoolId);
             }
         } else {
@@ -328,6 +331,8 @@ class ScheduleController extends Controller
      */
     public function export(Request $request): Response
     {
+        Gate::authorize('export', Schedule::class);
+
         $schoolId = (string) (
             $request->attributes->get('currentSchoolId')
             ?? $request->attributes->get('school_id')
