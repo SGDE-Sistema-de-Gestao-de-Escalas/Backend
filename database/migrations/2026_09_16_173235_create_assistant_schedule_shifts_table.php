@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('assistant_schedule_shifts', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignuuid('assistant_schedule_profile_id')->constrained('assistant_schedule_profiles');
+            $table->foreignUuid('assistant_schedule_profile_id')->constrained('assistant_schedule_profiles');
             $table->enum('shift_label', ['A', 'B']);
             $table->time('entry_time');
             $table->time('exit_time');
@@ -22,6 +22,8 @@ return new class extends Migration
             $table->time('lunch_end')->nullable();
             $table->unsignedSmallInteger('lunch_duration_minutes')->nullable();
             $table->timestamps();
+
+            $table->unique(['assistant_schedule_profile_id', 'shift_label'], 'asst_shifts_profile_label_unique');
         });
     }
 

@@ -13,13 +13,20 @@ return new class extends Migration
     {
         Schema::create('schedule_entries', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignuuid('schedule_id')->constrained('schedules');
-            $table->foreignuuid('activity_type_id')->constrained('activity_types');
+            $table->foreignUuid('schedule_id')->constrained('schedules');
+            $table->foreignUuid('activity_type_id')->constrained('activity_types');
+            $table->string('activity_name')->nullable();
+            $table->foreignUuid('schedule_rule_id')->nullable()->constrained('schedule_rules')->nullOnDelete();
             $table->date('date');
             $table->time('start_time');
             $table->time('end_time');
             $table->boolean('is_locked')->default(false);
+            $table->foreignUuid('replaced_assistant_id')->nullable()->constrained('assistants')->nullOnDelete();
+            $table->string('replacement_reason', 64)->nullable();
             $table->timestamps();
+
+            $table->index(['schedule_id', 'date']);
+            $table->index(['date']);
         });
     }
 

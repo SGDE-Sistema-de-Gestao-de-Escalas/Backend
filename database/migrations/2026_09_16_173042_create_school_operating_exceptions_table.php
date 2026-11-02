@@ -8,11 +8,6 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * Exceções ao horário fixo de uma escola: um período (valid_from a
-     * valid_until, ambos obrigatórios) em que a escola fecha (is_closed) ou
-     * funciona com um horário diferente, igual em todos os dias do período.
-     * Quando a escola fecha as horas ficam a null.
      */
     public function up(): void
     {
@@ -42,3 +37,4 @@ return new class extends Migration
         Schema::dropIfExists('school_operating_exceptions');
     }
 };
+
