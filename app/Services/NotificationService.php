@@ -549,6 +549,29 @@ class NotificationService
         return $counts;
     }
 
+    /**
+     * Contagem de não lidas agrupada por school_id (ou 'global' se null).
+     *
+     * @return array<string, int>
+     */
+    public function unreadCountsBySchool(User $user): array
+    {
+        $rows = Notification::query()
+            ->where('user_id', $user->getKey())
+            ->whereNull('read_at')
+            ->selectRaw('school_id, count(*) as total')
+            ->groupBy('school_id')
+            ->get();
+
+        $bySchool = [];
+        foreach ($rows as $row) {
+            $key = $row->school_id ?? 'global';
+            $bySchool[$key] = (int) $row->total;
+        }
+
+        return $bySchool;
+    }
+
     public function markAsRead(Notification $notification): Notification
     {
         if ($notification->read_at === null) {
@@ -575,7 +598,7 @@ class NotificationService
 
     private function baseQuery(User $user, ?string $schoolId): Builder
     {
-        return Notification::query()->where('user_id', $user->getKey())->forSchool($schoolId);
+        return Notification::query()->with('school:id,name')->where('user_id', $user->getKey())->forSchool($schoolId);
     }
 
     /**
