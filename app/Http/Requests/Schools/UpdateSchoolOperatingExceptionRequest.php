@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -27,7 +28,7 @@ class UpdateSchoolOperatingExceptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
             'is_closed' => ['sometimes', 'required', 'boolean'],
             'opening_time' => ['sometimes', 'nullable', 'date_format:H:i'],
             'closing_time' => ['sometimes', 'nullable', 'date_format:H:i'],

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Assistants;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,8 +43,8 @@ class UpdateAssistantRequest extends FormRequest
 
         return [
             // Conta (users)
-            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
-            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'first_name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
             'email' => [
                 'sometimes', 'required', 'email', 'max:255',
                 Rule::unique('users', 'email')->ignore($assistant->user_id)->whereNull('deleted_at'),

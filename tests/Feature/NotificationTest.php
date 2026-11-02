@@ -182,7 +182,6 @@ class NotificationTest extends TestCase
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->addDay()->toDateString(),
         ];
 
-        // O assistente já não regista ausências (mudança de regras): 403 e nada é notificado.
         $this->as($assistant->user)->postJson('/api/absences', $payload)->assertForbidden();
         $this->assertSame(0, Absence::count());
         $this->assertSame(0, Notification::where('event', 'absence.registered')->count());
@@ -406,7 +405,6 @@ class NotificationTest extends TestCase
 
     public function test_a_failure_while_notifying_never_breaks_the_main_operation(): void
     {
-        // Sem a tabela de notificações, notificar falha; o envio do documento tem de continuar a funcionar.
         $assistant = $this->makeAssistant('Maria');
         $absence = Absence::create([
             'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
