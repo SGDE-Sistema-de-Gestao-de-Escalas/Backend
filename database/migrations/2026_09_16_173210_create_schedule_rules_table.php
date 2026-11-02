@@ -21,7 +21,7 @@ return new class extends Migration
             $table->json('days_of_week')->nullable();
             $table->timestamps();
 
-            $table->index(['school_id', 'valid_from', 'valid_until']);
+            $table->index(['school_id', 'valid_from', 'valid_until'], 'sched_rules_school_period_index');
         });
     }
 

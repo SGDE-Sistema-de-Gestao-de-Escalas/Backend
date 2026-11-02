@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('replacement_reason', 64)->nullable();
             $table->timestamps();
 
-            $table->index(['schedule_id', 'date']);
+            $table->index(['schedule_id', 'date'], 'sched_entries_sched_date_index');
             $table->index(['date']);
         });
     }
