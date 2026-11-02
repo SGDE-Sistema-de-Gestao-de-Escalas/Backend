@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ? '*'
             : array_values(array_filter(array_map('trim', explode(',', $trusted)))));
 
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->api(prepend: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
@@ -38,6 +40,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Dois pedidos em simultâneo podem passar a validação e só falhar na base de
+        // dados (índice único). Para quem chama é um dado repetido, não um erro do servidor.
+        $exceptions->render(function (\Illuminate\Database\UniqueConstraintViolationException $e, \Illuminate\Http\Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Já existe um registo com estes dados.',
+                    'errors' => (object) [],
+                ], 422);
+            }
+        });
+
         $exceptions->shouldRenderJsonWhen(function (\Illuminate\Http\Request $request, Throwable $e) {
             return $request->is('api/*') || $request->expectsJson();
         });

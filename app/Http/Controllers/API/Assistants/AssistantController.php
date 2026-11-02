@@ -9,6 +9,7 @@ use App\Http\Requests\Assistants\UpdateAssistantRequest;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AssistantResource;
 use App\Services\AssistantService;
+use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -86,7 +87,7 @@ class AssistantController extends Controller
         }
 
         // 3. Pesquisa Textual (name, first_name, last_name, email, internal_number)
-        $search = trim((string) $request->input('search', ''));
+        $search = QueryInput::string($request, 'search');
         if ($search !== '') {
             $words = array_values(array_filter(preg_split('/\s+/', $search) ?: []));
 
@@ -115,7 +116,7 @@ class AssistantController extends Controller
 
         // 4. Ordenação
         $sortBy = $request->input('sort_by', 'name');
-        $sortDir = strtolower((string) $request->input('sort_direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $sortDir = strtolower(QueryInput::string($request, 'sort_direction')) === 'desc' ? 'desc' : 'asc';
 
         if ($sortBy === 'internal_number') {
             $query->orderBy('assistants.internal_number', $sortDir);

@@ -27,9 +27,11 @@ class StoreAssistantRequest extends FormRequest
     {
         $this->merge(array_filter([
             'school_id' => $this->header('X-School-ID'),
-            'nif' => $this->filled('nif') ? str_replace(' ', '', (string) $this->input('nif')) : null,
-            'social_security_number' => $this->filled('social_security_number')
-                ? str_replace(' ', '', (string) $this->input('social_security_number'))
+            'nif' => is_string($this->input('nif')) && $this->filled('nif')
+                ? str_replace(' ', '', $this->input('nif'))
+                : null,
+            'social_security_number' => is_string($this->input('social_security_number')) && $this->filled('social_security_number')
+                ? str_replace(' ', '', $this->input('social_security_number'))
                 : null,
         ], fn ($value) => $value !== null));
     }
