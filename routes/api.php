@@ -84,6 +84,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('users', UserController::class)->withTrashed(['show', 'destroy', 'update']);
 
     // Feriados globais: permissões via HolidayPolicy e FormRequests.
+    Route::get('/holidays/municipalities', [HolidayController::class, 'municipalities'])
+        ->name('holidays.municipalities');
+    Route::get('/holidays/preview', [HolidayController::class, 'preview'])
+        ->name('holidays.preview');
+    Route::post('/holidays/import', [HolidayController::class, 'import'])
+        ->name('holidays.import');
     Route::apiResource('holidays', HolidayController::class);
 
     // Restringe as restantes operações de gestão aos administradores.
