@@ -35,6 +35,14 @@ class AbsenceService
                     $data['total_days'] ?? null
                 );
 
+                $this->assertNoOverlap(
+                    $data['assistant_id'],
+                    $data['valid_from'],
+                    $data['valid_until'] ?? $data['valid_from'],
+                    $data['start_time'] ?? null,
+                    $data['end_time'] ?? null,
+                );
+
                 $documentName = null;
                 $documentPath = null;
                 if ($document) {
@@ -109,6 +117,23 @@ class AbsenceService
                     $validUntil,
                     $data['total_days'] ?? null
                 );
+
+                $assistantId = $data['assistant_id'] ?? $absence->assistant_id;
+                $newUntil = array_key_exists('valid_until', $data)
+                    ? ($data['valid_until'] ?? $validFrom)
+                    : $absence->valid_until?->format('Y-m-d');
+                $newStart = array_key_exists('start_time', $data) ? $data['start_time'] : $absence->start_time;
+                $newEnd = array_key_exists('end_time', $data) ? $data['end_time'] : $absence->end_time;
+
+                $scheduleChanged = (string) $assistantId !== (string) $absence->assistant_id
+                    || $this->dateOnly($validFrom) !== $absence->valid_from?->format('Y-m-d')
+                    || $this->dateOnly($newUntil) !== $absence->valid_until?->format('Y-m-d')
+                    || $this->timeOnly($newStart) !== $this->timeOnly($absence->start_time)
+                    || $this->timeOnly($newEnd) !== $this->timeOnly($absence->end_time);
+
+                if ($scheduleChanged) {
+                    $this->assertNoOverlap($assistantId, $validFrom, $newUntil, $newStart, $newEnd, $absence->id);
+                }
 
                 $documentName = $absence->document_name;
                 $documentPath = $absence->document_path;
@@ -381,6 +406,69 @@ class AbsenceService
             } catch (\Throwable) {
             }
         }
+    }
+
+    /**
+     * Recusa a falta se o assistente já tiver outra (não eliminada) que se sobreponha em datas e horas.
+     * Uma data de fim vazia na falta existente significa sem fim (bloqueia tudo o que vem depois).
+     */
+    private function assertNoOverlap(
+        string $assistantId,
+        string $from,
+        ?string $until,
+        ?string $startTime,
+        ?string $endTime,
+        ?string $ignoreAbsenceId = null,
+    ): void {
+        Assistant::query()->whereKey($assistantId)->lockForUpdate()->first();
+
+        $query = Absence::query()
+            ->where('assistant_id', $assistantId)
+            ->whereDate('valid_from', '<=', $this->dateOnly($until) ?? '2100-12-31')
+            ->where(function ($q) use ($from) {
+                $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $this->dateOnly($from));
+            });
+
+        if ($ignoreAbsenceId !== null) {
+            $query->where('id', '!=', $ignoreAbsenceId);
+        }
+
+        $newFrom = $this->minuteOfDay($startTime, 0);
+        $newTo = $this->minuteOfDay($endTime, 24 * 60);
+
+        foreach ($query->get(['id', 'start_time', 'end_time']) as $existing) {
+            $existingFrom = $this->minuteOfDay($existing->start_time, 0);
+            $existingTo = $this->minuteOfDay($existing->end_time, 24 * 60);
+
+            if ($newFrom < $existingTo && $existingFrom < $newTo) {
+                throw ValidationException::withMessages([
+                    'valid_from' => 'Este assistente já tem uma falta registada que se sobrepõe a este período.',
+                ]);
+            }
+        }
+    }
+
+    private function dateOnly(?string $value): ?string
+    {
+        return $value ? substr($value, 0, 10) : null;
+    }
+
+    private function timeOnly(?string $value): ?string
+    {
+        return $value ? substr($value, 0, 5) : null;
+    }
+
+    private function minuteOfDay(?string $time, int $default): int
+    {
+        $time = $this->timeOnly($time);
+
+        if ($time === null) {
+            return $default;
+        }
+
+        [$hours, $minutes] = array_map('intval', explode(':', $time));
+
+        return $hours * 60 + $minutes;
     }
 
     /**
