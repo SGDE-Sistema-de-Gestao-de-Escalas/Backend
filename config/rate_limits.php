@@ -40,4 +40,8 @@ return [
 
     // Operações pesadas (gerar escalas, importar/exportar CSV): por utilizador.
     'heavy' => (int) env('RATE_LIMIT_HEAVY_PER_USER', 10),
+
+    // Exportação em PDF do horário individual e do mapa mensal: máximo de assistentes por
+    // ficheiro quando não se escolhe um assistente (F-40). O DomPDF gasta muita memória e tempo.
+    'export_pdf_max_assistants' => (int) env('EXPORT_PDF_MAX_ASSISTANTS', 40),
 ];

@@ -19,6 +19,17 @@ class StoreAbsenceRequest extends FormRequest
     }
 
     /**
+     * Uma lista no lugar da data de início trata-se como em falta: a regra
+     * "after_or_equal" rebenta com um TypeError se receber uma lista.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('valid_from') && ! is_string($this->input('valid_from'))) {
+            $this->merge(['valid_from' => null]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -48,7 +59,7 @@ class StoreAbsenceRequest extends FormRequest
         $validator->after(function ($validator) {
             $schoolId = $this->header('X-School-ID');
 
-            if ($this->filled('assistant_id') && $schoolId) {
+            if (is_string($this->input('assistant_id')) && $this->filled('assistant_id') && $schoolId) {
                 $assistant = Assistant::find($this->assistant_id);
                 if ($assistant && (string) $assistant->school_id !== (string) $schoolId) {
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');

@@ -175,9 +175,6 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
         Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
-        Route::post('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'store']);
-        Route::put('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
-        Route::patch('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
             ->middleware('throttle:heavy')
             ->name('schedules.generate');
@@ -188,6 +185,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
         Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
             ->name('schedules.pending-recalculations');
         Route::get('/schedules/export', [ScheduleController::class, 'export'])
+            ->middleware('throttle:heavy')
             ->can('export', Schedule::class)
             ->name('schedules.export');
     });

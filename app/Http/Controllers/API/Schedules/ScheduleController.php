@@ -358,7 +358,7 @@ class ScheduleController extends Controller
             'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'format' => ['sometimes', 'string', 'in:pdf,csv'],
             'model' => ['sometimes', 'string', 'in:wall,individual,monthly'],
-            'assistant_id' => ['nullable', 'string'],
+            'assistant_id' => ['nullable', 'string', 'max:64'],
         ]);
 
         $startDate = $validated['start_date'];
@@ -393,6 +393,21 @@ class ScheduleController extends Controller
         if ($user && ! $user->isAdmin() && $user->assistant) {
             if ($model === 'individual' || $model === 'monthly') {
                 $assistantId = (string) $user->assistant->id;
+            }
+        }
+
+        // O PDF individual e o mensal de uma escola grande gasta demasiada memória e tempo (F-40)
+        $wholeSchool = $assistantId === null || $assistantId === '' || $assistantId === 'all';
+        if ($format === 'pdf' && $wholeSchool && in_array($model, ['individual', 'monthly'], true)) {
+            $maxAssistants = (int) config('rate_limits.export_pdf_max_assistants');
+
+            if (Assistant::where('school_id', $schoolId)->count() > $maxAssistants) {
+                return response()->json([
+                    'message' => "O PDF só pode abranger até {$maxAssistants} assistentes de cada vez. Escolha um assistente.",
+                    'errors' => [
+                        'assistant_id' => ["Escolha um assistente: o PDF só pode abranger até {$maxAssistants} assistentes de cada vez."],
+                    ],
+                ], 422);
             }
         }
 

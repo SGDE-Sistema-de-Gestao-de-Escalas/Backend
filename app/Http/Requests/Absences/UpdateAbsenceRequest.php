@@ -34,6 +34,17 @@ class UpdateAbsenceRequest extends FormRequest
     }
 
     /**
+     * Uma lista no lugar da data de início trata-se como em falta: a regra
+     * "after_or_equal" rebenta com um TypeError se receber uma lista.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('valid_from') && ! is_string($this->input('valid_from'))) {
+            $this->merge(['valid_from' => null]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -126,7 +137,7 @@ class UpdateAbsenceRequest extends FormRequest
                 }
             }
 
-            if ($this->filled('assistant_id') && $schoolId) {
+            if (is_string($this->input('assistant_id')) && $this->filled('assistant_id') && $schoolId) {
                 $assistant = Assistant::find($this->assistant_id);
                 if ($assistant && (string) $assistant->school_id !== (string) $schoolId) {
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');
@@ -162,6 +173,10 @@ class UpdateAbsenceRequest extends FormRequest
     private function hasFieldChanged(Absence $absence, string $field): bool
     {
         $incoming = $this->input($field);
+
+        if (is_array($incoming)) {
+            return true;
+        }
 
         if (in_array($field, ['valid_from', 'valid_until'], true)) {
             $currentDate = $field === 'valid_until'

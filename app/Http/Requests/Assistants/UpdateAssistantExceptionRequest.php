@@ -62,6 +62,10 @@ class UpdateAssistantExceptionRequest extends FormRequest
                 return;
             }
 
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
             // 2. Validação contra o calendário da escola
             if ($exception->assistant) {
                 $merged = array_merge([

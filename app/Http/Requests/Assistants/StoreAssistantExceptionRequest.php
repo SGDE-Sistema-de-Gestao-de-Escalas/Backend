@@ -49,13 +49,17 @@ class StoreAssistantExceptionRequest extends FormRequest
         $validator->after(function ($validator) {
             $schoolId = $this->header('X-School-ID');
 
-            if ($this->filled('assistant_id') && $schoolId) {
+            if (is_string($this->input('assistant_id')) && $this->filled('assistant_id') && $schoolId) {
                 $assistant = Assistant::find($this->assistant_id);
                 if ($assistant && (string) $assistant->school_id !== (string) $schoolId) {
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');
 
                     return;
                 }
+            }
+
+            if ($validator->errors()->isNotEmpty()) {
+                return;
             }
 
             if ($this->filled('assistant_id') && $this->filled('valid_from')) {

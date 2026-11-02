@@ -23,8 +23,8 @@ class UpdateAssistantRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         foreach (['nif', 'social_security_number'] as $field) {
-            if ($this->filled($field)) {
-                $this->merge([$field => str_replace(' ', '', (string) $this->input($field))]);
+            if ($this->filled($field) && is_string($this->input($field))) {
+                $this->merge([$field => str_replace(' ', '', $this->input($field))]);
             }
         }
     }
