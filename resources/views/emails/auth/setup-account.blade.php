@@ -1,12 +1,12 @@
 <x-mail::message>
-# Ativação de Conta
+# Bem-vindo ao SGDE
 
-A conta de **{{ $user->first_name }} {{ $user->last_name }}** com o perfil de **{{ $roleName }}** foi registada com sucesso no sistema pelo administrador.
+A conta de **{{ $user->first_name }} {{ $user->last_name }}** com o perfil de **{{ $roleName }}** foi criada com sucesso no sistema pelo administrador.
 
-Para aceder à plataforma, é necessário confirmar a conta e definir uma palavra-passe definitiva através do botão abaixo:
+Para aceder à plataforma e aos seus horários, é necessário ativar a sua conta e definir a sua palavra-passe de acesso através do botão abaixo:
 
 <x-mail::button :url="$setupUrl" color="primary">
-Confirmar e Ativar Conta
+Ativar Conta e Definir Palavra-passe
 </x-mail::button>
 
 <div class="link-fallback-label">

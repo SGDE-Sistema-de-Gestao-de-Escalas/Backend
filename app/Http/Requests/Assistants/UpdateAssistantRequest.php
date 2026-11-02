@@ -46,25 +46,25 @@ class UpdateAssistantRequest extends FormRequest
             'last_name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => [
                 'sometimes', 'required', 'email', 'max:255',
-                Rule::unique('users', 'email')->ignore($assistant->user_id)->whereNull('deleted_at'),
+                Rule::unique('users', 'email')->ignore($assistant->user_id),
             ],
 
             // Ficha do assistente (assistants)
             'internal_number' => [
                 'sometimes', 'required', 'string', 'max:50',
-                Rule::unique('assistants', 'internal_number')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'internal_number')->ignore($assistant),
             ],
             'phone' => [
                 'nullable', 'string', 'max:20',
-                Rule::unique('assistants', 'phone')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'phone')->ignore($assistant),
             ],
             'nif' => [
                 'nullable', 'digits:9',
-                Rule::unique('assistants', 'nif')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'nif')->ignore($assistant),
             ],
             'social_security_number' => [
                 'nullable', 'digits:11',
-                Rule::unique('assistants', 'social_security_number')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'social_security_number')->ignore($assistant),
             ],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'admission_date' => ['nullable', 'date'],

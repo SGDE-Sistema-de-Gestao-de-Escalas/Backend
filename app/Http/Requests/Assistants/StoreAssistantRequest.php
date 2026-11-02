@@ -48,25 +48,25 @@ class StoreAssistantRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('users', 'email')->whereNull('deleted_at'),
+                Rule::unique('users', 'email'),
             ],
 
             // Ficha do assistente (assistants)
             'internal_number' => [
                 'required', 'string', 'max:50',
-                Rule::unique('assistants', 'internal_number')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'internal_number'),
             ],
             'phone' => [
                 'nullable', 'string', 'max:20',
-                Rule::unique('assistants', 'phone')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'phone'),
             ],
             'nif' => [
                 'nullable', 'digits:9',
-                Rule::unique('assistants', 'nif')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'nif'),
             ],
             'social_security_number' => [
                 'nullable', 'digits:11',
-                Rule::unique('assistants', 'social_security_number')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'social_security_number'),
             ],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'admission_date' => ['nullable', 'date'],

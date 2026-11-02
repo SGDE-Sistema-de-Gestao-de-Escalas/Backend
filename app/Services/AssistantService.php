@@ -318,13 +318,14 @@ class AssistantService
     }
 
     /**
+     * Envia o email de boas-vindas e ativação de conta.
      * Uma falha no envio do email não deve anular a criação do assistente:
      * regista o erro e o admin pode reenviar pelo "esqueci-me da password".
      */
     private function sendAccessEmail(User $user): void
     {
         try {
-            $this->authService->sendPasswordResetLink($user->email);
+            $this->authService->sendAccountSetupLink($user);
         } catch (Throwable $e) {
             report($e);
         }
