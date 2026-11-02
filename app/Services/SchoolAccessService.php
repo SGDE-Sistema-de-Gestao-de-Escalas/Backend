@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Assistants\Assistant;
+use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Auth\User;
 use App\Models\Schools\School;
 
@@ -39,5 +40,31 @@ class SchoolAccessService
                     });
             })
             ->exists();
+    }
+
+    /**
+     * IDs das escolas a que um utilizador NÃO administrador tem acesso: a escola
+     * do seu assistente e as escolas de destino de cedências temporárias em
+     * vigor. Sem assistente associado, a lista é vazia. (Para o administrador
+     * não se aplica: vê todas.)
+     *
+     * @return array<int, string>
+     */
+    public function accessibleSchoolIds(User $user): array
+    {
+        $today = today();
+
+        $own = Assistant::where('user_id', $user->getKey())->pluck('school_id');
+
+        $temporary = AssistantTemporaryAssignments::query()
+            ->whereHas('assistant', fn ($assistant) => $assistant->where('user_id', $user->getKey()))
+            ->whereDate('valid_from', '<=', $today)
+            ->where(function ($until) use ($today) {
+                $until->whereNull('valid_until')
+                    ->orWhereDate('valid_until', '>=', $today);
+            })
+            ->pluck('destination_school_id');
+
+        return $own->merge($temporary)->filter()->unique()->values()->all();
     }
 }

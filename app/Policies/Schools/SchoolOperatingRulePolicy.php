@@ -2,65 +2,61 @@
 
 namespace App\Policies\Schools;
 
-use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Auth\User;
-use Illuminate\Auth\Access\Response;
+use App\Models\Schools\SchoolOperatingRule;
+use App\Services\SchoolAccessService;
 
 class SchoolOperatingRulePolicy
 {
+    public function __construct(
+        private readonly SchoolAccessService $schoolAccess
+    ) {}
+
     /**
-     * Determine whether the user can view any models.
+     * Administradores e assistentes podem listar. O controller restringe o
+     * resultado à escola do cabeçalho X-School-ID (já validada no acesso).
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Administrador: qualquer versão. Assistente: só as versões de uma escola a
+     * que tem acesso (a sua escola ou uma cedência temporária em vigor).
      */
     public function view(User $user, SchoolOperatingRule $schoolOperatingRule): bool
     {
-        return false;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->isStaff()
+            && $this->schoolAccess->canAccess($user, $schoolOperatingRule->school_id);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, SchoolOperatingRule $schoolOperatingRule): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, SchoolOperatingRule $schoolOperatingRule): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, SchoolOperatingRule $schoolOperatingRule): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, SchoolOperatingRule $schoolOperatingRule): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 }

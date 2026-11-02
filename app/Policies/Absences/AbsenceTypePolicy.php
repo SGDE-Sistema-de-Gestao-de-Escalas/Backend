@@ -12,7 +12,7 @@ class AbsenceTypePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -20,7 +20,7 @@ class AbsenceTypePolicy
      */
     public function view(User $user, AbsenceType $absenceType): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**

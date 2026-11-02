@@ -17,9 +17,14 @@ return new class extends Migration
             $table->string('type');
             $table->text('description')->nullable();
             $table->date('valid_from');
-            $table->date('valid_untill')->nullable();
+            $table->date('valid_until')->nullable();
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
+            $table->json('days')->nullable();
+            $table->boolean('lunch_enabled')->default(false);
+            $table->time('lunch_start')->nullable();
+            $table->time('lunch_end')->nullable();
+            $table->unsignedSmallInteger('lunch_duration_minutes')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

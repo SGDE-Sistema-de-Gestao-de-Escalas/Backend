@@ -40,14 +40,13 @@ class AuthController extends Controller
             minutes: $cookieMinutes,
             path: '/',
             domain: null,
-            secure: config('app.env') === 'production',
+            secure: config('app.env') === 'production' || $request->isSecure(),
             httpOnly: true,
             raw: false,
             sameSite: 'Lax'
         );
 
         return response()->json([
-            'access_token' => $authData['token'],
             'user' => new UserResource($authData['user']),
         ])->withCookie($cookie);
     }

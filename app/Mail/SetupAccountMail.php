@@ -21,13 +21,12 @@ class SetupAccountMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Bem-vindo ao SGDE - Configuração de Conta',
+            subject: 'SGDE - Ativação e Configuração de Conta',
         );
     }
 
     public function content(): Content
     {
-        // Link apontando para a tua SPA em React
         $setupUrl = config('app.frontend_url') . '/setup-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
 
         return new Content(

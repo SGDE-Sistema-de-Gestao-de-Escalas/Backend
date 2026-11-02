@@ -2,65 +2,57 @@
 
 namespace App\Policies\System;
 
-use App\Models\System\ActivityType;
 use App\Models\Auth\User;
-use Illuminate\Auth\Access\Response;
+use App\Models\System\ActivityType;
+use App\Services\SchoolAccessService;
 
 class ActivityTypePolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
+    public function __construct(
+        private readonly SchoolAccessService $schoolAccess
+    ) {}
+
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Administrador: qualquer atividade. Assistente: só as de uma escola a que
+     * tem acesso (a sua ou uma cedência temporária em vigor) (F-09).
      */
     public function view(User $user, ActivityType $activityType): bool
     {
-        return false;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->isStaff()
+            && $this->schoolAccess->canAccess($user, $activityType->school_id);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, ActivityType $activityType): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, ActivityType $activityType): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, ActivityType $activityType): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, ActivityType $activityType): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 }

@@ -2,63 +2,45 @@
 
 namespace App\Policies\System;
 
-use App\Models\System\Notification;
 use App\Models\Auth\User;
-use Illuminate\Auth\Access\Response;
+use App\Models\System\Notification;
 
+/**
+ * As notificações são pessoais: cada utilizador só vê/marca/elimina as suas.
+ * Não há criação manual (são geradas pelo sistema, ver NotificationService).
+ */
 class NotificationPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true; // a listagem é sempre filtrada pelo próprio utilizador
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, Notification $notification): bool
     {
-        return false;
+        return $notification->user_id === $user->id;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
         return false;
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Notification $notification): bool
     {
-        return false;
+        return $notification->user_id === $user->id;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Notification $notification): bool
     {
-        return false;
+        return $notification->user_id === $user->id;
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, Notification $notification): bool
     {
         return false;
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, Notification $notification): bool
     {
         return false;

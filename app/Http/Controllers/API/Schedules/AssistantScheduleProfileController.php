@@ -2,49 +2,107 @@
 
 namespace App\Http\Controllers\API\Schedules;
 
-use App\Models\Schedules\AssistantScheduleProfile;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Schedules\StoreAssistantScheduleProfileRequest;
 use App\Http\Requests\Schedules\UpdateAssistantScheduleProfileRequest;
+use App\Http\Resources\Schedules\AssistantScheduleProfileResource;
+use App\Models\Schedules\AssistantScheduleProfile;
+use App\Services\AssistantScheduleProfileService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class AssistantScheduleProfileController extends Controller
 {
+    public function __construct(
+        private readonly AssistantScheduleProfileService $scheduleProfileService
+    ) {}
+
     /**
-     * Display a listing of the resource.
+     * Display a listing of the resource for an assistant.
      */
-    public function index()
+    public function index(Request $request): AnonymousResourceCollection
     {
-        //
+        $schoolId = $request->header('X-School-ID') ?? $request->attributes->get('currentSchoolId');
+        $assistantId = $request->query('assistant_id');
+        $assistantIds = $request->query('assistant_ids');
+        $user = $request->user();
+        $query = AssistantScheduleProfile::with(['shifts.shiftDays']);
+
+        if ($user && ! $user->isAdmin()) {
+            $assistant = $user->assistant;
+            if ($assistant) {
+                $this->scheduleProfileService->normalizeAssistantProfilesChain((string) $assistant->id);
+            }
+            $query->where('assistant_id', $assistant?->id ?? '00000000-0000-0000-0000-000000000000');
+        } elseif ($assistantId) {
+            $this->scheduleProfileService->normalizeAssistantProfilesChain((string) $assistantId);
+            $query->where('assistant_id', $assistantId);
+        } elseif ($assistantIds) {
+            $ids = is_array($assistantIds) ? $assistantIds : explode(',', (string) $assistantIds);
+            foreach ($ids as $id) {
+                $cleanId = trim((string) $id);
+                if ($cleanId !== '') {
+                    $this->scheduleProfileService->normalizeAssistantProfilesChain($cleanId);
+                }
+            }
+            $query->whereIn('assistant_id', $ids);
+        } elseif ($schoolId) {
+            $query->where(function ($q) use ($schoolId) {
+                $q->whereHas('assistant', fn ($aq) => $aq->where('school_id', $schoolId))
+                  ->orWhereHas('assistant.assistantTemporaryAssignments', fn ($tq) => $tq->where('destination_school_id', $schoolId));
+            });
+        }
+
+        $profiles = $query->orderByDesc('valid_from')->get();
+
+        return AssistantScheduleProfileResource::collection($profiles);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created schedule profile for an assistant.
      */
-    public function store(StoreAssistantScheduleProfileRequest $request)
+    public function store(StoreAssistantScheduleProfileRequest $request): JsonResponse
     {
-        //
+        $profile = $this->scheduleProfileService->create($request->validated());
+
+        return (new AssistantScheduleProfileResource($profile))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(AssistantScheduleProfile $assistantScheduleProfile)
+    public function show(AssistantScheduleProfile $assistantScheduleProfile): AssistantScheduleProfileResource
     {
-        //
+        Gate::authorize('view', $assistantScheduleProfile);
+
+        return new AssistantScheduleProfileResource($assistantScheduleProfile->load(['shifts.shiftDays']));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAssistantScheduleProfileRequest $request, AssistantScheduleProfile $assistantScheduleProfile)
+    public function update(UpdateAssistantScheduleProfileRequest $request, AssistantScheduleProfile $assistantScheduleProfile): AssistantScheduleProfileResource
     {
-        //
+        $profile = $this->scheduleProfileService->update($assistantScheduleProfile, $request->validated());
+
+        return new AssistantScheduleProfileResource($profile);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(AssistantScheduleProfile $assistantScheduleProfile)
+    public function destroy(AssistantScheduleProfile $assistantScheduleProfile): JsonResponse
     {
-        //
+        Gate::authorize('delete', $assistantScheduleProfile);
+
+        $this->scheduleProfileService->delete($assistantScheduleProfile);
+
+        return response()->json([
+            'message' => 'Perfil de horário eliminado com sucesso.',
+        ]);
     }
 }

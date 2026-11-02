@@ -41,7 +41,9 @@ class PurgeAnonymizedCriminalRecords extends Command
 
         foreach ($pendingRecords as $record) {
             try {
-                if (! Storage::disk('local')->delete($record->criminal_record_path)) {
+                $configuredDisk = config('filesystems.documents_disk');
+                $disk = str_contains($record->criminal_record_path, 'criminal_record') ? $configuredDisk : 'local';
+                if (! Storage::disk($disk)->delete($record->criminal_record_path)) {
                     throw new \RuntimeException('Falha ao remover o ficheiro.');
                 }
 

@@ -4,7 +4,6 @@ namespace App\Policies\Assistants;
 
 use App\Models\Assistants\AssistantException;
 use App\Models\Auth\User;
-use Illuminate\Auth\Access\Response;
 
 class AssistantExceptionPolicy
 {
@@ -13,7 +12,7 @@ class AssistantExceptionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isStaff();
     }
 
     /**
@@ -21,7 +20,7 @@ class AssistantExceptionPolicy
      */
     public function view(User $user, AssistantException $assistantException): bool
     {
-        return false;
+        return $user->isAdmin() || $assistantException->assistant?->user_id === $user->id;
     }
 
     /**
@@ -29,7 +28,7 @@ class AssistantExceptionPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,7 +36,7 @@ class AssistantExceptionPolicy
      */
     public function update(User $user, AssistantException $assistantException): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -45,7 +44,7 @@ class AssistantExceptionPolicy
      */
     public function delete(User $user, AssistantException $assistantException): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -53,7 +52,7 @@ class AssistantExceptionPolicy
      */
     public function restore(User $user, AssistantException $assistantException): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     /**
@@ -61,6 +60,6 @@ class AssistantExceptionPolicy
      */
     public function forceDelete(User $user, AssistantException $assistantException): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 }

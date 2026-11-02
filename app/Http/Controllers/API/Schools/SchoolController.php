@@ -7,6 +7,7 @@ use App\Http\Requests\Schools\StoreSchoolRequest;
 use App\Http\Requests\Schools\UpdateSchoolRequest;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SchoolResource;
+use App\Services\SchoolAccessService;
 use App\Services\SchoolService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\Gate;
 class SchoolController extends Controller
 {
     public function __construct(
-        private readonly SchoolService $schoolService
+        private readonly SchoolService $schoolService,
+        private readonly SchoolAccessService $schoolAccess
     ) {}
 
     /**
@@ -25,10 +27,18 @@ class SchoolController extends Controller
     {
         Gate::authorize('viewAny', School::class);
 
-        $schools = School::withCount('assistants')
+        $user = request()->user();
+        $query = School::withCount('assistants')
             ->withCount(SchoolService::blockingCounts())
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        // Quem não é administrador só vê as escolas a que tem acesso. Sem
+        // assistente associado a lista fica vazia (antes devolvia todas) (F-09/F-31).
+        if ($user && ! $user->isAdmin()) {
+            $query->whereIn('id', $this->schoolAccess->accessibleSchoolIds($user));
+        }
+
+        $schools = $query->get();
 
         return SchoolResource::collection($schools);
     }

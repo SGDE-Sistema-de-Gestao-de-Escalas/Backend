@@ -18,7 +18,17 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
+            SchoolSeeder::class,
             AbsenceTypeSeeder::class,
+            // Depois das escolas: cria as atividades predefinidas em cada uma.
+            ActivityTypeSeeder::class,
+            // Horário de funcionamento das escolas, depois das escolas.
+            SchoolOperatingRuleSeeder::class,
+            // Assistentes e respetivos horários (dependem das escolas).
+            AssistantSeeder::class,
+            AssistantScheduleProfileSeeder::class,
+            // Regras de horário por período com assistentes aptos.
+            ScheduleRuleSeeder::class,
         ]);
     }
 }

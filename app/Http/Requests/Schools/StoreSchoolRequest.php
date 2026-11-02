@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
+use App\Rules\NoHtmlCharacters;
 use App\Models\Schools\School;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,8 +25,8 @@ class StoreSchoolRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'acronym' => ['required', 'string', 'max:20', 'unique:schools,acronym'],
+            'name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
+            'acronym' => ['nullable', 'string', 'max:20', 'unique:schools,acronym'],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', 'unique:schools,email'],

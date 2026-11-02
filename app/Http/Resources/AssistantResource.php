@@ -1,0 +1,124 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
+
+class AssistantResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $isAnonymized = (bool) ($this->is_anonymized || ($this->user?->anonymized_at !== null));
+        $firstName = $isAnonymized ? 'Assistente' : ($this->user?->first_name ?? '');
+        $lastName = $isAnonymized ? 'Anonimizado' : ($this->user?->last_name ?? '');
+        $name = $isAnonymized ? 'Assistente Anonimizado' : ($this->user?->name ?? trim("{$firstName} {$lastName}") ?: 'Assistente');
+        $isActive = (bool) ($this->user?->is_active ?? false) && ! $this->trashed() && ! $isAnonymized;
+        $canDelete = ! $isAnonymized && ! $this->trashed();
+        $cannotDeleteReason = $isAnonymized
+            ? 'Este assistente já se encontra anonimizado.'
+            : ($this->trashed() ? 'Este assistente já se encontra desativado/eliminado.' : null);
+
+        return [
+            'id' => $this->id,
+            'user_id' => $this->user_id,
+            'school_id' => $this->school_id,
+
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $name,
+            'initials' => $isAnonymized ? 'AA' : (Str::upper(Str::substr((string) $firstName, 0, 1).Str::substr((string) $lastName, 0, 1)) ?: 'AS'),
+            'is_active' => $isActive,
+            'active' => $isActive,
+            'is_anonymized' => $isAnonymized,
+            'anonymized_at' => $this->user?->anonymized_at?->toIso8601String(),
+            'can_delete' => $canDelete,
+            'cannot_delete_reason' => $cannotDeleteReason,
+
+            'internal_number' => $isAnonymized ? '---' : ($this->internal_number ?? ''),
+            'email' => $isAnonymized ? 'anonimizado@sistema.local' : ($this->user?->email ?? ''),
+            'phone' => $isAnonymized ? '-' : ($this->phone ?? '-'),
+            'nif' => $isAnonymized ? '---------' : ($this->nif ?? '-'),
+            'social_security_number' => $isAnonymized ? '-----------' : ($this->social_security_number ?? '-'),
+            'birth_date' => $this->birth_date?->format('Y-m-d') ?? '',
+            'admission_date' => $this->admission_date?->format('Y-m-d') ?? '',
+
+            'has_criminal_record' => ! $isAnonymized && $this->criminal_record_path !== null,
+            'criminal_record_name' => (! $isAnonymized) ? $this->criminal_record_name : null,
+            'criminal_record_path' => (! $isAnonymized) ? $this->criminal_record_path : null,
+            'criminal_record_url' => (! $isAnonymized && $this->criminal_record_path)
+                ? $this->getCriminalRecordUrl($this->criminal_record_path)
+                : null,
+            'criminal_record_expiry' => $isAnonymized ? null : $this->criminal_record_expiry?->format('Y-m-d'),
+
+            'address_street' => $isAnonymized ? '-' : ($this->address_street ?? '-'),
+            'address_zip_code' => $isAnonymized ? '-' : ($this->address_zip_code ?? '-'),
+            'address_city' => $isAnonymized ? '-' : ($this->address_city ?? '-'),
+
+            'emergency_contact_name' => $isAnonymized ? '-' : ($this->emergency_contact_name ?? '-'),
+            'emergency_contact_phone' => $isAnonymized ? '-' : ($this->emergency_contact_phone ?? '-'),
+            'emergency_contact_kinship' => $isAnonymized ? '-' : ($this->emergency_contact_kinship ?? '-'),
+
+            'available_for_transfer' => ! $isAnonymized && (bool) ($this->available_for_transfer ?? false),
+
+            'school' => $this->whenLoaded('school', fn () => [
+                'id' => $this->school->id,
+                'name' => $this->school->name,
+                'acronym' => $this->school->acronym,
+            ]),
+
+            'schedule_profiles' => $this->whenLoaded('assistantScheduleProfiles', fn () => $this->assistantScheduleProfiles->map(fn ($profile) => [
+                'id' => $profile->id,
+                'type' => $profile->type,
+                'rotation_period' => $profile->rotation_period,
+                'starts_with' => $profile->starts_with,
+                'valid_from' => is_string($profile->valid_from) ? $profile->valid_from : $profile->valid_from?->format('Y-m-d'),
+                'valid_until' => is_string($profile->valid_until) ? $profile->valid_until : $profile->valid_until?->format('Y-m-d'),
+                'shifts' => $profile->shifts->map(fn ($shift) => [
+                    'id' => $shift->id,
+                    'shift_label' => $shift->shift_label,
+                    'entry_time' => is_string($shift->entry_time) ? substr($shift->entry_time, 0, 5) : $shift->entry_time,
+                    'exit_time' => is_string($shift->exit_time) ? substr($shift->exit_time, 0, 5) : $shift->exit_time,
+                    'lunch_enabled' => (bool) $shift->lunch_enabled,
+                    'lunch_start' => is_string($shift->lunch_start) ? substr($shift->lunch_start, 0, 5) : $shift->lunch_start,
+                    'lunch_end' => is_string($shift->lunch_end) ? substr($shift->lunch_end, 0, 5) : $shift->lunch_end,
+                    'lunch_duration_minutes' => $shift->lunch_duration_minutes,
+                    'days' => $shift->shiftDays->pluck('day_of_week')->values()->all(),
+                ]),
+            ])),
+
+            'assistant_exceptions' => $this->whenLoaded('assistantExceptions', fn () => $this->assistantExceptions->map(fn ($exc) => [
+                'id' => (string) $exc->id,
+                'assistant_id' => (string) $exc->assistant_id,
+                'type' => $exc->type,
+                'description' => $exc->description,
+                'valid_from' => is_string($exc->valid_from) ? substr($exc->valid_from, 0, 10) : $exc->valid_from?->format('Y-m-d'),
+                'valid_until' => is_string($exc->valid_until) ? substr($exc->valid_until, 0, 10) : $exc->valid_until?->format('Y-m-d'),
+                'start_time' => $exc->getRawOriginal('start_time') ? substr((string) $exc->getRawOriginal('start_time'), 0, 5) : null,
+                'end_time' => $exc->getRawOriginal('end_time') ? substr((string) $exc->getRawOriginal('end_time'), 0, 5) : null,
+                'days' => is_array($exc->days) ? array_values(array_map('intval', $exc->days)) : [],
+                'lunch_enabled' => (bool) $exc->lunch_enabled,
+                'lunch_start' => $exc->getRawOriginal('lunch_start') ? substr((string) $exc->getRawOriginal('lunch_start'), 0, 5) : null,
+                'lunch_end' => $exc->getRawOriginal('lunch_end') ? substr((string) $exc->getRawOriginal('lunch_end'), 0, 5) : null,
+                'lunch_duration_minutes' => $exc->lunch_duration_minutes !== null ? (int) $exc->lunch_duration_minutes : null,
+            ])),
+
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'deleted_at' => $this->deleted_at,
+        ];
+    }
+
+    private function getCriminalRecordUrl(string $path): string
+    {
+        // Os documentos têm dados pessoais: o único endereço é o da rota
+        // autenticada, nunca o URL direto do disco (F-02).
+        return route('assistants.criminal-record', ['assistant' => $this->id]);
+    }
+}

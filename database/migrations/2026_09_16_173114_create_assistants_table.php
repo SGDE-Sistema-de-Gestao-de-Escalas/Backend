@@ -23,17 +23,20 @@ return new class extends Migration
             $table->date('birth_date')->nullable();
             $table->date('admission_date')->nullable();
 
+            $table->string('criminal_record_name')->nullable();
             $table->string('criminal_record_path')->nullable();
             $table->date('criminal_record_expiry')->nullable();
 
             $table->string('address_street')->nullable();
             $table->string('address_zip_code')->nullable();
+            $table->string('address_city')->nullable();
 
             $table->string('emergency_contact_name')->nullable();
             $table->string('emergency_contact_phone')->nullable();
             $table->string('emergency_contact_kinship')->nullable();
             
             $table->boolean('available_for_transfer')->default(false);
+            $table->boolean('is_anonymized')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });

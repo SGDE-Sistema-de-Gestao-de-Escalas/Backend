@@ -60,7 +60,38 @@ return [
             'report' => false,
         ],
 
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('CLOUDFLARE_R2_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('CLOUDFLARE_R2_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => 'auto',
+            'bucket' => env('CLOUDFLARE_R2_BUCKET', env('AWS_BUCKET')),
+            'url' => env('CLOUDFLARE_R2_URL'),
+            'endpoint' => env('CLOUDFLARE_R2_ENDPOINT'),
+            'use_path_style_endpoint' => env('CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Documents Disk
+    |--------------------------------------------------------------------------
+    |
+    | Define o disco onde os documentos (atestados, registos criminais) são
+    | armazenados. Contêm dados pessoais, por isso o valor por omissão é o disco
+    | privado ('local', em storage/app/private), que o servidor web não serve.
+    |
+    | NUNCA usar 'public' para documentos: com `storage:link` qualquer pessoa
+    | com o endereço descarrega o ficheiro sem iniciar sessão. Os ficheiros só
+    | devem sair pelas rotas autenticadas (/absences/{id}/document e
+    | /assistants/{id}/criminal-record). Com 'r2', o bucket tem de ser privado.
+    |
+    */
+    'documents_disk' => env('DOCUMENTS_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------

@@ -93,7 +93,7 @@ class UserService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $target = User::whereKey($target->getKey())
+            $target = User::withTrashed()->whereKey($target->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -141,7 +141,7 @@ class UserService
         DB::transaction(function () use ($actor, $target) {
             $this->deactivate($actor, $target, 'delete');
 
-            $target->refresh();
+            $target = User::withTrashed()->whereKey($target->getKey())->firstOrFail();
 
             $assistants = Assistant::withTrashed()
                 ->where('user_id', $target->id)
@@ -163,6 +163,8 @@ class UserService
                 if (array_key_exists('email', $assistant->getAttributes())) {
                     $assistant->email = null;
                 }
+                $assistant->internal_number = 'anon_' . $assistant->id;
+                $assistant->is_anonymized = true;
                 $assistant->phone = null;
                 $assistant->nif = null;
                 $assistant->social_security_number = null;
@@ -174,6 +176,7 @@ class UserService
                 $assistant->emergency_contact_kinship = null;
                 $assistant->available_for_transfer = false;
                 $assistant->criminal_record_expiry = null;
+                $assistant->criminal_record_name = null;
                  
                 $assistant->save();
 
@@ -183,7 +186,9 @@ class UserService
 
                 if ($criminalRecordPath !== null && $criminalRecordPath !== '') {
                     DB::afterCommit(function () use ($criminalRecordPath, $assistantId) {
-                        if (! Storage::disk('local')->delete($criminalRecordPath)) {
+                        $configuredDisk = config('filesystems.documents_disk');
+                        $disk = str_contains($criminalRecordPath, 'criminal_record') ? $configuredDisk : 'local';
+                        if (! Storage::disk($disk)->delete($criminalRecordPath)) {
                             throw new RuntimeException(
                                 'Não foi possível remover o ficheiro do registo criminal.'
                             );
@@ -239,7 +244,7 @@ class UserService
         return DB::transaction(function () use ($actor, $target) {
             $this->deactivate($actor, $target, 'delete');
 
-            $target->refresh();
+            $target = User::withTrashed()->whereKey($target->getKey())->firstOrFail();
 
             if ($this->deleteAction($target) === 'anonymize') {
                 $this->anonymize($actor, $target);
@@ -339,6 +344,8 @@ class UserService
             ->where('is_active', true)
             ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
             ->get();
+
+        app(NotificationService::class)->deactivationRequested($user, $reason);
 
         if ($admins->isNotEmpty()) {
             Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
