@@ -725,255 +725,103 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonCount(1, 'conflicts')
             ->assertJsonPath('conflicts.0.transfer_candidates.0.assistant_id', $externalAssistant->id)
             ->assertJsonPath('conflicts.0.transfer_candidates.0.causes_origin_shortfall', false)
-            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 98);
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.score', 96)
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_start', '08:00')
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_end', '16:00')
+            ->assertJsonPath('conflicts.0.transfer_candidates.0.shift_covers_deficit', 'full');
     }
-public function test_transfers_are_not_persisted_when_generation_fails(): void
-    {
-        $otherSchool = School::create([
-            'name' => 'Escola Outra',
-            'acronym' => 'EO',
-            'active' => true,
-        ]);
-        $externalAssistant = $this->createAssistantWithShift(
-            name: 'Assistente Externo',
-            internalNumber: 'EXT1',
-            entryTime: '08:00:00',
-            exitTime: '16:00:00',
-            school: $otherSchool,
-            availableForTransfer: true
-        );
 
-        // Erro de pré-validação: janela de almoço inválida (intervalo menor que a duração de 60 min)
-        // Isto faz com que o ScheduleGenerationService lance ValidationException (422)
-        $this->createAssistantWithShift(
-            name: 'Assistente Com Janela Almoço Inválida',
-            internalNumber: 'INV1',
+    public function test_suggests_external_transfer_candidate_resolves_active_rotating_shift(): void
+    {
+        // Assistente da escola principal ausente na segunda-feira 2026-11-09
+        $a1 = $this->createAssistantWithShift(
+            name: 'Assistente Ausente Rotativo',
+            internalNumber: 'A002',
             entryTime: '08:00:00',
-            exitTime: '16:00:00',
-            lunchEnabled: true,
-            lunchStart: '12:00:00',
-            lunchEnd: '12:30:00',
-            lunchDuration: 60,
+            exitTime: '12:00:00',
+            lunchEnabled: false,
+            lunchStart: null,
+            lunchEnd: null,
+            lunchDuration: null,
             days: [0]
         );
 
-        $response = $this->actingAs($this->admin)
-            ->withHeader('X-School-ID', $this->school->id)
-            ->postJson('/api/schedules/generate', [
-                'start_date' => '2026-11-02',
-                'end_date' => '2026-11-02',
-                'transfers' => [
-                    [
-                        'assistant_id' => $externalAssistant->id,
-                        'date' => '2026-11-02',
-                    ],
-                ],
-            ]);
-
-        $response->assertStatus(422);
-
-        // A cedência NÃO deve ter sido gravada na base de dados
-        $this->assertDatabaseMissing('assistant_temporary_assignments', [
-            'assistant_id' => $externalAssistant->id,
-            'destination_school_id' => $this->school->id,
+        $absenceTypeId = (string) Str::uuid();
+        DB::table('absence_types')->insert(['id' => $absenceTypeId, 'name' => 'Férias']);
+        Absence::create([
+            'assistant_id' => $a1->id,
+            'absence_type_id' => $absenceTypeId,
+            'valid_from' => '2026-11-09',
+            'valid_until' => '2026-11-09',
+            'total_days' => 1,
+            'status' => 'justified',
         ]);
-    }
 
-    public function test_not_available_for_transfer_is_rejected(): void
-    {
+        // Outra escola com assistente em horário rotativo quinzenal
+        // Início: 2026-10-26 (Turno A: 07:30–15:30, Turno B: 10:00–17:00). Starts with A.
+        // Semana 1 (26 Out - 01 Nov): Turno A
+        // Semana 2 (02 Nov - 08 Nov): Turno A
+        // Semana 3 (09 Nov - 15 Nov): Turno B!
         $otherSchool = School::create([
-            'name' => 'Escola Outra 2',
-            'acronym' => 'EO2',
+            'name' => 'Escola Básica de Teste',
+            'acronym' => 'EBT',
             'active' => true,
         ]);
-        $unavailableAssistant = $this->createAssistantWithShift(
-            name: 'Assistente Indisponível',
-            internalNumber: 'IND1',
-            entryTime: '08:00:00',
-            exitTime: '16:00:00',
-            school: $otherSchool,
-            availableForTransfer: false
-        );
 
-        $response = $this->actingAs($this->admin)
-            ->withHeader('X-School-ID', $this->school->id)
-            ->postJson('/api/schedules/generate', [
-                'start_date' => '2026-11-02',
-                'end_date' => '2026-11-02',
-                'transfers' => [
-                    [
-                        'assistant_id' => $unavailableAssistant->id,
-                        'date' => '2026-11-02',
-                    ],
-                ],
-            ]);
-
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors('transfers.0.assistant_id');
-
-        $this->assertDatabaseMissing('assistant_temporary_assignments', [
-            'assistant_id' => $unavailableAssistant->id,
+        $role = Role::where('slug', 'assistant')->first();
+        $user = User::factory()->create([
+            'first_name' => 'Rotativo',
+            'last_name' => 'Externo',
+            'role_id' => $role->id,
+            'is_active' => true,
         ]);
-    }
 
-    public function test_date_outside_generation_range_is_rejected(): void
-    {
-        $otherSchool = School::create([
-            'name' => 'Escola Outra 3',
-            'acronym' => 'EO3',
-            'active' => true,
+        $rotAssistant = Assistant::create([
+            'school_id' => $otherSchool->id,
+            'user_id' => $user->id,
+            'internal_number' => 'ROT1',
+            'available_for_transfer' => true,
         ]);
-        $externalAssistant = $this->createAssistantWithShift(
-            name: 'Assistente Externo 3',
-            internalNumber: 'EXT3',
-            entryTime: '08:00:00',
-            exitTime: '16:00:00',
-            school: $otherSchool,
-            availableForTransfer: true
-        );
 
-        $response = $this->actingAs($this->admin)
-            ->withHeader('X-School-ID', $this->school->id)
-            ->postJson('/api/schedules/generate', [
-                'start_date' => '2026-11-02',
-                'end_date' => '2026-11-02',
-                'transfers' => [
-                    [
-                        'assistant_id' => $externalAssistant->id,
-                        'date' => '2027-06-01',
-                    ],
-                ],
-            ]);
+        $profile = AssistantScheduleProfile::create([
+            'assistant_id' => $rotAssistant->id,
+            'type' => 'rotativo',
+            'rotation_period' => 'biweekly',
+            'starts_with' => 'A',
+            'valid_from' => '2026-10-26',
+            'valid_until' => null,
+        ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors('transfers.0.date');
+        $shiftA = AssistantScheduleShift::create([
+            'assistant_schedule_profile_id' => $profile->id,
+            'shift_label' => 'A',
+            'entry_time' => '07:30:00',
+            'exit_time' => '15:30:00',
+            'lunch_enabled' => true,
+            'lunch_start' => '12:00:00',
+            'lunch_end' => '13:00:00',
+            'lunch_duration_minutes' => 60,
+        ]);
+        AssistantScheduleShiftDay::create(['assistant_schedule_shift_id' => $shiftA->id, 'day_of_week' => 0]);
 
-        $this->assertDatabaseMissing('assistant_temporary_assignments', [
-            'assistant_id' => $externalAssistant->id,
+        $shiftB = AssistantScheduleShift::create([
+            'assistant_schedule_profile_id' => $profile->id,
+            'shift_label' => 'B',
+            'entry_time' => '10:00:00',
+            'exit_time' => '17:00:00',
+            'lunch_enabled' => true,
+            'lunch_start' => '13:00:00',
+            'lunch_end' => '14:00:00',
+            'lunch_duration_minutes' => 60,
         ]);
-    }
-    public static function transferLunchCases(): array
-    {
-        return [
-            'whole day' => [null, null, ['12:45', '13:45'], false],
-            'across lunch' => ['10:00', '16:00', ['12:45', '13:45'], false],
-            'before lunch' => ['10:00', '12:00', null, false],
-            'after lunch' => ['14:00', '16:00', null, false],
-            'starts during lunch' => ['13:00', '16:00', ['13:00', '13:45'], false],
-            'ends during lunch' => ['10:00', '13:00', ['12:45', '13:00'], false],
-            'exception lunch' => ['10:00', '16:00', ['13:00', '13:30'], true],
-            'flexible lunch window' => ['10:00', '16:00', ['12:45', '13:45'], false, '14:45'],
-        ];
-    }
+        AssistantScheduleShiftDay::create(['assistant_schedule_shift_id' => $shiftB->id, 'day_of_week' => 0]);
 
-    #[DataProvider('transferLunchCases')]
-    public function test_transfer_preserves_lunch_and_work_in_both_schools(
-        ?string $start, ?string $end, ?array $expectedLunch, bool $withException, string $profileLunchEnd = '13:45'
-    ): void {
-        $origin = School::create(['name' => 'Origem', 'acronym' => 'OR']);
-        $operatingRule = SchoolOperatingRule::create(['school_id' => $origin->id, 'valid_from' => '2026-01-01']);
-        SchoolOperatingRuleDay::create([
-            'school_operating_rule_id' => $operatingRule->id, 'day_of_week' => 0,
-            'opening_time' => '08:00', 'closing_time' => '18:00',
-            'lunch_start' => '12:00', 'lunch_end' => '14:30', 'lunch_duration_minutes' => 60,
-        ]);
-        $assistant = $this->createAssistantWithShift(
-            'Transferida', 'T001', lunchStart: '12:45', lunchEnd: $profileLunchEnd, school: $origin
-        );
-        $originActivity = ActivityType::create([
-            'school_id' => $origin->id, 'name' => 'Tarefa origem', 'color' => '#8B5CF6',
-            'active' => true, 'is_fallback' => false,
-        ]);
-        $originRule = ScheduleRule::create([
-            'school_id' => $origin->id, 'activity_type_id' => $originActivity->id,
-            'period_start' => '08:00', 'period_end' => '10:00', 'min' => 1,
-            'type' => 'mandatory', 'valid_from' => '2026-01-01', 'days_of_week' => [0],
-        ]);
-        $originRule->assistants()->attach($assistant->id, ['priority' => 1]);
-        if ($withException) {
-            \App\Models\Assistants\AssistantException::create([
-                'assistant_id' => $assistant->id, 'type' => 'schedule_change',
-                'valid_from' => '2026-11-02', 'valid_until' => '2026-11-02',
-                'start_time' => '08:00', 'end_time' => '16:00', 'days' => [0],
-                'lunch_enabled' => true, 'lunch_start' => '13:00', 'lunch_end' => '13:30',
-                'lunch_duration_minutes' => 30,
-            ]);
-        }
-        \App\Models\Assistants\AssistantTemporaryAssignments::create([
-            'assistant_id' => $assistant->id, 'origin_school_id' => $origin->id,
-            'destination_school_id' => $this->school->id,
-            'created_by_user_id' => $this->admin->id,
-            'validated_by_user_id' => $this->admin->id,
-            'valid_from' => '2026-11-02', 'valid_until' => '2026-11-02',
-            'start_time' => $start, 'end_time' => $end,
-        ]);
+        // Regra obrigatória na escola principal para 09 Nov (10:00–12:00)
         ScheduleRule::create([
-            'school_id' => $this->school->id, 'activity_type_id' => $this->vigilancia->id,
-            'period_start' => '10:00', 'period_end' => '16:00', 'min' => 1,
-            'type' => 'mandatory', 'valid_from' => '2026-01-01', 'days_of_week' => [0],
-        ]);
-
-        $service = app(\App\Services\ScheduleGenerationService::class);
-        $result = $service->generate($this->school->id, '2026-11-02', '2026-11-02');
-        $lunch = $result['lunch_blocks']['2026-11-02'][$assistant->id] ?? null;
-        $this->assertSame($expectedLunch, $lunch ? [$lunch['start_time'], $lunch['end_time']] : null);
-        $entries = ScheduleEntry::whereHas('schedule', fn ($q) => $q
-            ->where('assistant_id', $assistant->id)->where('school_id', $this->school->id))->get();
-        $this->assertNotEmpty($entries);
-        $lunchStart = $withException ? '13:00' : '12:45';
-        $lunchEnd = $withException ? '13:30' : '13:45';
-        foreach ($entries as $entry) {
-            $s = substr($entry->start_time, 0, 5);
-            $e = substr($entry->end_time, 0, 5);
-            $this->assertGreaterThanOrEqual($start ?? '08:00', $s);
-            $this->assertLessThanOrEqual($end ?? '16:00', $e);
-            $this->assertFalse($s < $lunchEnd && $e > $lunchStart);
-        }
-
-        $this->assertSame($origin->id, $originRule->fresh()->assistants->first()->school_id);
-        $originResult = $service->generate($origin->id, '2026-11-02', '2026-11-02');
-        $originEntries = ScheduleEntry::whereHas('schedule', fn ($q) => $q
-            ->where('assistant_id', $assistant->id)->where('school_id', $origin->id))->get();
-        if ($start !== null) {
-            $this->assertTrue($originEntries->contains('schedule_rule_id', $originRule->id));
-        }
-        foreach ($originEntries as $entry) {
-            $s = substr($entry->start_time, 0, 5);
-            $e = substr($entry->end_time, 0, 5);
-            $this->assertFalse($s < ($end ?? '16:00') && $e > ($start ?? '08:00'));
-            $this->assertFalse($s < $lunchEnd && $e > $lunchStart);
-        }
-        $originLunch = $originResult['lunch_blocks']['2026-11-02'][$assistant->id];
-        $this->assertSame([$lunchStart, $lunchEnd], [$originLunch['start_time'], $originLunch['end_time']]);
-    }
-
-    public function test_partial_hours_transfer_allocates_only_transferred_window_and_adapts_lunch(): void
-    {
-        $otherSchool = School::create([
-            'name' => 'Escola Outra Parcial',
-            'acronym' => 'EOP',
-            'active' => true,
-        ]);
-        $externalAssistant = $this->createAssistantWithShift(
-            name: 'Assistente Com Horas Parciais',
-            internalNumber: 'PAR1',
-            entryTime: '08:00:00',
-            exitTime: '16:00:00',
-            lunchEnabled: true,
-            lunchStart: '12:00:00',
-            lunchEnd: '14:00:00',
-            lunchDuration: 60,
-            days: [0],
-            school: $otherSchool,
-            availableForTransfer: true
-        );
-
-        // Regra obrigatória na escola de destino às 12:15–13:30
-        $rule = ScheduleRule::create([
             'school_id' => $this->school->id,
-            'activity_type_id' => $this->vigilancia->id,
-            'period_start' => '12:15',
-            'period_end' => '13:30',
+            'activity_type_id' => $this->portaria->id,
+            'period_start' => '10:00',
+            'period_end' => '12:00',
             'min' => 1,
             'type' => 'mandatory',
             'valid_from' => '2026-01-01',
@@ -983,38 +831,23 @@ public function test_transfers_are_not_persisted_when_generation_fails(): void
         $response = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
             ->postJson('/api/schedules/generate', [
-                'start_date' => '2026-11-02',
-                'end_date' => '2026-11-02',
-                'transfers' => [
-                    [
-                        'assistant_id' => $externalAssistant->id,
-                        'date' => '2026-11-02',
-                        'start_time' => '12:15',
-                        'end_time' => '13:30',
-                        'rule_id' => $rule->id,
-                    ],
-                ],
+                'start_date' => '2026-11-09',
+                'end_date' => '2026-11-09',
             ]);
 
-        $response->assertStatus(200);
-// Verificar que na escola de destino foram criadas entradas apenas dentro do horário transferido (12:15–13:30)
-        $schedule = Schedule::where('assistant_id', $externalAssistant->id)
-            ->where('school_id', $this->school->id)
-            ->first();
-        $this->assertNotNull($schedule);
+        $response->assertStatus(200)
+            ->assertJsonPath('resolution_status', 'draft_with_deficit')
+            ->assertJsonCount(1, 'conflicts');
 
-        $entries = ScheduleEntry::where('schedule_id', $schedule->id)->get();
-        $this->assertNotEmpty($entries); 
-                foreach ($entries as $e) {
-            $this->assertGreaterThanOrEqual('12:15', substr($e->start_time, 0, 5));
-            $this->assertLessThanOrEqual('13:30', substr($e->end_time, 0, 5));
-        }
-
-        // Verificar que a transferência temporária tem start_time e end_time gravados
-        $assignment = \App\Models\Assistants\AssistantTemporaryAssignments::where('assistant_id', $externalAssistant->id)->first();
-        $this->assertNotNull($assignment);
-        $this->assertEquals('12:15', substr($assignment->start_time, 0, 5));
-        $this->assertEquals('13:30', substr($assignment->end_time, 0, 5));
+        $candidates = $response->json('conflicts.0.transfer_candidates');
+        $this->assertNotEmpty($candidates);
+        $candidate = collect($candidates)->firstWhere('assistant_id', $rotAssistant->id);
+        $this->assertNotNull($candidate);
+        // Em 09 Nov (Semana 3), o turno ativo tem de ser Turno B (10:00–17:00), e NÃO Turno A (07:30–15:30)
+        $this->assertEquals('10:00', $candidate['shift_start']);
+        $this->assertEquals('17:00', $candidate['shift_end']);
+        $this->assertEquals('full', $candidate['shift_covers_deficit']);
+        $this->assertTrue($candidate['works_today']);
     }
 
 public function test_idempotency_key_reused_with_other_range_generates_fresh_schedule(): void

@@ -137,7 +137,10 @@ class AssistantController extends Controller
 
         // 5. Suporte para devolver todos nos dropdowns (per_page = -1)
         if ((int) $request->input('per_page', 10) === -1) {
-            $assistants = $query->get();
+            $assistants = $query->with([
+                'assistantScheduleProfiles.shifts.shiftDays',
+                'assistantExceptions',
+            ])->get();
 
             return AssistantResource::collection($assistants)->additional([
                 'counts' => $counts,
@@ -173,7 +176,7 @@ class AssistantController extends Controller
     {
         Gate::authorize('view', $assistant);
 
-        return new AssistantResource($assistant->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']));
+        return new AssistantResource($assistant->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays', 'assistantExceptions']));
     }
 
     /**

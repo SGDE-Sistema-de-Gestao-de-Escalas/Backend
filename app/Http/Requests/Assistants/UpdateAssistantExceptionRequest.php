@@ -62,24 +62,7 @@ class UpdateAssistantExceptionRequest extends FormRequest
                 return;
             }
 
-            // 2. Se a exceção estiver em vigor (valid_from <= hoje e (valid_until >= hoje ou null))
-            if ($validFrom && ! $validFrom->isAfter($today)) {
-                $immutableFields = ['type', 'valid_from', 'start_time', 'end_time', 'days', 'lunch_enabled', 'lunch_start', 'lunch_end', 'lunch_duration_minutes'];
-                foreach ($immutableFields as $field) {
-                    if ($this->has($field)) {
-                        $validator->errors()->add($field, 'Não é possível alterar os dados base ou data de início de uma exceção em vigor; apenas a data de fim pode ser ajustada.');
-                    }
-                }
-
-                if ($this->filled('valid_until')) {
-                    $newUntil = Carbon::parse($this->input('valid_until'))->startOfDay();
-                    if ($newUntil->isBefore($today)) {
-                        $validator->errors()->add('valid_until', 'A data de fim não pode ser anterior à data de hoje.');
-                    }
-                }
-            }
-
-            // 3. Validação contra o calendário da escola
+            // 2. Validação contra o calendário da escola
             if ($exception->assistant) {
                 $merged = array_merge([
                     'valid_from' => $exception->valid_from?->format('Y-m-d'),
