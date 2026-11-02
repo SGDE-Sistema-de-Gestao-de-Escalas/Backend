@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use App\Services\UserService;
 use App\Http\Requests\Auth\UpdateUserRequest;
+use App\Rules\StrongPassword;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -26,13 +27,11 @@ class AuthController extends Controller
             'remember_me' => 'boolean'
         ]);
 
-        $cookieMinutes = !empty($credentials['remember_me']) ? 60 * 24 * 30 : 60 * 24; // 30 dias ou 24 horas
+        $cookieMinutes = !empty($credentials['remember_me'])
+            ? AuthService::REMEMBER_MINUTES
+            : AuthService::SESSION_MINUTES;
 
-        if (!empty($credentials['remember_me'])) {
-            config(['sanctum.expiration' => $cookieMinutes]);
-        }
-
-        $authData = $this->authService->attemptLogin($credentials);
+        $authData = $this->authService->attemptLogin($credentials, $cookieMinutes);
 
         $cookie = cookie(
             name: 'access_token',
@@ -89,7 +88,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'current_password' => 'required|string|current_password:sanctum',
-            'new_password' => 'required|string|min:8|confirmed',
+            'new_password' => ['required', 'string', 'confirmed', new StrongPassword($request->user()->email)],
         ]);
 
         $this->authService->updatePassword($request->user(), $validated['new_password']);
@@ -110,7 +109,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'token' => 'required|string',
             'email' => 'required|email',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'string', 'confirmed', new StrongPassword((string) $request->input('email'))],
         ]);
 
         $this->authService->resetPasswordWithToken($validated);
