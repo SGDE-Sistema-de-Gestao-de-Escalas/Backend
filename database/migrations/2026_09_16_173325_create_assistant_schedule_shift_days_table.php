@@ -13,13 +13,15 @@ return new class extends Migration
     {
         Schema::create('assistant_schedule_shift_days', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignuuid('assistant_schedule_shift_id')
+            $table->foreignUuid('assistant_schedule_shift_id')
                   ->constrained(
                       table: 'assistant_schedule_shifts',
                       indexName: 'fk_shift_days_shift_id'
                   );
             $table->unsignedTinyInteger('day_of_week');
             $table->timestamps();
+
+            $table->unique(['assistant_schedule_shift_id', 'day_of_week'], 'asst_shift_days_shift_dow_unique');
         });
     }
 

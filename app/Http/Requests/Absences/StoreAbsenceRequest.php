@@ -14,7 +14,6 @@ class StoreAbsenceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // O assistente já não regista ausências: só o administrador (via AbsencePolicy).
         return $this->user()?->can('create', \App\Models\Absences\Absence::class) ?? false;
     }
 

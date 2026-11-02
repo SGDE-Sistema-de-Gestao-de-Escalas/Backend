@@ -25,47 +25,55 @@ class AbsenceService
      */
     public function create(array $data, ?UploadedFile $document = null, ?User $user = null): Absence
     {
-        $absence = DB::transaction(function () use ($data, $document, $user) {
-            $totalDays = $this->calculateTotalDays(
-                $data['valid_from'] ?? null,
-                $data['valid_until'] ?? null,
-                $data['total_days'] ?? null
-            );
+        $storedDocumentPath = null;
 
-            $documentName = null;
-            $documentPath = null;
-            if ($document) {
-                $assistant = Assistant::with('user')->findOrFail($data['assistant_id']);
-                $documentName = $document->getClientOriginalName();
-                $documentPath = $this->storeAbsenceDocument($document, $assistant);
-            }
+        try {
+            $absence = DB::transaction(function () use ($data, $document, $user, &$storedDocumentPath) {
+                $totalDays = $this->calculateTotalDays(
+                    $data['valid_from'] ?? null,
+                    $data['valid_until'] ?? null,
+                    $data['total_days'] ?? null
+                );
 
-            // Só o administrador decide o estado de uma falta. Um assistente cria-a
-            // sempre como pendente, mesmo que envie outro valor (o frontend envia "pending").
-            $status = ($user !== null && ! $user->isAdmin())
-                ? 'pending'
-                : ($data['status'] ?? 'pending');
-            $justifiedByUserId = in_array($status, ['justified', 'unjustified'], true) ? $user?->id : null;
+                $documentName = null;
+                $documentPath = null;
+                if ($document) {
+                    $assistant = Assistant::with('user')->findOrFail($data['assistant_id']);
+                    $documentName = $document->getClientOriginalName();
+                    $documentPath = $this->storeAbsenceDocument($document, $assistant);
+                    $storedDocumentPath = $documentPath;
+                }
 
-            $absence = Absence::create([
-                'assistant_id' => $data['assistant_id'],
-                'absence_type_id' => $data['absence_type_id'],
-                'created_by_user_id' => $user?->id,
-                'justified_by_user_id' => $justifiedByUserId,
-                'valid_from' => $data['valid_from'],
-                'valid_until' => $data['valid_until'] ?? $data['valid_from'],
-                'start_time' => $data['start_time'] ?? null,
-                'end_time' => $data['end_time'] ?? null,
-                'total_days' => $totalDays,
-                'justification' => $data['justification'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'status' => $status,
-                'document_name' => $documentName,
-                'document_path' => $documentPath,
-            ]);
+                // Só o administrador decide o estado de uma falta. Um assistente cria-a
+                // sempre como pendente, mesmo que envie outro valor (o frontend envia "pending").
+                $status = ($user !== null && ! $user->isAdmin())
+                    ? 'pending'
+                    : ($data['status'] ?? 'pending');
+                $justifiedByUserId = in_array($status, ['justified', 'unjustified'], true) ? $user?->id : null;
 
-            return $absence->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
-        });
+                $absence = Absence::create([
+                    'assistant_id' => $data['assistant_id'],
+                    'absence_type_id' => $data['absence_type_id'],
+                    'created_by_user_id' => $user?->id,
+                    'justified_by_user_id' => $justifiedByUserId,
+                    'valid_from' => $data['valid_from'],
+                    'valid_until' => $data['valid_until'] ?? $data['valid_from'],
+                    'start_time' => $data['start_time'] ?? null,
+                    'end_time' => $data['end_time'] ?? null,
+                    'total_days' => $totalDays,
+                    'justification' => $data['justification'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                    'status' => $status,
+                    'document_name' => $documentName,
+                    'document_path' => $documentPath,
+                ]);
+
+                return $absence->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
+            });
+        } catch (Throwable $e) {
+            $this->deleteAbsenceDocument($storedDocumentPath);
+            throw $e;
+        }
 
         // Enviar email ao assistente quando o administrador regista uma falta em seu nome
         if ($user && $user->isAdmin()) {
@@ -89,81 +97,94 @@ class AbsenceService
         $previousStatus = (string) $absence->status;
         $previousJustification = trim((string) ($absence->justification ?? ''));
 
-        $updated = DB::transaction(function () use ($absence, $data, $document, $user) {
-            $validFrom = $data['valid_from'] ?? $absence->valid_from?->format('Y-m-d');
-            $validUntil = array_key_exists('valid_until', $data) ? $data['valid_until'] : $absence->valid_until?->format('Y-m-d');
+        $storedDocumentPath = null;
 
-            $totalDays = $this->calculateTotalDays(
-                $validFrom,
-                $validUntil,
-                $data['total_days'] ?? null
-            );
+        try {
+            $updated = DB::transaction(function () use ($absence, $data, $document, $user, &$storedDocumentPath) {
+                $validFrom = $data['valid_from'] ?? $absence->valid_from?->format('Y-m-d');
+                $validUntil = array_key_exists('valid_until', $data) ? $data['valid_until'] : $absence->valid_until?->format('Y-m-d');
 
-            $documentName = $absence->document_name;
-            $documentPath = $absence->document_path;
+                $totalDays = $this->calculateTotalDays(
+                    $validFrom,
+                    $validUntil,
+                    $data['total_days'] ?? null
+                );
 
-            // Remove existing document if requested
-            if (! empty($data['remove_document'])) {
-                $this->deleteAbsenceDocument($documentPath);
-                $documentName = null;
-                $documentPath = null;
-            }
+                $documentName = $absence->document_name;
+                $documentPath = $absence->document_path;
+                $obsoleteDocumentPath = null;
 
-            // Replace with new document if provided (by Admin or Assistant)
-            if ($document) {
-                $this->deleteAbsenceDocument($documentPath);
-
-                $targetAssistantId = $data['assistant_id'] ?? $absence->assistant_id;
-                $assistant = Assistant::with('user')->findOrFail($targetAssistantId);
-
-                $documentName = $document->getClientOriginalName();
-                $documentPath = $this->storeAbsenceDocument($document, $assistant);
-            }
-
-            $updatePayload = [
-                'total_days' => $totalDays,
-                'document_name' => $documentName,
-                'document_path' => $documentPath,
-            ];
-
-            if (isset($data['assistant_id'])) {
-                $updatePayload['assistant_id'] = $data['assistant_id'];
-            }
-            if (isset($data['absence_type_id'])) {
-                $updatePayload['absence_type_id'] = $data['absence_type_id'];
-            }
-            if (isset($data['valid_from'])) {
-                $updatePayload['valid_from'] = $data['valid_from'];
-            }
-            if (array_key_exists('valid_until', $data)) {
-                $updatePayload['valid_until'] = $data['valid_until'] ?? ($updatePayload['valid_from'] ?? $validFrom);
-            }
-            if (array_key_exists('start_time', $data)) {
-                $updatePayload['start_time'] = $data['start_time'];
-            }
-            if (array_key_exists('end_time', $data)) {
-                $updatePayload['end_time'] = $data['end_time'];
-            }
-            if (array_key_exists('justification', $data)) {
-                $updatePayload['justification'] = $data['justification'];
-            }
-            if (array_key_exists('notes', $data)) {
-                $updatePayload['notes'] = $data['notes'];
-            }
-
-            if (isset($data['status'])) {
-                $updatePayload['status'] = $data['status'];
-                if (in_array($data['status'], ['justified', 'unjustified'], true)) {
-                    $updatePayload['justified_by_user_id'] = $user?->id;
-                } else {
-                    $updatePayload['justified_by_user_id'] = null;
+                // Remove existing document if requested
+                if (! empty($data['remove_document'])) {
+                    $obsoleteDocumentPath = $documentPath;
+                    $documentName = null;
+                    $documentPath = null;
                 }
-            }
 
-            $absence->update($updatePayload);
+                // Replace with new document if provided (by Admin or Assistant)
+                if ($document) {
+                    $obsoleteDocumentPath ??= $documentPath;
 
-            return $absence->fresh()->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
-        });
+                    $targetAssistantId = $data['assistant_id'] ?? $absence->assistant_id;
+                    $assistant = Assistant::with('user')->findOrFail($targetAssistantId);
+
+                    $documentName = $document->getClientOriginalName();
+                    $documentPath = $this->storeAbsenceDocument($document, $assistant);
+                    $storedDocumentPath = $documentPath;
+                }
+
+                $updatePayload = [
+                    'total_days' => $totalDays,
+                    'document_name' => $documentName,
+                    'document_path' => $documentPath,
+                ];
+
+                if (isset($data['assistant_id'])) {
+                    $updatePayload['assistant_id'] = $data['assistant_id'];
+                }
+                if (isset($data['absence_type_id'])) {
+                    $updatePayload['absence_type_id'] = $data['absence_type_id'];
+                }
+                if (isset($data['valid_from'])) {
+                    $updatePayload['valid_from'] = $data['valid_from'];
+                }
+                if (array_key_exists('valid_until', $data)) {
+                    $updatePayload['valid_until'] = $data['valid_until'] ?? ($updatePayload['valid_from'] ?? $validFrom);
+                }
+                if (array_key_exists('start_time', $data)) {
+                    $updatePayload['start_time'] = $data['start_time'];
+                }
+                if (array_key_exists('end_time', $data)) {
+                    $updatePayload['end_time'] = $data['end_time'];
+                }
+                if (array_key_exists('justification', $data)) {
+                    $updatePayload['justification'] = $data['justification'];
+                }
+                if (array_key_exists('notes', $data)) {
+                    $updatePayload['notes'] = $data['notes'];
+                }
+
+                if (isset($data['status'])) {
+                    $updatePayload['status'] = $data['status'];
+                    if (in_array($data['status'], ['justified', 'unjustified'], true)) {
+                        $updatePayload['justified_by_user_id'] = $user?->id;
+                    } else {
+                        $updatePayload['justified_by_user_id'] = null;
+                    }
+                }
+
+                $absence->update($updatePayload);
+
+                if ($obsoleteDocumentPath !== null) {
+                    DB::afterCommit(fn () => $this->deleteAbsenceDocument($obsoleteDocumentPath));
+                }
+
+                return $absence->fresh()->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
+            });
+        } catch (Throwable $e) {
+            $this->deleteAbsenceDocument($storedDocumentPath);
+            throw $e;
+        }
 
         // Enviar email ao assistente quando o administrador avalia a falta como Justificada ou Injustificada
         if (
@@ -287,11 +308,17 @@ class AbsenceService
             ]);
         }
 
-        if ($absence->document_path) {
-            $this->deleteAbsenceDocument($absence->document_path);
-        }
+        $documentPath = $absence->document_path;
 
-        return (bool) $absence->delete();
+        return DB::transaction(function () use ($absence, $documentPath) {
+            $deleted = (bool) $absence->delete();
+
+            if ($deleted && $documentPath) {
+                DB::afterCommit(fn () => $this->deleteAbsenceDocument($documentPath));
+            }
+
+            return $deleted;
+        });
     }
 
     /**

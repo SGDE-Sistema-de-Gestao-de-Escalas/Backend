@@ -13,13 +13,20 @@ return new class extends Migration
     {
         Schema::create('notifications', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignuuid('user_id')->constrained('users');
+            $table->foreignUuid('user_id')->constrained('users');
+            $table->foreignUuid('school_id')->nullable()->constrained('schools')->nullOnDelete();
             $table->string('type');
+            $table->string('event', 64)->nullable();
             $table->string('title');
             $table->text('body')->nullable();
             $table->json('data')->nullable();
+            $table->string('dedupe_key', 191)->nullable();
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
+
+            $table->unique(['user_id', 'dedupe_key']);
+            $table->index(['user_id', 'read_at', 'created_at']);
+            $table->index(['user_id', 'type']);
         });
     }
 

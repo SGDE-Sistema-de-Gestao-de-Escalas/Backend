@@ -13,6 +13,7 @@ use App\Models\Schedules\Schedule;
 use App\Services\NotificationService;
 use App\Services\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use App\Services\ScheduleIntegrityService;
 use App\Services\ScheduleExportService;
 use Symfony\Component\HttpFoundation\Response;
@@ -52,7 +53,9 @@ class ScheduleController extends Controller
         // Para administradores, filtra pela escola ativa do cabeçalho/contexto se fornecida.
         // Para assistentes (staff), devolve as suas escalas mesmo que geradas noutra escola (ex: transferência temporária).
         if ($user->isAdmin()) {
-            if ($schoolId) {
+            if ($request->filled('school_id')) {
+                $query->where('school_id', $request->query('school_id'));
+            } elseif ($schoolId && ! $request->filled('assistant_id')) {
                 $query->where('school_id', $schoolId);
             }
         } else {
@@ -204,78 +207,83 @@ class ScheduleController extends Controller
         ]);
 
         $now = now();
-        $savedDaysCount = 0;
 
-        foreach ($validated['days'] as $dayData) {
-            $date = $dayData['date'];
-            $carbonDate = CarbonImmutable::parse($date);
-            $weekStart = $carbonDate->startOfWeek()->toDateString();
-            $weekEnd = $carbonDate->endOfWeek()->toDateString();
+        $savedDaysCount = DB::transaction(function () use ($validated, $schoolId, $now) {
+            $savedDaysCount = 0;
 
-            // Agrupar entradas por assistente
-            $entriesByAssistant = [];
-            foreach ($dayData['entries'] as $entry) {
-                $aid = (string) $entry['assistant_id'];
-                $entriesByAssistant[$aid][] = $entry;
-            }
+            foreach ($validated['days'] as $dayData) {
+                $date = $dayData['date'];
+                $carbonDate = CarbonImmutable::parse($date);
+                $weekStart = $carbonDate->startOfWeek()->toDateString();
+                $weekEnd = $carbonDate->endOfWeek()->toDateString();
 
-            // Identificar todos os assistentes relevantes
-            $existingScheduleIds = Schedule::query()
-                ->where('school_id', $schoolId)
-                ->where('week_start', $weekStart)
-                ->pluck('id', 'assistant_id')
-                ->all();
-
-            $allAssistantIds = array_unique(array_merge(
-                array_keys($entriesByAssistant),
-                array_keys($existingScheduleIds)
-            ));
-
-            foreach ($allAssistantIds as $assistantId) {
-                $schedule = Schedule::firstOrCreate(
-                    [
-                        'school_id' => $schoolId,
-                        'assistant_id' => $assistantId,
-                        'week_start' => $weekStart,
-                        'week_end' => $weekEnd,
-                    ],
-                    [
-                        'status' => 'draft',
-                        'generated_at' => $now,
-                    ]
-                );
-
-                // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
-                if ($schedule->status !== 'draft') {
-                    $schedule->status = 'draft';
-                    $schedule->published_at = null;
-                    $schedule->save();
+                // Agrupar entradas por assistente
+                $entriesByAssistant = [];
+                foreach ($dayData['entries'] as $entry) {
+                    $aid = (string) $entry['assistant_id'];
+                    $entriesByAssistant[$aid][] = $entry;
                 }
 
-                // Remover entradas antigas desta data para este assistente
-                ScheduleEntry::where('schedule_id', $schedule->id)
-                    ->where('date', $date)
-                    ->delete();
+                // Identificar todos os assistentes relevantes
+                $existingScheduleIds = Schedule::query()
+                    ->where('school_id', $schoolId)
+                    ->where('week_start', $weekStart)
+                    ->pluck('id', 'assistant_id')
+                    ->all();
 
-                // Inserir as novas entradas
-                if (! empty($entriesByAssistant[$assistantId])) {
-                    foreach ($entriesByAssistant[$assistantId] as $entry) {
-                        ScheduleEntry::create([
-                            'schedule_id' => $schedule->id,
-                            'activity_type_id' => $entry['activity_type_id'] ?? null,
-                            'activity_name' => $entry['activity_name'] ?? 'Atividade',
-                            'schedule_rule_id' => $entry['schedule_rule_id'] ?? null,
-                            'date' => $date,
-                            'start_time' => substr($entry['start_time'], 0, 5),
-                            'end_time' => substr($entry['end_time'], 0, 5),
-                            'is_locked' => (bool) ($entry['is_locked'] ?? false),
-                        ]);
+                $allAssistantIds = array_unique(array_merge(
+                    array_keys($entriesByAssistant),
+                    array_keys($existingScheduleIds)
+                ));
+
+                foreach ($allAssistantIds as $assistantId) {
+                    $schedule = Schedule::firstOrCreate(
+                        [
+                            'school_id' => $schoolId,
+                            'assistant_id' => $assistantId,
+                            'week_start' => $weekStart,
+                            'week_end' => $weekEnd,
+                        ],
+                        [
+                            'status' => 'draft',
+                            'generated_at' => $now,
+                        ]
+                    );
+
+                    // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
+                    if ($schedule->status !== 'draft') {
+                        $schedule->status = 'draft';
+                        $schedule->published_at = null;
+                        $schedule->save();
+                    }
+
+                    // Remover entradas antigas desta data para este assistente
+                    ScheduleEntry::where('schedule_id', $schedule->id)
+                        ->where('date', $date)
+                        ->delete();
+
+                    // Inserir as novas entradas
+                    if (! empty($entriesByAssistant[$assistantId])) {
+                        foreach ($entriesByAssistant[$assistantId] as $entry) {
+                            ScheduleEntry::create([
+                                'schedule_id' => $schedule->id,
+                                'activity_type_id' => $entry['activity_type_id'] ?? null,
+                                'activity_name' => $entry['activity_name'] ?? 'Atividade',
+                                'schedule_rule_id' => $entry['schedule_rule_id'] ?? null,
+                                'date' => $date,
+                                'start_time' => substr($entry['start_time'], 0, 5),
+                                'end_time' => substr($entry['end_time'], 0, 5),
+                                'is_locked' => (bool) ($entry['is_locked'] ?? false),
+                            ]);
+                        }
                     }
                 }
+
+                $savedDaysCount++;
             }
 
-            $savedDaysCount++;
-        }
+            return $savedDaysCount;
+        });
 
         return response()->json([
             'message' => 'Escalas guardadas com sucesso na base de dados.',
@@ -328,6 +336,8 @@ class ScheduleController extends Controller
      */
     public function export(Request $request): Response
     {
+        Gate::authorize('export', Schedule::class);
+
         $schoolId = (string) (
             $request->attributes->get('currentSchoolId')
             ?? $request->attributes->get('school_id')

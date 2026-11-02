@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Password;
@@ -12,7 +13,11 @@ use App\Mail\SetupAccountMail;
 
 class AuthService
 {
-    public function attemptLogin(array $credentials): array
+    public const SESSION_MINUTES = 60 * 24;
+
+    public const REMEMBER_MINUTES = 60 * 24 * 30;
+
+    public function attemptLogin(array $credentials, int $minutes = self::SESSION_MINUTES): array
     {
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
@@ -28,7 +33,7 @@ class AuthService
 
         $user->tokens()->delete();
 
-        $token = $user->createToken('sgde-access-token')->plainTextToken;
+        $token = $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
 
         return [
             'user' => $user,
@@ -38,11 +43,13 @@ class AuthService
 
     public function updatePassword(User $user, string $newPassword): void
     {
-        $user->update([
-            'password' => Hash::make($newPassword),
-        ]);
+        DB::transaction(function () use ($user, $newPassword) {
+            $user->update([
+                'password' => Hash::make($newPassword),
+            ]);
 
-        $user->tokens()->delete();
+            $user->tokens()->delete();
+        });
     }
 
     public function logout(User $user): void
@@ -54,7 +61,7 @@ class AuthService
         }
     }
 
-    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser): string
+    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser, int $minutes = self::REMEMBER_MINUTES): string
     {
         $user = User::where('email', $socialUser->getEmail())->first();
 
@@ -88,7 +95,7 @@ class AuthService
 
         $user->tokens()->delete();
         
-        return $user->createToken('sgde-access-token')->plainTextToken;
+        return $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
     }
 
     public function createUserAndSendResetLink(array $data): User
@@ -116,13 +123,15 @@ class AuthService
         $status = Password::broker()->reset(
             $data,
             function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password)
-                ])->setRememberToken(\Illuminate\Support\Str::random(60));
+                DB::transaction(function () use ($user, $password) {
+                    $user->forceFill([
+                        'password' => Hash::make($password)
+                    ])->setRememberToken(\Illuminate\Support\Str::random(60));
 
-                $user->save();
+                    $user->save();
 
-                $user->tokens()->delete();
+                    $user->tokens()->delete();
+                });
             }
         );
 

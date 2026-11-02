@@ -20,8 +20,13 @@ return new class extends Migration
             $table->foreignUuid('validated_by_user_id')->nullable()->constrained('users');  
             $table->date('valid_from');
             $table->date('valid_until')->nullable();
+            $table->time('start_time')->nullable();
+            $table->time('end_time')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
+
+            $table->index(['destination_school_id', 'valid_from', 'valid_until'], 'asst_temp_dest_period_index');
+            $table->index(['origin_school_id', 'valid_from', 'valid_until'], 'asst_temp_origin_period_index');
         });
     }
 

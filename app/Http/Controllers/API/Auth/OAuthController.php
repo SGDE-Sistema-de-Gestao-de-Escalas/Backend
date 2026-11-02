@@ -53,12 +53,12 @@ class OAuthController extends Controller
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            $token = $this->authService->handleOAuthCallback($provider, $socialUser);
+            $token = $this->authService->handleOAuthCallback($provider, $socialUser, AuthService::REMEMBER_MINUTES);
 
             $cookie = $this->makeCookie(
                 'access_token',
                 $token,
-                60 * 24 * 30, // 30 dias
+                AuthService::REMEMBER_MINUTES,
                 $request
             );
 
