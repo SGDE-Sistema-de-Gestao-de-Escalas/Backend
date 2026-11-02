@@ -1226,6 +1226,7 @@ class ScheduleExportService
                     $absentRows[] = [
                         'name' => $fullName,
                         'code' => $code,
+                        'shift_start' => $shiftStart,
                         'is_absent' => true,
                         'shift' => "$shiftStart – $shiftEnd",
                         'lunch' => null,
@@ -1337,6 +1338,7 @@ class ScheduleExportService
                 $workingRows[] = [
                     'name' => $fullName,
                     'code' => $code,
+                    'shift_start' => $shiftStart,
                     'is_absent' => false,
                     'shift' => "$shiftStart – $shiftEnd",
                     'lunch' => $lunchStr,
@@ -1344,6 +1346,23 @@ class ScheduleExportService
                     'timeline_blocks' => $timelineBlocks,
                 ];
             }
+
+            // Ordenar por hora de entrada ao serviço (shift_start ASC) e desempate por nome
+            usort($workingRows, function ($a, $b) {
+                $cmp = strcmp($a['shift_start'] ?? '99:99', $b['shift_start'] ?? '99:99');
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                return strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+            });
+
+            usort($absentRows, function ($a, $b) {
+                $cmp = strcmp($a['shift_start'] ?? '99:99', $b['shift_start'] ?? '99:99');
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                return strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+            });
 
             $rows = array_merge($workingRows, $absentRows);
 
