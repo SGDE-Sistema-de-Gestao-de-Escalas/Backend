@@ -1940,6 +1940,10 @@ class ScheduleGenerationService
 
         $results = [];
         foreach ($candidates as $candidate) {
+            $fullDayAbsence = false;
+            $absenceOverlapsDeficit = false;
+            $partialAbsenceDetail = null;
+
             // Verificar faltas do assistente para a data
             $absences = Absence::where('assistant_id', $candidate->id)
                 ->whereDate('valid_from', '<=', $date)
