@@ -2151,58 +2151,11 @@ class ScheduleGenerationService
                 }
             }
 
-            $shiftEntryMin = $shiftStart ? $this->toMinutes($shiftStart) : null;
-            $shiftExitMin = $shiftEnd ? $this->toMinutes($shiftEnd) : null;
-
-            $shiftCoversDeficit = 'outside'; // 'full' | 'partial' | 'outside'
-            $overlapMinutes = 0;
-            $deficitDurationMinutes = max(1, $endMin - $startMin);
-
-            if ($shiftEntryMin !== null && $shiftExitMin !== null) {
-                $overlapStart = max($startMin, $shiftEntryMin);
-                $overlapEnd = min($endMin, $shiftExitMin);
-                if ($overlapEnd > $overlapStart) {
-                    $overlapMinutes = $overlapEnd - $overlapStart;
-                    if ($overlapMinutes >= $deficitDurationMinutes) {
-                        $shiftCoversDeficit = 'full';
-                    } else {
-                        $shiftCoversDeficit = 'partial';
-                    }
-                } else {
-                    $shiftCoversDeficit = 'outside';
-                }
-            }
-
-            $selectable = ! $fullDayAbsence && ! $absenceOverlapsDeficit && $worksToday && ! $causesOriginShortfall;
-
-            if ($fullDayAbsence || ! $worksToday || $absenceOverlapsDeficit) {
-                $score = 0;
-            } else {
-                if ($shiftCoversDeficit === 'full') {
-                    $score = $causesOriginShortfall ? 75 : 98;
-                } elseif ($shiftCoversDeficit === 'partial') {
-                    $ratio = $overlapMinutes / $deficitDurationMinutes;
-                    $base = (int) round(55 + ($ratio * 30));
-                    $score = $causesOriginShortfall ? max(35, $base - 20) : $base;
-                } else {
-                    $score = $causesOriginShortfall ? 25 : 45;
-                }
-            }
-
             $results[] = [
                 'assistant_id' => $candidate->id,
                 'name' => $this->assistantDisplayName($candidate),
                 'origin_school_id' => $candidate->school_id,
                 'origin_school_name' => $candidate->school?->name,
-                'shift_start' => $shiftStart,
-                'shift_end' => $shiftEnd,
-                'lunch_start' => $lunchStart,
-                'lunch_end' => $lunchEnd,
-                'lunch_duration' => $lunchDuration,
-                'is_absent' => $fullDayAbsence,
-                'partial_absence' => $partialAbsenceDetail,
-                'absence_overlaps' => $absenceOverlapsDeficit,
-                'works_today' => $worksToday,
                 'causes_origin_shortfall' => $causesOriginShortfall,
                 'selectable' => ! $causesOriginShortfall,
                 'score' => $causesOriginShortfall ? 72 : 96,

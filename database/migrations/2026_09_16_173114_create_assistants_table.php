@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('assistants', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignuuid('user_id')->constrained('users')->nullable();
-            $table->foreignuuid('school_id')->constrained('schools');
+            $table->foreignUuid('user_id')->nullable()->unique()->constrained('users');
+            $table->foreignUuid('school_id')->constrained('schools');
 
             $table->string('internal_number')->unique();
             $table->string('phone')->unique()->nullable();
@@ -39,6 +39,9 @@ return new class extends Migration
             $table->boolean('is_anonymized')->default(false);
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['school_id', 'available_for_transfer']);
+            $table->index(['school_id', 'is_anonymized']);
         });
     }
 

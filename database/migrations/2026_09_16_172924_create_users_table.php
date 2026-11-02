@@ -26,6 +26,8 @@ return new class extends Migration
             $table->timestamp('anonymized_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['role_id', 'is_active']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
