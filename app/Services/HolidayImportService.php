@@ -147,10 +147,9 @@ class HolidayImportService
                 $munDate = $this->resolveMunicipalHolidayDate($mun['rule'], $year);
                 if ($munDate) {
                     $munDateStr = $munDate->format('Y-m-d');
-                    $munName = "Feriado Municipal de {$mun['name']}";
-                    if (! empty($mun['holiday_name'])) {
-                        $munName .= " ({$mun['holiday_name']})";
-                    }
+                    $munName = ! empty($mun['holiday_name'])
+                        ? $mun['holiday_name']
+                        : "Feriado Municipal de {$mun['name']}";
 
                     // Se já coincidir com um feriado nacional, anota na descrição
                     if (isset($holidaysList[$munDateStr])) {
