@@ -96,7 +96,7 @@ class DashboardBootstrapController extends Controller
             ->when($schoolId !== '', fn ($q) => $q->where('school_id', $schoolId))
             ->when($startDate && $endDate, fn ($q) => $q->whereDate('week_start', '<=', $endDate)->whereDate('week_end', '>=', $startDate))
             ->orderBy('week_start')
-            ->limit(200)
+            ->limit(500)
             ->get();
 
         // 3. Ausências
@@ -125,7 +125,7 @@ class DashboardBootstrapController extends Controller
             $absencesQuery->whereDate('valid_from', '<=', $endDate);
         }
 
-        $absences = $absencesQuery->orderBy('valid_from', 'desc')->limit(200)->get();
+        $absences = $absencesQuery->orderBy('valid_from', 'desc')->limit(500)->get();
 
         // 4. Calendário de Funcionamento
         $calendar = ($schoolId !== '' && $startDate && $endDate)
