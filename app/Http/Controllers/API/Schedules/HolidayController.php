@@ -77,13 +77,13 @@ class HolidayController extends Controller
         $validated = $request->validate([
             'year' => ['required', 'integer', 'between:2020,2050'],
             'municipality' => ['nullable', 'string', 'max:100'],
-            'include_carnival' => ['sometimes', 'boolean'],
+            'include_carnival' => ['sometimes'],
         ]);
 
         $preview = $this->holidayImportService->preview(
             year: (int) $validated['year'],
             municipalitySlug: $validated['municipality'] ?? null,
-            includeCarnival: (bool) ($validated['include_carnival'] ?? true)
+            includeCarnival: $request->boolean('include_carnival', true)
         );
 
         return response()->json([
@@ -103,14 +103,14 @@ class HolidayController extends Controller
             'municipality' => ['nullable', 'string', 'max:100'],
             'dates' => ['nullable', 'array'],
             'dates.*' => ['string', 'date_format:Y-m-d'],
-            'include_carnival' => ['sometimes', 'boolean'],
+            'include_carnival' => ['sometimes'],
         ]);
 
         $result = $this->holidayImportService->import(
             year: (int) $validated['year'],
             municipalitySlug: $validated['municipality'] ?? null,
             selectedDates: $validated['dates'] ?? null,
-            includeCarnival: (bool) ($validated['include_carnival'] ?? true),
+            includeCarnival: $request->boolean('include_carnival', true),
             actor: $request->user()
         );
 
