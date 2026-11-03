@@ -8,13 +8,17 @@ use App\Http\Requests\Schedules\StoreScheduleRuleRequest;
 use App\Http\Requests\Schedules\UpdateScheduleRuleRequest;
 use App\Http\Resources\ScheduleRuleResource;
 use App\Models\Schedules\ScheduleRule;
+use App\Services\NotificationService;
 use App\Services\ScheduleRuleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ScheduleRuleController extends Controller
 {
-    public function __construct(private readonly ScheduleRuleService $service) {}
+    public function __construct(
+        private readonly ScheduleRuleService $service,
+        private readonly NotificationService $notifications,
+    ) {}
 
     public function index(ScheduleRuleRequest $request): AnonymousResourceCollection
     {
@@ -45,8 +49,28 @@ class ScheduleRuleController extends Controller
 
     public function destroy(ScheduleRuleRequest $request, ScheduleRule $scheduleRule): JsonResponse
     {
-        $scheduleRule->delete();
+        $result = $this->service->delete($scheduleRule, $request->boolean('confirm'));
 
-        return response()->json(['message' => 'Regra removida com sucesso.']);
+        if (! $result['deleted']) {
+            return response()->json([
+                'message' => 'Esta regra é usada em horários de hoje em diante. Confirme a eliminação para continuar.',
+                'requires_confirmation' => true,
+                'impact' => $result['impact'],
+            ], 409);
+        }
+
+        $response = ['message' => 'Regra removida com sucesso.'];
+
+        if ($result['impact'] !== null) {
+            $this->notifications->scheduleRecalculationRequired(
+                schoolId: $scheduleRule->school_id,
+                impact: $result['impact'],
+                cause: 'eliminação de uma regra',
+                actor: $request->user(),
+            );
+            $response['impact'] = $result['impact'];
+        }
+
+        return response()->json($response);
     }
 }

@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\System\ActivityType;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +27,54 @@ class ScheduleRuleService
 
             return $rule->load('assistants.user');
         });
+    }
+
+    public function delete(ScheduleRule $rule, bool $confirmed = false): array
+    {
+        return DB::transaction(function () use ($rule, $confirmed) {
+            $rule = ScheduleRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
+            $today = CarbonImmutable::today()->toDateString();
+            $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)->whereHas('schedule');
+
+            if ((clone $entries)->where('date', '<', $today)->exists()) {
+                throw ValidationException::withMessages([
+                    'schedule_rule' => 'Não é possível eliminar uma regra que já foi usada em horários passados. Defina a data de fim da regra.',
+                ]);
+            }
+
+            $upcoming = (clone $entries)->where('date', '>=', $today)->get(['schedule_id', 'date']);
+            $impact = $upcoming->isEmpty() ? null : $this->deletionImpact($upcoming);
+
+            if ($impact !== null && ! $confirmed) {
+                return ['deleted' => false, 'impact' => $impact];
+            }
+
+            if ($impact !== null) {
+                Schedule::whereIn('id', $upcoming->pluck('schedule_id')->unique())
+                    ->where('status', 'published')
+                    ->update(['status' => 'draft', 'published_at' => null]);
+            }
+
+            $rule->delete();
+
+            return ['deleted' => true, 'impact' => $impact];
+        });
+    }
+
+    private function deletionImpact(Collection $upcoming): array
+    {
+        $scheduleIds = $upcoming->pluck('schedule_id')->unique()->values();
+        $dates = $upcoming->map(fn ($entry) => substr((string) $entry->date, 0, 10))->unique()->sort()->values()->all();
+        $published = Schedule::whereIn('id', $scheduleIds)->where('status', 'published')->count();
+
+        return [
+            'has_impact' => true,
+            'requires_recalculation' => true,
+            'affected_dates' => $dates,
+            'affected_schedules' => $scheduleIds->count(),
+            'drafted_schedules' => $published,
+            'message' => 'A eliminação desta regra afeta a escala gerada em '.count($dates).' dia(s). Os horários afetados passam a rascunho e é necessário recalcular o horário.',
+        ];
     }
 
     public function update(ScheduleRule $rule, array $data): ScheduleRule
