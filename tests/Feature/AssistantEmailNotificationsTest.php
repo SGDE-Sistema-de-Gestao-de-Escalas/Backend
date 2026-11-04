@@ -481,7 +481,7 @@ class AssistantEmailNotificationsTest extends TestCase
                 && $mail->hasSubject('Bem-vindo ao SGDE - Criação de Palavra-passe')
                 && str_contains($rendered, 'Bem-vindo ao SGDE')
                 && str_contains($rendered, 'Maria Santos')
-                && str_contains($rendered, 'reset-password');
+                && str_contains($rendered, 'setup-password');
         });
     }
 }

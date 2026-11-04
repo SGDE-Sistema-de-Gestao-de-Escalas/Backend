@@ -27,7 +27,7 @@ class SetupAccountMail extends Mailable
 
     public function content(): Content
     {
-        $setupUrl = config('app.frontend_url') . '/reset-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
+        $setupUrl = config('app.frontend_url') . '/setup-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
 
         return new Content(
             markdown: 'emails.auth.setup-account',
