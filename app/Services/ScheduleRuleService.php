@@ -43,14 +43,15 @@ class ScheduleRuleService
             }
 
             $upcoming = (clone $entries)->where('date', '>=', $today)->get(['schedule_id', 'date']);
-            $impact = $upcoming->isEmpty() ? null : $this->deletionImpact($upcoming);
+            $schedules = $upcoming->isEmpty() ? null : $this->schedulesOfAffectedDays($rule->school_id, $upcoming);
+            $impact = $schedules === null ? null : $this->deletionImpact($upcoming, $schedules);
 
             if ($impact !== null && ! $confirmed) {
                 return ['deleted' => false, 'impact' => $impact];
             }
 
             if ($impact !== null) {
-                Schedule::whereIn('id', $upcoming->pluck('schedule_id')->unique())
+                Schedule::whereIn('id', $schedules->pluck('id'))
                     ->where('status', 'published')
                     ->update(['status' => 'draft', 'published_at' => null]);
             }
@@ -61,19 +62,49 @@ class ScheduleRuleService
         });
     }
 
-    private function deletionImpact(Collection $upcoming): array
+    private function schedulesOfAffectedDays(string $schoolId, Collection $upcoming): Collection
     {
-        $scheduleIds = $upcoming->pluck('schedule_id')->unique()->values();
-        $dates = $upcoming->map(fn ($entry) => substr((string) $entry->date, 0, 10))->unique()->sort()->values()->all();
-        $published = Schedule::whereIn('id', $scheduleIds)->where('status', 'published')->count();
+        $dates = $this->affectedDates($upcoming);
+        $usingIds = $upcoming->pluck('schedule_id')->unique()->all();
+
+        return Schedule::query()
+            ->where('school_id', $schoolId)
+            ->where(function ($query) use ($dates, $usingIds) {
+                $query->whereIn('id', $usingIds);
+                foreach ($dates as $date) {
+                    $query->orWhere(fn ($week) => $week->where('week_start', '<=', $date)->where('week_end', '>=', $date));
+                }
+            })
+            ->get(['id', 'status']);
+    }
+
+    private function affectedDates(Collection $upcoming): array
+    {
+        return $upcoming->map(fn ($entry) => substr((string) $entry->date, 0, 10))->unique()->sort()->values()->all();
+    }
+
+    private function deletionImpact(Collection $upcoming, Collection $schedules): array
+    {
+        $dates = $this->affectedDates($upcoming);
+        $days = $upcoming
+            ->groupBy(fn ($entry) => substr((string) $entry->date, 0, 10))
+            ->map(fn (Collection $entries, string $date) => [
+                'date' => $date,
+                'assistants' => $entries->pluck('schedule_id')->unique()->count(),
+                'entries' => $entries->count(),
+            ])
+            ->sortKeys()
+            ->values()
+            ->all();
 
         return [
             'has_impact' => true,
             'requires_recalculation' => true,
             'affected_dates' => $dates,
-            'affected_schedules' => $scheduleIds->count(),
-            'drafted_schedules' => $published,
-            'message' => 'A eliminação desta regra afeta a escala gerada em '.count($dates).' dia(s). Os horários afetados passam a rascunho e é necessário recalcular o horário.',
+            'affected_days' => $days,
+            'affected_schedules' => $schedules->count(),
+            'drafted_schedules' => $schedules->where('status', 'published')->count(),
+            'message' => 'A eliminação desta regra afeta a escala gerada em '.count($dates).' dia(s). Todos os horários da escola nessas semanas passam a rascunho e é necessário recalcular o horário.',
         ];
     }
 

@@ -171,17 +171,78 @@ class ScheduleRuleDeleteImpactTest extends TestCase
         $this->assertDatabaseHas('schedule_entries', ['id' => $entry->id, 'schedule_rule_id' => null]);
     }
 
-    public function test_only_the_schedules_that_use_the_rule_go_back_to_draft(): void
+    public function test_every_schedule_of_the_affected_day_goes_back_to_draft_not_only_the_ones_using_the_rule(): void
     {
         $using = $this->scheduleFor(0, 2);
         $this->entry($using, 2, $this->ruleId);
         $other = $this->scheduleFor(1, 2);
         $this->entry($other, 2, null);
 
+        $this->destroy('?confirm=1')
+            ->assertOk()
+            ->assertJsonPath('impact.affected_schedules', 2)
+            ->assertJsonPath('impact.drafted_schedules', 2);
+
+        $this->assertSame('draft', $using->fresh()->status);
+        $this->assertSame('draft', $other->fresh()->status);
+        $this->assertNull($other->fresh()->published_at);
+    }
+
+    public function test_a_schedule_of_another_week_stays_published(): void
+    {
+        $using = $this->scheduleFor(0, 2);
+        $this->entry($using, 2, $this->ruleId);
+        $otherWeek = $this->scheduleFor(1, 30);
+        $this->entry($otherWeek, 30, null);
+
         $this->destroy('?confirm=1')->assertOk()->assertJsonPath('impact.drafted_schedules', 1);
 
         $this->assertSame('draft', $using->fresh()->status);
-        $this->assertSame('published', $other->fresh()->status);
+        $this->assertSame('published', $otherWeek->fresh()->status);
+    }
+
+    public function test_a_schedule_of_another_school_stays_published(): void
+    {
+        $using = $this->scheduleFor(0, 2);
+        $this->entry($using, 2, $this->ruleId);
+
+        $otherSchool = School::create(['name' => 'Escola B', 'acronym' => 'EB', 'active' => true]);
+        $staffRole = Role::where('slug', 'staff')->first();
+        $user = User::factory()->create(['role_id' => $staffRole->id, 'is_active' => true]);
+        $stranger = Assistant::create([
+            'school_id' => $otherSchool->id, 'user_id' => $user->id, 'internal_number' => '900',
+            'available_for_transfer' => false,
+        ]);
+        $date = CarbonImmutable::today()->addDays(2);
+        $foreign = Schedule::forceCreate([
+            'school_id' => $otherSchool->id,
+            'assistant_id' => $stranger->id,
+            'week_start' => $date->startOfWeek()->toDateString(),
+            'week_end' => $date->endOfWeek()->toDateString(),
+            'status' => 'published',
+            'published_at' => now(),
+            'generated_at' => now(),
+        ]);
+
+        $this->destroy('?confirm=1')->assertOk()->assertJsonPath('impact.drafted_schedules', 1);
+
+        $this->assertSame('published', $foreign->fresh()->status);
+    }
+
+    public function test_the_impact_lists_each_affected_day_with_the_assistants_using_the_rule(): void
+    {
+        $first = $this->scheduleFor(0, 2);
+        $second = $this->scheduleFor(1, 2);
+        $this->entry($first, 2, $this->ruleId);
+        $this->entry($second, 2, $this->ruleId);
+        $this->entry($first, 4, $this->ruleId);
+
+        $this->destroy()
+            ->assertStatus(409)
+            ->assertJsonPath('impact.affected_days', [
+                ['date' => $this->day(2), 'assistants' => 2, 'entries' => 2],
+                ['date' => $this->day(4), 'assistants' => 1, 'entries' => 1],
+            ]);
     }
 
     public function test_confirming_notifies_the_admins_that_a_recalculation_is_needed(): void
