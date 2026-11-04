@@ -21,19 +21,19 @@ class SetupAccountMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'SGDE - Ativação e Configuração de Conta',
+            subject: 'Bem-vindo ao SGDE - Criação de Palavra-passe',
         );
     }
 
     public function content(): Content
     {
-        $setupUrl = config('app.frontend_url') . '/setup-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
+        $setupUrl = config('app.frontend_url') . '/reset-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
 
         return new Content(
             markdown: 'emails.auth.setup-account',
             with: [
                 'setupUrl' => $setupUrl,
-                'roleName' => $this->user->role->name ?? 'Utilizador',
+                'roleName' => $this->user->role->name ?? 'Assistente Operacional',
             ],
         );
     }

@@ -9,6 +9,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\ResetPasswordMail;
+use App\Mail\SetupAccountMail;
 
 class AuthService
 {
@@ -150,5 +151,13 @@ class AuthService
             
             Mail::to($user->email)->send(new ResetPasswordMail($user, $token));
         }
+    }
+
+    public function sendAccountSetupLink(User $user): void
+    {
+        $user->loadMissing('role');
+        $token = Password::broker()->createToken($user);
+
+        Mail::to($user->email)->send(new SetupAccountMail($user, $token));
     }
 }

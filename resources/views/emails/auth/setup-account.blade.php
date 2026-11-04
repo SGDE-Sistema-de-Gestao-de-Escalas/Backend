@@ -1,16 +1,16 @@
 <x-mail::message>
-# Ativação de Conta
+# Bem-vindo ao SGDE
 
-A conta de **{{ $user->first_name }} {{ $user->last_name }}** com o perfil de **{{ $roleName }}** foi registada com sucesso no sistema pelo administrador.
+A conta de **{{ $user->first_name }} {{ $user->last_name }}** com o perfil de **{{ $roleName }}** foi criada com sucesso no sistema **SGDE**.
 
-Para aceder à plataforma, é necessário confirmar a conta e definir uma palavra-passe definitiva através do botão abaixo:
+Para aceder à plataforma e consultar os seus horários de serviço, é necessário criar a sua palavra-passe de acesso através do botão abaixo:
 
 <x-mail::button :url="$setupUrl" color="primary">
-Confirmar e Ativar Conta
+Criar Palavra-passe
 </x-mail::button>
 
 <div class="link-fallback-label">
-Hiperligação direta para ativação da conta:
+Hiperligação direta para criar a sua palavra-passe:
 </div>
 
 <div class="link-fallback-box">
@@ -18,6 +18,6 @@ Hiperligação direta para ativação da conta:
 </div>
 
 <p class="help-note">
-Esta ligação é válida por 60 minutos por motivos de segurança. Caso expire, solicite um novo envio junto da administração escolar.
+Esta ligação é válida por 60 minutos por motivos de segurança. Caso expire, contacte a administração escolar ou utilize a recuperação de acesso.
 </p>
 </x-mail::message>
