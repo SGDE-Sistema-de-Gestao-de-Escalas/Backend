@@ -478,9 +478,11 @@ class AssistantEmailNotificationsTest extends TestCase
         Mail::assertSent(SetupAccountMail::class, function (SetupAccountMail $mail) {
             $rendered = $mail->render();
             return $mail->hasTo('maria.santos.welcome@teste.pt')
-                && $mail->hasSubject('Bem-vindo ao SGDE - Criação de Palavra-passe')
-                && str_contains($rendered, 'Bem-vindo ao SGDE')
+                && $mail->hasSubject('Bem-vindo(a) ao SGDE - Ative a sua conta')
+                && str_contains($rendered, 'Bem-vindo(a) ao SGDE!')
                 && str_contains($rendered, 'Maria Santos')
+                && str_contains($rendered, 'EB1 Quinta das Flores')
+                && str_contains($rendered, 'AO-WELCOME-1')
                 && str_contains($rendered, 'setup-password');
         });
     }

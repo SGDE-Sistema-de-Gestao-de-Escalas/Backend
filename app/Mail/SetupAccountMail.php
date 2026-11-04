@@ -21,12 +21,13 @@ class SetupAccountMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Bem-vindo ao SGDE - Criação de Palavra-passe',
+            subject: 'Bem-vindo(a) ao SGDE - Ative a sua conta',
         );
     }
 
     public function content(): Content
     {
+        $this->user->loadMissing(['role', 'assistant.school']);
         $setupUrl = config('app.frontend_url') . '/setup-password?token=' . $this->token . '&email=' . urlencode($this->user->email);
 
         return new Content(
@@ -34,6 +35,8 @@ class SetupAccountMail extends Mailable
             with: [
                 'setupUrl' => $setupUrl,
                 'roleName' => $this->user->role->name ?? 'Assistente Operacional',
+                'schoolName' => $this->user->assistant?->school?->name,
+                'internalNumber' => $this->user->assistant?->internal_number,
             ],
         );
     }
