@@ -98,6 +98,48 @@ class AbsenceIntegrityTest extends TestCase
         ], $extra));
     }
 
+    public function test_absence_can_be_created_with_only_a_start_time(): void
+    {
+        foreach ([[], ['end_time' => null]] as $offset => $extra) {
+            $response = $this->submitAbsence($this->absenceData($offset, $offset, array_merge([
+                'start_time' => '14:00',
+            ], $extra)));
+
+            $response->assertCreated()
+                ->assertJsonPath('data.start_time', '14:00')
+                ->assertJsonPath('data.end_time', null);
+
+            $this->assertDatabaseHas('absences', [
+                'id' => $response->json('data.id'),
+                'end_time' => null,
+            ]);
+        }
+    }
+
+    public function test_end_time_can_be_removed_when_editing_an_absence(): void
+    {
+        $absence = $this->givenAbsence(0, 0, ['start_time' => '14:00', 'end_time' => '15:00']);
+
+        $this->amendAbsence($absence, ['end_time' => null])
+            ->assertOk()
+            ->assertJsonPath('data.start_time', '14:00')
+            ->assertJsonPath('data.end_time', null);
+
+        $this->assertNull($absence->fresh()->end_time);
+    }
+
+    public function test_start_only_absence_blocks_the_rest_of_the_day(): void
+    {
+        $this->givenAbsence(0, 0, ['start_time' => '14:00']);
+
+        $this->submitAbsence($this->absenceData(0, 0, ['start_time' => '13:00', 'end_time' => '14:00']))
+            ->assertCreated();
+
+        $this->submitAbsence($this->absenceData(0, 0, ['start_time' => '16:00', 'end_time' => '17:00']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['valid_from']);
+    }
+
     public function test_an_identical_absence_is_refused(): void
     {
         $this->givenAbsence(0, 2);
