@@ -39,8 +39,7 @@ class UpdateUserRequest extends FormRequest
                 // Ignora a própria conta: sem isto, guardar o perfil com o email
                 // inalterado dava "o email já existe" (em /me a rota não tem {user}).
                 Rule::unique('users', 'email')
-                    ->ignore($targetId)
-                    ->whereNull('deleted_at'),
+                    ->ignore($targetId),
             ],
         ];
 

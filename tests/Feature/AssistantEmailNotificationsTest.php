@@ -7,6 +7,7 @@ use App\Mail\AbsenceRegisteredMail;
 use App\Mail\AbsenceStatusUpdatedMail;
 use App\Mail\CriminalRecordExpiryAlertMail;
 use App\Mail\SchedulePublishedMail;
+use App\Mail\SetupAccountMail;
 use App\Models\Absences\Absence;
 use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
@@ -451,6 +452,38 @@ class AssistantEmailNotificationsTest extends TestCase
                 && $mail->daysRemaining === 0
                 && str_contains($mail->render(), 'Sofia Martins (AO-903)')
                 && str_contains($mail->render(), '/assistants');
+        });
+    }
+
+    public function test_creating_assistant_sends_welcome_account_setup_email(): void
+    {
+        Mail::fake();
+
+        $payload = [
+            'school_id' => $this->school->id,
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'email' => 'maria.santos.welcome@teste.pt',
+            'internal_number' => 'AO-WELCOME-1',
+            'weekly_hours' => 35,
+            'daily_hours' => 7,
+        ];
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', $this->school->id)
+            ->postJson('/api/assistants', $payload);
+
+        $response->assertStatus(201);
+
+        Mail::assertSent(SetupAccountMail::class, function (SetupAccountMail $mail) {
+            $rendered = $mail->render();
+            return $mail->hasTo('maria.santos.welcome@teste.pt')
+                && $mail->hasSubject('Bem-vindo(a) ao SGDE - Ative a sua conta')
+                && str_contains($rendered, 'Bem-vindo(a) ao SGDE!')
+                && str_contains($rendered, 'Maria Santos')
+                && str_contains($rendered, 'EB1 Quinta das Flores')
+                && str_contains($rendered, 'AO-WELCOME-1')
+                && str_contains($rendered, 'setup-password');
         });
     }
 }
