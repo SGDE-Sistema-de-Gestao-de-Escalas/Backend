@@ -93,6 +93,24 @@ class AbsenceFeatureTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_absence_creation_requires_valid_until(): void
+    {
+        $payload = [
+            'assistant_id' => $this->assistant->id,
+            'absence_type_id' => $this->absenceType->id,
+            'valid_from' => '2026-10-15',
+            // valid_until is omitted
+            'status' => 'pending',
+        ];
+
+        $response = $this->actingAs($this->admin)
+            ->withHeader('X-School-ID', (string) $this->school->id)
+            ->postJson('/api/absences', $payload);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['valid_until']);
+    }
+
     public function test_admin_can_create_absence_without_document(): void
     {
         $payload = [
