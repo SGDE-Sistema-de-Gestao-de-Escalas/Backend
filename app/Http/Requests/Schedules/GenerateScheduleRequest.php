@@ -62,6 +62,10 @@ class GenerateScheduleRequest extends FormRequest
                 }
             }
 
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
             $transfers = $this->input('transfers');
             if (! empty($transfers) && is_array($transfers)) {
                 $assistants = Assistant::whereIn(

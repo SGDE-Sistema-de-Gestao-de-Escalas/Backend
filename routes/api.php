@@ -37,11 +37,15 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::post('/password/forgot', [AuthController::class, 'requestPasswordReset'])
     ->middleware('throttle:password-forgot')
     ->name('password.email');
+Route::post('/forgot-password', [AuthController::class, 'requestPasswordReset'])
+    ->middleware('throttle:password-forgot');
 
 // Repor Password (utilizado após receber o email)
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:password-reset')
     ->name('password.update');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:password-reset');
 
 // Rotas OAuth
 Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthController::class, 'redirect'])
@@ -84,6 +88,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('users', UserController::class)->withTrashed(['show', 'destroy', 'update']);
 
     // Feriados globais: permissões via HolidayPolicy e FormRequests.
+    Route::get('/holidays/municipalities', [HolidayController::class, 'municipalities'])
+        ->name('holidays.municipalities');
+    Route::get('/holidays/preview', [HolidayController::class, 'preview'])
+        ->name('holidays.preview');
+    Route::post('/holidays/import', [HolidayController::class, 'import'])
+        ->name('holidays.import');
     Route::apiResource('holidays', HolidayController::class);
 
     // Restringe as restantes operações de gestão aos administradores.
@@ -175,9 +185,6 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
         Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
-        Route::post('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'store']);
-        Route::put('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
-        Route::patch('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'update']);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
             ->middleware('throttle:heavy')
             ->name('schedules.generate');
@@ -188,6 +195,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
         Route::get('/schedules/pending-recalculations', [ScheduleController::class, 'pendingRecalculations'])
             ->name('schedules.pending-recalculations');
         Route::get('/schedules/export', [ScheduleController::class, 'export'])
+            ->middleware('throttle:heavy')
             ->can('export', Schedule::class)
             ->name('schedules.export');
     });

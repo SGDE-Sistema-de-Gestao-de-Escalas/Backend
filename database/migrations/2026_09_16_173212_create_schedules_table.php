@@ -23,6 +23,10 @@ return new class extends Migration
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['school_id', 'week_start', 'week_end'], 'schedules_school_weeks_index');
+            $table->index(['assistant_id', 'week_start', 'week_end'], 'schedules_asst_weeks_index');
+            $table->index(['school_id', 'assistant_id', 'week_start'], 'schedules_school_asst_week_index');
         });
     }
 

@@ -14,14 +14,10 @@ return new class extends Migration
         Schema::create('school_operating_rules', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignuuid('school_id')->constrained('schools');
-            $table->time('opening_time');
-            $table->time('closing_time');
-            $table->time('lunch_start');
-            $table->time('lunch_end');
-            $table->unsignedSmallInteger('lunch_duration_minutes');
             $table->date('valid_from');
-            $table->date('valid_untill')->nullable();
             $table->timestamps();
+
+            $table->unique(['school_id', 'valid_from'], 'operating_rules_school_valid_from_unique');
         });
     }
 

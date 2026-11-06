@@ -8,6 +8,7 @@ use App\Http\Requests\Assistants\UpdateAssistantExceptionRequest;
 use App\Http\Resources\Assistants\AssistantExceptionResource;
 use App\Models\Assistants\AssistantException;
 use App\Services\AssistantExceptionService;
+use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Gate;
 class AssistantExceptionController extends Controller
 {
     public function __construct(
-        private readonly AssistantExceptionService $exceptionService
+        private readonly AssistantExceptionService $exceptionService,
+        private readonly ScheduleIntegrityService $scheduleIntegrityService,
     ) {}
 
     /**
@@ -65,8 +67,31 @@ class AssistantExceptionController extends Controller
         Gate::authorize('create', AssistantException::class);
 
         $exception = $this->exceptionService->create($request->validated());
+        $exception->loadMissing('assistant');
+
+        $schoolId = $exception->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID');
+
+        $impact = null;
+        if ($schoolId && $exception->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $exception->valid_from->format('Y-m-d'),
+                endDate: $exception->valid_until?->format('Y-m-d'),
+                eventType: 'exception',
+                assistantId: (string) $exception->assistant_id,
+            );
+        }
+
+        $futureCheck = $this->exceptionService->checkFutureSchedulesWarning($exception);
 
         return (new AssistantExceptionResource($exception))
+            ->additional([
+                'message' => 'Exceção criada com sucesso.',
+                'warning' => $futureCheck['warning'],
+                'impact' => $impact,
+            ])
             ->response()
             ->setStatusCode(201);
     }
@@ -89,21 +114,69 @@ class AssistantExceptionController extends Controller
         Gate::authorize('update', $assistantException);
 
         $updated = $this->exceptionService->update($assistantException, $request->validated());
+        $updated->loadMissing('assistant');
 
-        return new AssistantExceptionResource($updated);
+        $schoolId = $updated->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID');
+
+        $impact = null;
+        if ($schoolId && $updated->valid_from) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $updated->valid_from->format('Y-m-d'),
+                endDate: $updated->valid_until?->format('Y-m-d'),
+                eventType: 'exception',
+                assistantId: (string) $updated->assistant_id,
+            );
+        }
+
+        $futureCheck = $this->exceptionService->checkFutureSchedulesWarning($updated);
+
+        return (new AssistantExceptionResource($updated))
+            ->additional([
+                'message' => 'Exceção atualizada com sucesso.',
+                'warning' => $futureCheck['warning'],
+                'impact' => $impact,
+            ]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(AssistantException $assistantException): JsonResponse
+    public function destroy(Request $request, AssistantException $assistantException): JsonResponse
     {
         Gate::authorize('delete', $assistantException);
 
+        $assistantException->loadMissing('assistant');
+        $schoolId = $assistantException->assistant?->school_id
+            ?? $request->attributes->get('school_id')
+            ?? $request->header('X-School-ID');
+
+        $validFromStr = $assistantException->valid_from?->format('Y-m-d');
+        $validUntilStr = $assistantException->valid_until?->format('Y-m-d');
+        $assistantId = (string) $assistantException->assistant_id;
+        $futureCheck = $this->exceptionService->checkFutureSchedulesWarning($assistantException);
+
         $this->exceptionService->delete($assistantException);
 
+        $impact = null;
+        if ($schoolId && $validFromStr) {
+            $impact = $this->scheduleIntegrityService->checkImpact(
+                schoolId: (string) $schoolId,
+                startDate: $validFromStr,
+                endDate: $validUntilStr,
+                eventType: 'exception',
+                assistantId: $assistantId,
+            );
+        }
+
         return response()->json([
-            'message' => 'Exceção eliminada com sucesso.',
+            'message' => $futureCheck['warning']
+                ? 'Exceção eliminada com sucesso. ' . $futureCheck['warning']
+                : 'Exceção eliminada com sucesso.',
+            'warning' => $futureCheck['warning'],
+            'impact' => $impact,
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schools;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class UpdateSchoolRequest extends FormRequest
         $school = $this->route('school');
 
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
             'acronym' => ['sometimes', 'nullable', 'string', 'max:20', Rule::unique('schools', 'acronym')->ignore($school)],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],

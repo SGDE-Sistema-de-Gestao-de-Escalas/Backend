@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\System\ActivityType;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +27,85 @@ class ScheduleRuleService
 
             return $rule->load('assistants.user');
         });
+    }
+
+    public function delete(ScheduleRule $rule, bool $confirmed = false): array
+    {
+        return DB::transaction(function () use ($rule, $confirmed) {
+            $rule = ScheduleRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
+            $today = CarbonImmutable::today()->toDateString();
+            $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)->whereHas('schedule');
+
+            if ((clone $entries)->where('date', '<', $today)->exists()) {
+                throw ValidationException::withMessages([
+                    'schedule_rule' => 'Não é possível eliminar uma regra que já foi usada em horários passados. Defina a data de fim da regra.',
+                ]);
+            }
+
+            $upcoming = (clone $entries)->where('date', '>=', $today)->get(['schedule_id', 'date']);
+            $schedules = $upcoming->isEmpty() ? null : $this->schedulesOfAffectedDays($rule->school_id, $upcoming);
+            $impact = $schedules === null ? null : $this->deletionImpact($upcoming, $schedules);
+
+            if ($impact !== null && ! $confirmed) {
+                return ['deleted' => false, 'impact' => $impact];
+            }
+
+            if ($impact !== null) {
+                Schedule::whereIn('id', $schedules->pluck('id'))
+                    ->where('status', 'published')
+                    ->update(['status' => 'draft', 'published_at' => null]);
+            }
+
+            $rule->delete();
+
+            return ['deleted' => true, 'impact' => $impact];
+        });
+    }
+
+    private function schedulesOfAffectedDays(string $schoolId, Collection $upcoming): Collection
+    {
+        $dates = $this->affectedDates($upcoming);
+        $usingIds = $upcoming->pluck('schedule_id')->unique()->all();
+
+        return Schedule::query()
+            ->where('school_id', $schoolId)
+            ->where(function ($query) use ($dates, $usingIds) {
+                $query->whereIn('id', $usingIds);
+                foreach ($dates as $date) {
+                    $query->orWhere(fn ($week) => $week->where('week_start', '<=', $date)->where('week_end', '>=', $date));
+                }
+            })
+            ->get(['id', 'status']);
+    }
+
+    private function affectedDates(Collection $upcoming): array
+    {
+        return $upcoming->map(fn ($entry) => substr((string) $entry->date, 0, 10))->unique()->sort()->values()->all();
+    }
+
+    private function deletionImpact(Collection $upcoming, Collection $schedules): array
+    {
+        $dates = $this->affectedDates($upcoming);
+        $days = $upcoming
+            ->groupBy(fn ($entry) => substr((string) $entry->date, 0, 10))
+            ->map(fn (Collection $entries, string $date) => [
+                'date' => $date,
+                'assistants' => $entries->pluck('schedule_id')->unique()->count(),
+                'entries' => $entries->count(),
+            ])
+            ->sortKeys()
+            ->values()
+            ->all();
+
+        return [
+            'has_impact' => true,
+            'requires_recalculation' => true,
+            'affected_dates' => $dates,
+            'affected_days' => $days,
+            'affected_schedules' => $schedules->count(),
+            'drafted_schedules' => $schedules->where('status', 'published')->count(),
+            'message' => 'A eliminação desta regra afeta a escala gerada em '.count($dates).' dia(s). Todos os horários da escola nessas semanas passam a rascunho e é necessário recalcular o horário.',
+        ];
     }
 
     public function update(ScheduleRule $rule, array $data): ScheduleRule

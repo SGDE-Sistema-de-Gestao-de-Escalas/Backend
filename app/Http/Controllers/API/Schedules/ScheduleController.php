@@ -207,78 +207,83 @@ class ScheduleController extends Controller
         ]);
 
         $now = now();
-        $savedDaysCount = 0;
 
-        foreach ($validated['days'] as $dayData) {
-            $date = $dayData['date'];
-            $carbonDate = CarbonImmutable::parse($date);
-            $weekStart = $carbonDate->startOfWeek()->toDateString();
-            $weekEnd = $carbonDate->endOfWeek()->toDateString();
+        $savedDaysCount = DB::transaction(function () use ($validated, $schoolId, $now) {
+            $savedDaysCount = 0;
 
-            // Agrupar entradas por assistente
-            $entriesByAssistant = [];
-            foreach ($dayData['entries'] as $entry) {
-                $aid = (string) $entry['assistant_id'];
-                $entriesByAssistant[$aid][] = $entry;
-            }
+            foreach ($validated['days'] as $dayData) {
+                $date = $dayData['date'];
+                $carbonDate = CarbonImmutable::parse($date);
+                $weekStart = $carbonDate->startOfWeek()->toDateString();
+                $weekEnd = $carbonDate->endOfWeek()->toDateString();
 
-            // Identificar todos os assistentes relevantes
-            $existingScheduleIds = Schedule::query()
-                ->where('school_id', $schoolId)
-                ->where('week_start', $weekStart)
-                ->pluck('id', 'assistant_id')
-                ->all();
-
-            $allAssistantIds = array_unique(array_merge(
-                array_keys($entriesByAssistant),
-                array_keys($existingScheduleIds)
-            ));
-
-            foreach ($allAssistantIds as $assistantId) {
-                $schedule = Schedule::firstOrCreate(
-                    [
-                        'school_id' => $schoolId,
-                        'assistant_id' => $assistantId,
-                        'week_start' => $weekStart,
-                        'week_end' => $weekEnd,
-                    ],
-                    [
-                        'status' => 'draft',
-                        'generated_at' => $now,
-                    ]
-                );
-
-                // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
-                if ($schedule->status !== 'draft') {
-                    $schedule->status = 'draft';
-                    $schedule->published_at = null;
-                    $schedule->save();
+                // Agrupar entradas por assistente
+                $entriesByAssistant = [];
+                foreach ($dayData['entries'] as $entry) {
+                    $aid = (string) $entry['assistant_id'];
+                    $entriesByAssistant[$aid][] = $entry;
                 }
 
-                // Remover entradas antigas desta data para este assistente
-                ScheduleEntry::where('schedule_id', $schedule->id)
-                    ->where('date', $date)
-                    ->delete();
+                // Identificar todos os assistentes relevantes
+                $existingScheduleIds = Schedule::query()
+                    ->where('school_id', $schoolId)
+                    ->where('week_start', $weekStart)
+                    ->pluck('id', 'assistant_id')
+                    ->all();
 
-                // Inserir as novas entradas
-                if (! empty($entriesByAssistant[$assistantId])) {
-                    foreach ($entriesByAssistant[$assistantId] as $entry) {
-                        ScheduleEntry::create([
-                            'schedule_id' => $schedule->id,
-                            'activity_type_id' => $entry['activity_type_id'] ?? null,
-                            'activity_name' => $entry['activity_name'] ?? 'Atividade',
-                            'schedule_rule_id' => $entry['schedule_rule_id'] ?? null,
-                            'date' => $date,
-                            'start_time' => substr($entry['start_time'], 0, 5),
-                            'end_time' => substr($entry['end_time'], 0, 5),
-                            'is_locked' => (bool) ($entry['is_locked'] ?? false),
-                        ]);
+                $allAssistantIds = array_unique(array_merge(
+                    array_keys($entriesByAssistant),
+                    array_keys($existingScheduleIds)
+                ));
+
+                foreach ($allAssistantIds as $assistantId) {
+                    $schedule = Schedule::firstOrCreate(
+                        [
+                            'school_id' => $schoolId,
+                            'assistant_id' => $assistantId,
+                            'week_start' => $weekStart,
+                            'week_end' => $weekEnd,
+                        ],
+                        [
+                            'status' => 'draft',
+                            'generated_at' => $now,
+                        ]
+                    );
+
+                    // Se o horário estava publicado e foram guardadas alterações manuais, reverter para rascunho
+                    if ($schedule->status !== 'draft') {
+                        $schedule->status = 'draft';
+                        $schedule->published_at = null;
+                        $schedule->save();
+                    }
+
+                    // Remover entradas antigas desta data para este assistente
+                    ScheduleEntry::where('schedule_id', $schedule->id)
+                        ->where('date', $date)
+                        ->delete();
+
+                    // Inserir as novas entradas
+                    if (! empty($entriesByAssistant[$assistantId])) {
+                        foreach ($entriesByAssistant[$assistantId] as $entry) {
+                            ScheduleEntry::create([
+                                'schedule_id' => $schedule->id,
+                                'activity_type_id' => $entry['activity_type_id'] ?? null,
+                                'activity_name' => $entry['activity_name'] ?? 'Atividade',
+                                'schedule_rule_id' => $entry['schedule_rule_id'] ?? null,
+                                'date' => $date,
+                                'start_time' => substr($entry['start_time'], 0, 5),
+                                'end_time' => substr($entry['end_time'], 0, 5),
+                                'is_locked' => (bool) ($entry['is_locked'] ?? false),
+                            ]);
+                        }
                     }
                 }
+
+                $savedDaysCount++;
             }
 
-            $savedDaysCount++;
-        }
+            return $savedDaysCount;
+        });
 
         return response()->json([
             'message' => 'Escalas guardadas com sucesso na base de dados.',
@@ -353,7 +358,7 @@ class ScheduleController extends Controller
             'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'format' => ['sometimes', 'string', 'in:pdf,csv'],
             'model' => ['sometimes', 'string', 'in:wall,individual,monthly'],
-            'assistant_id' => ['nullable', 'string'],
+            'assistant_id' => ['nullable', 'string', 'max:64'],
         ]);
 
         $startDate = $validated['start_date'];
@@ -388,6 +393,21 @@ class ScheduleController extends Controller
         if ($user && ! $user->isAdmin() && $user->assistant) {
             if ($model === 'individual' || $model === 'monthly') {
                 $assistantId = (string) $user->assistant->id;
+            }
+        }
+
+        // O PDF individual e o mensal de uma escola grande gasta demasiada memória e tempo (F-40)
+        $wholeSchool = $assistantId === null || $assistantId === '' || $assistantId === 'all';
+        if ($format === 'pdf' && $wholeSchool && in_array($model, ['individual', 'monthly'], true)) {
+            $maxAssistants = (int) config('rate_limits.export_pdf_max_assistants');
+
+            if (Assistant::where('school_id', $schoolId)->count() > $maxAssistants) {
+                return response()->json([
+                    'message' => "O PDF só pode abranger até {$maxAssistants} assistentes de cada vez. Escolha um assistente.",
+                    'errors' => [
+                        'assistant_id' => ["Escolha um assistente: o PDF só pode abranger até {$maxAssistants} assistentes de cada vez."],
+                    ],
+                ], 422);
             }
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
+use App\Rules\NoHtmlCharacters;
 use App\Models\Schedules\Holiday;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,7 +25,7 @@ class StoreHolidayRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
             'date' => ['required', 'date_format:Y-m-d', 'unique:holidays,date'],
             'description' => ['nullable', 'string'],
         ];

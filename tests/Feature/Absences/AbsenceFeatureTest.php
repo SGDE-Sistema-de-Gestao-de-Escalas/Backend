@@ -357,6 +357,8 @@ class AbsenceFeatureTest extends TestCase
 
         // Também ao criar como pending sem documento
         $payload['status'] = 'pending';
+        $payload['valid_from'] = '2026-10-21';
+        $payload['valid_until'] = '2026-10-21';
         $responsePending = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', (string) $this->school->id)
             ->postJson('/api/absences', $payload);

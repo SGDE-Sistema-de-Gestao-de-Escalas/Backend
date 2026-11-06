@@ -16,8 +16,12 @@ return new class extends Migration
             $table->time('period_end');
             $table->unsignedInteger('min');
             $table->string('type');
-            $table->date('start');
+            $table->date('valid_from');
+            $table->date('valid_until')->nullable();
+            $table->json('days_of_week')->nullable();
             $table->timestamps();
+
+            $table->index(['school_id', 'valid_from', 'valid_until'], 'sched_rules_school_period_index');
         });
     }
 
@@ -26,3 +30,4 @@ return new class extends Migration
         Schema::dropIfExists('schedule_rules');
     }
 };
+

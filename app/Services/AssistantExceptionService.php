@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
+use App\Models\Schedules\ScheduleEntry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -13,6 +14,99 @@ class AssistantExceptionService
     public function __construct(
         private readonly OperatingHoursResolver $operatingHoursResolver
     ) {}
+
+    /**
+     * Verifica se a exceção já regeu algum horário em datas passadas (< hoje).
+     */
+    public function hasPastSchedules(AssistantException $exception): bool
+    {
+        $todayStr = Carbon::today()->toDateString();
+        $validFromStr = $exception->valid_from ? Carbon::parse($exception->valid_from)->toDateString() : null;
+
+        if (! $validFromStr || $validFromStr >= $todayStr) {
+            return false;
+        }
+
+        $yesterdayStr = Carbon::yesterday()->toDateString();
+        $validUntilStr = $exception->valid_until ? Carbon::parse($exception->valid_until)->toDateString() : $yesterdayStr;
+        $pastEndStr = min($validUntilStr, $yesterdayStr);
+
+        return ScheduleEntry::query()
+            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $exception->assistant_id)->whereNull('deleted_at'))
+            ->whereDate('date', '>=', $validFromStr)
+            ->whereDate('date', '<=', $pastEndStr)
+            ->exists();
+    }
+
+    /**
+     * Verifica se existem escalas futuras (>= hoje, em draft ou published) no período da exceção.
+     *
+     * @return array{has_future_schedules: bool, draft_days_count: int, published_days_count: int, warning: string|null}
+     */
+    public function checkFutureSchedulesWarning(AssistantException $exception): array
+    {
+        $todayStr = Carbon::today()->toDateString();
+        $validFromStr = $exception->valid_from ? Carbon::parse($exception->valid_from)->toDateString() : $todayStr;
+        $validUntilStr = $exception->valid_until ? Carbon::parse($exception->valid_until)->toDateString() : Carbon::today()->addDays(60)->toDateString();
+
+        if ($validUntilStr < $todayStr) {
+            return [
+                'has_future_schedules' => false,
+                'draft_days_count' => 0,
+                'published_days_count' => 0,
+                'warning' => null,
+            ];
+        }
+
+        $fromStr = max($validFromStr, $todayStr);
+
+        $entries = ScheduleEntry::query()
+            ->with('schedule:id,status,assistant_id')
+            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $exception->assistant_id)->whereNull('deleted_at'))
+            ->whereDate('date', '>=', $fromStr)
+            ->whereDate('date', '<=', $validUntilStr)
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return [
+                'has_future_schedules' => false,
+                'draft_days_count' => 0,
+                'published_days_count' => 0,
+                'warning' => null,
+            ];
+        }
+
+        $draftDates = [];
+        $publishedDates = [];
+
+        foreach ($entries as $entry) {
+            $dateKey = is_string($entry->date) ? substr($entry->date, 0, 10) : $entry->date->format('Y-m-d');
+            if ($entry->schedule?->status === 'published') {
+                $publishedDates[$dateKey] = true;
+            } else {
+                $draftDates[$dateKey] = true;
+            }
+        }
+
+        $draftCount = count($draftDates);
+        $publishedCount = count($publishedDates);
+
+        $warning = null;
+        if ($draftCount > 0 && $publishedCount > 0) {
+            $warning = "Atenção: existem escalas em rascunho ({$draftCount} dia(s)) e publicadas ({$publishedCount} dia(s)) neste período. Deverá recalcular a escala para aplicar a alteração.";
+        } elseif ($publishedCount > 0) {
+            $warning = "Atenção: existem escalas já publicadas ({$publishedCount} dia(s)) neste período. Deverá recalcular e republicar a escala.";
+        } elseif ($draftCount > 0) {
+            $warning = "Atenção: existem escalas em rascunho ({$draftCount} dia(s)) neste período que deverão ser recalculadas.";
+        }
+
+        return [
+            'has_future_schedules' => true,
+            'draft_days_count' => $draftCount,
+            'published_days_count' => $publishedCount,
+            'warning' => $warning,
+        ];
+    }
 
     /**
      * Cria uma nova exceção de assistente após validar contra o calendário da escola.
@@ -28,69 +122,25 @@ class AssistantExceptionService
     }
 
     /**
-     * Atualiza uma exceção de assistente com regras de ciclo de vida e integridade histórica.
+     * Atualiza uma exceção de assistente permitindo edição se ainda não terminou no passado.
      */
     public function update(AssistantException $exception, array $data): AssistantException
     {
         $status = $this->calculateStatus($exception);
 
-        // 1. Passada: não pode ser editada de todo
+        // Passada (valid_until < hoje): não pode ser editada de todo
         if ($status === 'superseded') {
             throw ValidationException::withMessages([
                 'valid_until' => 'Não é possível editar uma exceção cuja vigência já terminou no passado.',
             ]);
         }
 
-        // 2. Em vigor: não pode alterar dados base/início retroativamente; apenas ajustar término
-        if ($status === 'current') {
-            $immutableFields = ['type', 'valid_from', 'start_time', 'end_time', 'assistant_id', 'days', 'lunch_enabled', 'lunch_start', 'lunch_end', 'lunch_duration_minutes'];
-            foreach ($immutableFields as $field) {
-                if (isset($data[$field])) {
-                    if ($field === 'days') {
-                        $existingDays = $exception->days ? array_values(array_map('intval', $exception->days)) : [];
-                        $incomingDays = is_array($data['days']) ? array_values(array_map('intval', $data['days'])) : [];
-                        sort($existingDays);
-                        sort($incomingDays);
-                        if ($existingDays !== $incomingDays) {
-                            throw ValidationException::withMessages([
-                                'days' => 'Não é possível alterar os dias de uma exceção em vigor; apenas a data de fim pode ser ajustada.',
-                            ]);
-                        }
-                        continue;
-                    }
-
-                    $existingValue = $exception->{$field};
-                    if ($existingValue instanceof Carbon) {
-                        $existingValue = $existingValue->format('Y-m-d');
-                    }
-                    $incomingValue = $data[$field];
-                    if ($incomingValue instanceof Carbon) {
-                        $incomingValue = $incomingValue->format('Y-m-d');
-                    }
-                    if ((string) $incomingValue !== (string) $existingValue) {
-                        throw ValidationException::withMessages([
-                            $field => 'Não é possível alterar os dados base ou data de início de uma exceção em vigor; apenas a data de fim pode ser ajustada.',
-                        ]);
-                    }
-                }
-            }
-
-            if (array_key_exists('valid_until', $data) && $data['valid_until'] !== null) {
-                $newUntil = Carbon::parse($data['valid_until'])->startOfDay();
-                if ($newUntil->isBefore(Carbon::today())) {
-                    throw ValidationException::withMessages([
-                        'valid_until' => 'A data de fim não pode ser anterior à data de hoje.',
-                    ]);
-                }
-            }
-        }
-
         $assistant = $exception->assistant ?? Assistant::findOrFail($exception->assistant_id);
         $mergedData = [
             'valid_from' => $data['valid_from'] ?? $exception->valid_from?->format('Y-m-d'),
             'valid_until' => array_key_exists('valid_until', $data) ? $data['valid_until'] : $exception->valid_until?->format('Y-m-d'),
-            'start_time' => $data['start_time'] ?? ($exception->start_time ? Carbon::parse($exception->start_time)->format('H:i') : null),
-            'end_time' => $data['end_time'] ?? ($exception->end_time ? Carbon::parse($exception->end_time)->format('H:i') : null),
+            'start_time' => array_key_exists('start_time', $data) ? $data['start_time'] : ($exception->start_time ? Carbon::parse($exception->start_time)->format('H:i') : null),
+            'end_time' => array_key_exists('end_time', $data) ? $data['end_time'] : ($exception->end_time ? Carbon::parse($exception->end_time)->format('H:i') : null),
             'days' => array_key_exists('days', $data) ? $data['days'] : $exception->days,
             'lunch_enabled' => array_key_exists('lunch_enabled', $data) ? $data['lunch_enabled'] : $exception->lunch_enabled,
             'lunch_start' => array_key_exists('lunch_start', $data) ? $data['lunch_start'] : ($exception->lunch_start ? Carbon::parse($exception->lunch_start)->format('H:i') : null),
@@ -108,15 +158,23 @@ class AssistantExceptionService
     }
 
     /**
-     * Elimina uma exceção se for futura. Exceções em vigor ou passadas não podem ser eliminadas.
+     * Elimina uma exceção.
+     * Só bloqueia a eliminação se a exceção já terminou no passado ou se já tiver regido horários passados (< hoje).
+     * Caso tenha horários futuros (draft ou published), permite eliminar e o Controller devolve o aviso de recálculo.
      */
     public function delete(AssistantException $exception): void
     {
         $status = $this->calculateStatus($exception);
 
-        if ($status !== 'upcoming') {
+        if ($status === 'superseded') {
             throw ValidationException::withMessages([
-                'exception' => 'Não é possível eliminar uma exceção em vigor ou que já regeu escalas passadas.',
+                'exception' => 'Não é possível eliminar uma exceção cuja vigência já terminou no passado.',
+            ]);
+        }
+
+        if ($this->hasPastSchedules($exception)) {
+            throw ValidationException::withMessages([
+                'exception' => 'Não é possível eliminar esta exceção porque já existem escalas passadas geradas sob a sua vigência. Edite a data de fim ou crie uma nova exceção para a dar como terminada.',
             ]);
         }
 

@@ -15,6 +15,7 @@ class AssistantScheduleProfileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $service = app(\App\Services\AssistantScheduleProfileService::class);
         $today = Carbon::today();
         $validFrom = $this->valid_from ? Carbon::parse($this->valid_from)->startOfDay() : null;
         $validUntil = $this->valid_until ? Carbon::parse($this->valid_until)->startOfDay() : null;
@@ -35,11 +36,17 @@ class AssistantScheduleProfileResource extends JsonResource
             $cannotDeleteReason = 'Não é possível eliminar um horário passado que já regeu escalas passadas.';
         } else {
             $status = 'current';
-            $canEdit = false;
-            $canChangeEndDate = false;
-            $canDelete = false;
-            $cannotEditReason = 'Não é possível editar um horário em vigor; o assistente tem de ter sempre um horário ativo.';
-            $cannotDeleteReason = 'Não é possível eliminar o horário em vigor; o assistente tem de ter sempre um horário ativo.';
+            $canEdit = $service->canEdit($this->resource);
+            $canChangeEndDate = $canEdit;
+            $canDelete = $service->canDelete($this->resource);
+            $cannotEditReason = $canEdit
+                ? null
+                : 'Não é possível editar um horário que já regeu escalas passadas.';
+            $cannotDeleteReason = $canDelete
+                ? null
+                : ($service->hasPreviousProfile($this->resource)
+                    ? 'Não é possível eliminar um horário que já regeu escalas passadas.'
+                    : 'Não é possível eliminar o único horário em vigor; o assistente tem de ter sempre um horário ativo.');
         }
 
         return [

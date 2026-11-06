@@ -9,12 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('schedule_rule_assistant', function (Blueprint $table) {
-            $table->foreignUuid('schedule_rule_id')->constrained('schedule_rules')->cascadeOnDelete();
-            $table->foreignUuid('assistant_id')->constrained('assistants')->cascadeOnDelete();
+            $table->foreignUuid('schedule_rule_id')->constrained('schedule_rules');
+            $table->foreignUuid('assistant_id')->constrained('assistants');
             $table->unsignedInteger('priority')->default(1);
 
             $table->primary(['schedule_rule_id', 'assistant_id']);
             $table->index(['schedule_rule_id', 'priority']);
+            $table->index('assistant_id');
         });
     }
 
@@ -23,3 +24,4 @@ return new class extends Migration
         Schema::dropIfExists('schedule_rule_assistant');
     }
 };
+

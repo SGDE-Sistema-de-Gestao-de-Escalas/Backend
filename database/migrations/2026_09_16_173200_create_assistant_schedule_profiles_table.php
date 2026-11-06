@@ -20,6 +20,8 @@ return new class extends Migration
             $table->date('valid_from');
             $table->date('valid_until')->nullable();
             $table->timestamps();
+
+            $table->index(['assistant_id', 'valid_from', 'valid_until'], 'asst_sched_profiles_period_index');
         });
     }
 

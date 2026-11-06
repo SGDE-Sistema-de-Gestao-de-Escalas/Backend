@@ -33,34 +33,42 @@ class AssistantService
      */
     public function create(array $data, ?UploadedFile $criminalRecordFile = null): Assistant
     {
-        $assistant = DB::transaction(function () use ($data, $criminalRecordFile) {
-            $staffRole = Role::where('slug', 'staff')->firstOrFail();
+        $storedPath = null;
 
-            $user = User::create([
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'email' => $data['email'],
-                'role_id' => $staffRole->id,
-                // Password inutilizável; o assistente define a sua pelo link do email.
-                'password' => Hash::make(Str::random(64)),
-            ]);
+        try {
+            $assistant = DB::transaction(function () use ($data, $criminalRecordFile, &$storedPath) {
+                $staffRole = Role::where('slug', 'staff')->firstOrFail();
 
-            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record']));
+                $user = User::create([
+                    'first_name' => $data['first_name'],
+                    'last_name' => $data['last_name'],
+                    'email' => $data['email'],
+                    'role_id' => $staffRole->id,
+                    // Password inutilizável; o assistente define a sua pelo link do email.
+                    'password' => Hash::make(Str::random(64)),
+                ]);
 
-            if ($criminalRecordFile) {
-                $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
-                $assistantData['criminal_record_path'] = $this->storeCriminalRecordFile(
-                    $criminalRecordFile,
-                    $data['first_name'],
-                    $data['last_name'],
-                    $data['internal_number']
-                );
-            }
+                $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record']));
 
-            $assistant = $user->assistant()->create($assistantData);
+                if ($criminalRecordFile) {
+                    $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
+                    $storedPath = $this->storeCriminalRecordFile(
+                        $criminalRecordFile,
+                        $data['first_name'],
+                        $data['last_name'],
+                        $data['internal_number']
+                    );
+                    $assistantData['criminal_record_path'] = $storedPath;
+                }
 
-            return $assistant;
-        });
+                $assistant = $user->assistant()->create($assistantData);
+
+                return $assistant;
+            });
+        } catch (Throwable $e) {
+            $this->deleteCriminalRecordFile($storedPath);
+            throw $e;
+        }
 
         $this->sendAccessEmail($assistant->user);
 
@@ -69,48 +77,62 @@ class AssistantService
 
     public function update(Assistant $assistant, array $data, ?UploadedFile $criminalRecordFile = null): Assistant
     {
-        return DB::transaction(function () use ($assistant, $data, $criminalRecordFile) {
-            $assistant->loadMissing('user');
-            $userData = Arr::only($data, self::USER_FIELDS);
+        $storedPath = null;
 
-            if ($userData !== []) {
-                $user = $assistant->user;
-                $user->fill($userData);
+        try {
+            return DB::transaction(function () use ($assistant, $data, $criminalRecordFile, &$storedPath) {
+                $assistant->loadMissing('user');
+                $userData = Arr::only($data, self::USER_FIELDS);
 
-                if ($user->isDirty('email')) {
-                    $user->email_verified_at = null;
+                if ($userData !== []) {
+                    $user = $assistant->user;
+                    $user->fill($userData);
+
+                    if ($user->isDirty('email')) {
+                        $user->email_verified_at = null;
+                    }
+
+                    $user->save();
                 }
 
-                $user->save();
-            }
+                $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['first_name', 'last_name', 'criminal_record', 'remove_criminal_record']));
 
-            $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['first_name', 'last_name', 'criminal_record', 'remove_criminal_record']));
+                $obsoletePath = null;
 
-            if (! empty($data['remove_criminal_record'])) {
-                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
-                $assistantData['criminal_record_name'] = null;
-                $assistantData['criminal_record_path'] = null;
-                $assistantData['criminal_record_expiry'] = null;
-            } elseif ($criminalRecordFile) {
-                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
+                if (! empty($data['remove_criminal_record'])) {
+                    $obsoletePath = $assistant->criminal_record_path;
+                    $assistantData['criminal_record_name'] = null;
+                    $assistantData['criminal_record_path'] = null;
+                    $assistantData['criminal_record_expiry'] = null;
+                } elseif ($criminalRecordFile) {
+                    $obsoletePath = $assistant->criminal_record_path;
 
-                $firstName = $data['first_name'] ?? $assistant->user?->first_name ?? 'assistente';
-                $lastName = $data['last_name'] ?? $assistant->user?->last_name ?? '';
-                $internalNumber = $data['internal_number'] ?? $assistant->internal_number ?? $assistant->id;
+                    $firstName = $data['first_name'] ?? $assistant->user?->first_name ?? 'assistente';
+                    $lastName = $data['last_name'] ?? $assistant->user?->last_name ?? '';
+                    $internalNumber = $data['internal_number'] ?? $assistant->internal_number ?? $assistant->id;
 
-                $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
-                $assistantData['criminal_record_path'] = $this->storeCriminalRecordFile(
-                    $criminalRecordFile,
-                    $firstName,
-                    $lastName,
-                    $internalNumber
-                );
-            }
+                    $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
+                    $storedPath = $this->storeCriminalRecordFile(
+                        $criminalRecordFile,
+                        $firstName,
+                        $lastName,
+                        $internalNumber
+                    );
+                    $assistantData['criminal_record_path'] = $storedPath;
+                }
 
-            $assistant->update($assistantData);
+                $assistant->update($assistantData);
 
-            return $assistant->refresh()->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
-        });
+                if ($obsoletePath !== null) {
+                    DB::afterCommit(fn () => $this->deleteCriminalRecordFile($obsoletePath));
+                }
+
+                return $assistant->refresh()->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
+            });
+        } catch (Throwable $e) {
+            $this->deleteCriminalRecordFile($storedPath);
+            throw $e;
+        }
     }
 
     /**
@@ -318,13 +340,14 @@ class AssistantService
     }
 
     /**
+     * Envia o email de boas-vindas e ativação de conta.
      * Uma falha no envio do email não deve anular a criação do assistente:
      * regista o erro e o admin pode reenviar pelo "esqueci-me da password".
      */
     private function sendAccessEmail(User $user): void
     {
         try {
-            $this->authService->sendPasswordResetLink($user->email);
+            $this->authService->sendAccountSetupLink($user);
         } catch (Throwable $e) {
             report($e);
         }

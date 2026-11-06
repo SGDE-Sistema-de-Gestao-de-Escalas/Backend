@@ -27,6 +27,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('lunch_duration_minutes')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['assistant_id', 'valid_from', 'valid_until'], 'asst_exceptions_period_index');
         });
     }
 

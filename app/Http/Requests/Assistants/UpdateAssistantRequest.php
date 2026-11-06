@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Assistants;
 
+use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -22,8 +23,8 @@ class UpdateAssistantRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         foreach (['nif', 'social_security_number'] as $field) {
-            if ($this->filled($field)) {
-                $this->merge([$field => str_replace(' ', '', (string) $this->input($field))]);
+            if ($this->filled($field) && is_string($this->input($field))) {
+                $this->merge([$field => str_replace(' ', '', $this->input($field))]);
             }
         }
     }
@@ -42,29 +43,29 @@ class UpdateAssistantRequest extends FormRequest
 
         return [
             // Conta (users)
-            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
-            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'first_name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255', new NoHtmlCharacters],
             'email' => [
                 'sometimes', 'required', 'email', 'max:255',
-                Rule::unique('users', 'email')->ignore($assistant->user_id)->whereNull('deleted_at'),
+                Rule::unique('users', 'email')->ignore($assistant->user_id),
             ],
 
             // Ficha do assistente (assistants)
             'internal_number' => [
                 'sometimes', 'required', 'string', 'max:50',
-                Rule::unique('assistants', 'internal_number')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'internal_number')->ignore($assistant),
             ],
             'phone' => [
                 'nullable', 'string', 'max:20',
-                Rule::unique('assistants', 'phone')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'phone')->ignore($assistant),
             ],
             'nif' => [
                 'nullable', 'digits:9',
-                Rule::unique('assistants', 'nif')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'nif')->ignore($assistant),
             ],
             'social_security_number' => [
                 'nullable', 'digits:11',
-                Rule::unique('assistants', 'social_security_number')->ignore($assistant)->whereNull('deleted_at'),
+                Rule::unique('assistants', 'social_security_number')->ignore($assistant),
             ],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'admission_date' => ['nullable', 'date'],

@@ -53,11 +53,9 @@ class UpdateAssistantScheduleProfileRequest extends FormRequest
                 return;
             }
 
-            $today = Carbon::today();
-            $validFrom = $profile->valid_from ? Carbon::parse($profile->valid_from)->startOfDay() : null;
-
-            if (! $validFrom || ! $validFrom->isAfter($today)) {
-                $validator->errors()->add('profile', 'Não é possível editar um horário em vigor ou que já regeu escalas passadas.');
+            $service = app(\App\Services\AssistantScheduleProfileService::class);
+            if (! $service->canEdit($profile)) {
+                $validator->errors()->add('profile', 'Não é possível editar um horário que já regeu escalas passadas.');
             }
         });
     }

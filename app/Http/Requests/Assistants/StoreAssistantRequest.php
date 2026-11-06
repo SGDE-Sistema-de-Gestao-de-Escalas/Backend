@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Assistants;
 
+use App\Rules\NoHtmlCharacters;
 use App\Models\Assistants\Assistant;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -26,9 +27,11 @@ class StoreAssistantRequest extends FormRequest
     {
         $this->merge(array_filter([
             'school_id' => $this->header('X-School-ID'),
-            'nif' => $this->filled('nif') ? str_replace(' ', '', (string) $this->input('nif')) : null,
-            'social_security_number' => $this->filled('social_security_number')
-                ? str_replace(' ', '', (string) $this->input('social_security_number'))
+            'nif' => is_string($this->input('nif')) && $this->filled('nif')
+                ? str_replace(' ', '', $this->input('nif'))
+                : null,
+            'social_security_number' => is_string($this->input('social_security_number')) && $this->filled('social_security_number')
+                ? str_replace(' ', '', $this->input('social_security_number'))
                 : null,
         ], fn ($value) => $value !== null));
     }
@@ -44,29 +47,29 @@ class StoreAssistantRequest extends FormRequest
             'school_id' => ['required', 'uuid', Rule::exists('schools', 'id')->where('active', true)],
 
             // Conta (users)
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
+            'last_name' => ['required', 'string', 'max:255', new NoHtmlCharacters],
             'email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('users', 'email')->whereNull('deleted_at'),
+                Rule::unique('users', 'email'),
             ],
 
             // Ficha do assistente (assistants)
             'internal_number' => [
                 'required', 'string', 'max:50',
-                Rule::unique('assistants', 'internal_number')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'internal_number'),
             ],
             'phone' => [
                 'nullable', 'string', 'max:20',
-                Rule::unique('assistants', 'phone')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'phone'),
             ],
             'nif' => [
                 'nullable', 'digits:9',
-                Rule::unique('assistants', 'nif')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'nif'),
             ],
             'social_security_number' => [
                 'nullable', 'digits:11',
-                Rule::unique('assistants', 'social_security_number')->whereNull('deleted_at'),
+                Rule::unique('assistants', 'social_security_number'),
             ],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'admission_date' => ['nullable', 'date'],

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Assistants;
 
+use App\Services\AssistantExceptionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,9 +16,13 @@ class AssistantExceptionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $service = app(AssistantExceptionService::class);
         $today = Carbon::today();
         $validFrom = $this->valid_from ? Carbon::parse($this->valid_from)->startOfDay() : null;
         $validUntil = $this->valid_until ? Carbon::parse($this->valid_until)->startOfDay() : null;
+
+        $hasPastSchedules = $service->hasPastSchedules($this->resource);
+        $futureCheck = $service->checkFutureSchedulesWarning($this->resource);
 
         if ($validFrom && $validFrom->isAfter($today)) {
             $status = 'upcoming';
@@ -35,11 +40,13 @@ class AssistantExceptionResource extends JsonResource
             $cannotDeleteReason = 'Não é possível eliminar uma exceção cuja vigência já terminou no passado.';
         } else {
             $status = 'current';
-            $canEdit = false;
+            $canEdit = true;
             $canChangeEndDate = true;
-            $canDelete = false;
-            $cannotEditReason = 'Não é possível alterar os dados base ou data de início de uma exceção em vigor; apenas a data de fim pode ser ajustada.';
-            $cannotDeleteReason = 'Não é possível eliminar uma exceção em vigor.';
+            $canDelete = ! $hasPastSchedules;
+            $cannotEditReason = null;
+            $cannotDeleteReason = $hasPastSchedules
+                ? 'Não é possível eliminar esta exceção porque já existem escalas passadas geradas sob a sua vigência. Defina uma data de fim para dar esta exceção como terminada.'
+                : null;
         }
 
         return [
@@ -62,6 +69,11 @@ class AssistantExceptionResource extends JsonResource
             'can_delete' => $canDelete,
             'cannot_edit_reason' => $cannotEditReason,
             'cannot_delete_reason' => $cannotDeleteReason,
+            'has_past_schedules' => $hasPastSchedules,
+            'has_future_schedules' => $futureCheck['has_future_schedules'],
+            'draft_days_count' => $futureCheck['draft_days_count'],
+            'published_days_count' => $futureCheck['published_days_count'],
+            'delete_warning' => $futureCheck['warning'],
             'assistant' => $this->whenLoaded('assistant'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

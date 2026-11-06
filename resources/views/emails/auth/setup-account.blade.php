@@ -1,16 +1,28 @@
 <x-mail::message>
-# Ativação de Conta
+# Bem-vindo(a) ao SGDE!
 
-A conta de **{{ $user->first_name }} {{ $user->last_name }}** com o perfil de **{{ $roleName }}** foi registada com sucesso no sistema pelo administrador.
+Olá **{{ $user->first_name }} {{ $user->last_name }}**,
 
-Para aceder à plataforma, é necessário confirmar a conta e definir uma palavra-passe definitiva através do botão abaixo:
+Damos-lhe as boas-vindas ao **SGDE (Sistema de Gestão de Escalas)**. A sua área pessoal já se encontra disponível para que possa consultar os seus horários de serviço, turnos atribuídos e submeter justificações de ausências.
+
+<x-mail::panel>
+@if ($schoolName)
+**Estabelecimento de Ensino:** {{ $schoolName }}<br>
+@endif
+@if ($internalNumber)
+**Número Mecanográfico:** {{ $internalNumber }}<br>
+@endif
+**Email de Acesso:** {{ $user->email }}
+</x-mail::panel>
+
+Para concluir a ativação da sua conta e fazer o seu primeiro acesso, crie a sua palavra-passe pessoal clicando no botão abaixo:
 
 <x-mail::button :url="$setupUrl" color="primary">
-Confirmar e Ativar Conta
+Criar a Minha Palavra-passe
 </x-mail::button>
 
 <div class="link-fallback-label">
-Hiperligação direta para ativação da conta:
+Se o botão não funcionar, copie e cole a seguinte ligação no seu navegador:
 </div>
 
 <div class="link-fallback-box">
@@ -18,6 +30,6 @@ Hiperligação direta para ativação da conta:
 </div>
 
 <p class="help-note">
-Esta ligação é válida por 60 minutos por motivos de segurança. Caso expire, solicite um novo envio junto da administração escolar.
+Por motivos de segurança, esta ligação é válida durante 60 minutos. Caso expire antes de concluir o acesso, poderá pedir um novo link em "Esqueci-me da palavra-passe" na página de login.
 </p>
 </x-mail::message>
