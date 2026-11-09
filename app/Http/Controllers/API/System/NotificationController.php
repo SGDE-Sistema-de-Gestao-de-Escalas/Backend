@@ -4,7 +4,7 @@ namespace App\Http\Controllers\API\System;
 
 use App\Enums\NotificationType;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\NotificationResource;
+use App\Http\Resources\System\NotificationResource;
 use App\Models\System\Notification;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;

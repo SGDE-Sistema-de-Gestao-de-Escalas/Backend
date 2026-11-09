@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\API\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\AbsenceResource;
-use App\Http\Resources\ActivityTypeResource;
-use App\Http\Resources\AssistantResource;
-use App\Http\Resources\HolidayResource;
-use App\Http\Resources\ScheduleRuleResource;
+use App\Http\Resources\Absences\AbsenceResource;
+use App\Http\Resources\System\ActivityTypeResource;
+use App\Http\Resources\Assistants\AssistantResource;
+use App\Http\Resources\Schedules\HolidayResource;
+use App\Http\Resources\Schedules\ScheduleRuleResource;
 use App\Http\Resources\Schedules\ScheduleResource;
-use App\Http\Resources\SchoolOperatingExceptionResource;
-use App\Http\Resources\SchoolOperatingRuleResource;
+use App\Http\Resources\Schools\SchoolOperatingExceptionResource;
+use App\Http\Resources\Schools\SchoolOperatingRuleResource;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;

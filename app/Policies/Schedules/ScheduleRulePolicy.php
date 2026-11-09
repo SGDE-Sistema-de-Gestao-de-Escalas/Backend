@@ -4,31 +4,14 @@ namespace App\Policies\Schedules;
 
 use App\Models\Auth\User;
 use App\Models\Schedules\ScheduleRule;
+use App\Policies\Concerns\HandlesSchoolScopedPolicy;
 
 class ScheduleRulePolicy
 {
-    public function viewAny(User $user): bool
-    {
-        return $user->isAdmin() || $user->isStaff();
-    }
-
-    public function create(User $user): bool
-    {
-        return $user->isAdmin();
-    }
+    use HandlesSchoolScopedPolicy;
 
     public function view(User $user, ScheduleRule $rule): bool
     {
         return $user->isAdmin() || $user->isStaff();
-    }
-
-    public function update(User $user, ScheduleRule $rule): bool
-    {
-        return $user->isAdmin();
-    }
-
-    public function delete(User $user, ScheduleRule $rule): bool
-    {
-        return $user->isAdmin();
     }
 }

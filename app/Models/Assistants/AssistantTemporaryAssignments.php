@@ -4,13 +4,11 @@ namespace App\Models\Assistants;
 
 use App\Models\Schools\School;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AssistantTemporaryAssignments extends Model
 {
-    /** @use HasFactory<\Database\Factories\AssistantTemporaryAssignmentsFactory> */
-    use HasFactory, HasUuids;
+    use HasUuids;
 
     protected $fillable = [
         'assistant_id',
@@ -21,8 +19,6 @@ class AssistantTemporaryAssignments extends Model
         'valid_from',
         'valid_until',
         'notes',
-        'start_date',
-        'end_date',
         'start_time',
         'end_time',
     ];

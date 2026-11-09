@@ -21,13 +21,7 @@ $adminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') .
 Analisar Pedido na Plataforma
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $adminUrl }}" target="_blank" rel="noopener">{{ $adminUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $adminUrl])
 
 <p class="help-note">
 Proceda à análise do pedido e posterior desativação ou anonimização da conta em conformidade com o Regulamento Geral sobre a Proteção de Dados (RGPD).

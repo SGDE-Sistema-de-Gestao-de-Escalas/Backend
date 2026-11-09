@@ -7,7 +7,7 @@ use App\Models\Auth\User;
 use App\Http\Requests\Assistants\StoreAssistantRequest;
 use App\Http\Requests\Assistants\UpdateAssistantRequest;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\AssistantResource;
+use App\Http\Resources\Assistants\AssistantResource;
 use App\Services\AssistantService;
 use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
@@ -194,21 +194,15 @@ class AssistantController extends Controller
     /**
      * Download or view the criminal record document.
      */
-    public function downloadCriminalRecord(Assistant $assistant): StreamedResponse
+    public function downloadCriminalRecord(Assistant $assistant, \App\Services\AssistantDocumentStorageService $documentStorage): StreamedResponse
     {
         Gate::authorize('view', $assistant);
 
-        if (! $assistant->criminal_record_path) {
-            abort(404, 'Registo criminal não encontrado.');
-        }
-
-        $disk = config('filesystems.documents_disk');
-
-        if (! Storage::disk($disk)->exists($assistant->criminal_record_path)) {
-            abort(404, 'Ficheiro do registo criminal não encontrado no servidor.');
-        }
-
-        return Storage::disk($disk)->response($assistant->criminal_record_path, null, ['X-Content-Type-Options' => 'nosniff']);
+        return $documentStorage->downloadResponse(
+            $assistant->criminal_record_path,
+            'Registo criminal não encontrado.',
+            'Ficheiro do registo criminal não encontrado no servidor.'
+        );
     }
 
 

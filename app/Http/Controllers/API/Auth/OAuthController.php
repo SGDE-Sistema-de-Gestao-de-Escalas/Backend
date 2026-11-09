@@ -37,7 +37,7 @@ class OAuthController extends Controller
             ->getTargetUrl();
 
         return response()->json(['url' => $url])
-            ->withCookie($this->makeCookie(self::STATE_COOKIE, $state, self::STATE_MINUTES, $request));
+            ->withCookie($this->authService->makeCookie(self::STATE_COOKIE, $state, self::STATE_MINUTES, $request));
     }
 
     public function externalLoginCallback(string $provider, Request $request)
@@ -55,8 +55,7 @@ class OAuthController extends Controller
 
             $token = $this->authService->handleOAuthCallback($provider, $socialUser, AuthService::REMEMBER_MINUTES);
 
-            $cookie = $this->makeCookie(
-                'access_token',
+            $cookie = $this->authService->makeAuthCookie(
                 $token,
                 AuthService::REMEMBER_MINUTES,
                 $request
@@ -94,20 +93,5 @@ class OAuthController extends Controller
         return redirect()
             ->away(config('app.frontend_url') . '/auth/callback?error=' . urlencode($message))
             ->withoutCookie(self::STATE_COOKIE);
-    }
-
-    private function makeCookie(string $name, string $value, int $minutes, Request $request): SymfonyCookie
-    {
-        return cookie(
-            name: $name,
-            value: $value,
-            minutes: $minutes,
-            path: '/',
-            domain: null,
-            secure: config('app.env') === 'production' || $request->isSecure(),
-            httpOnly: true,
-            raw: false,
-            sameSite: 'Lax'
-        );
     }
 }

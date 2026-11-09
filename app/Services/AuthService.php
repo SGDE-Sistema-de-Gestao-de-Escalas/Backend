@@ -98,26 +98,6 @@ class AuthService
         return $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
     }
 
-    public function createUserAndSendResetLink(array $data): User
-    {
-        $data['password'] = \Illuminate\Support\Str::random(16);
-        
-        $user = User::create([
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'email' => $data['email'],
-            'provider' => $data['provider'] ?? null,
-            'provider_id' => $data['provider_id'] ?? null,
-            'role_id' => $data['role_id'],
-            'password' => Hash::make($data['password']),
-        ]);
-
-        $token = Password::broker()->createToken($user);
-        $user->sendPasswordResetNotification($token);
-
-        return $user;
-    }
-
     public function resetPasswordWithToken(array $data): void
     {
         $status = Password::broker()->reset(
@@ -159,5 +139,25 @@ class AuthService
         $token = Password::broker()->createToken($user);
 
         Mail::to($user->email)->send(new SetupAccountMail($user, $token));
+    }
+
+    public function makeCookie(string $name, string $value, int $minutes, \Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\Cookie
+    {
+        return cookie(
+            name: $name,
+            value: $value,
+            minutes: $minutes,
+            path: '/',
+            domain: null,
+            secure: config('app.env') === 'production' || $request->isSecure(),
+            httpOnly: true,
+            raw: false,
+            sameSite: 'Lax'
+        );
+    }
+
+    public function makeAuthCookie(string $token, int $minutes, \Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\Cookie
+    {
+        return $this->makeCookie('access_token', $token, $minutes, $request);
     }
 }

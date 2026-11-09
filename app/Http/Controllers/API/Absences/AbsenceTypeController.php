@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\Absences;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Absences\StoreAbsenceTypeRequest;
 use App\Http\Requests\Absences\UpdateAbsenceTypeRequest;
-use App\Http\Resources\AbsenceTypeResource;
+use App\Http\Resources\Absences\AbsenceTypeResource;
 use App\Models\Absences\AbsenceType;
 use App\Services\AbsenceTypeService;
 use Illuminate\Http\JsonResponse;

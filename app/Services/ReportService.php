@@ -311,12 +311,12 @@ class ReportService
 
     private function minutes(?string $time): int
     {
-        return (int) substr((string) $time, 0, 2) * 60 + (int) substr((string) $time, 3, 2);
+        return \App\Support\TimeHelper::toMinutes($time);
     }
 
     private function time(int $minutes): string
     {
-        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+        return \App\Support\TimeHelper::toTimeString($minutes);
     }
 
     private function name(?Assistant $assistant): string

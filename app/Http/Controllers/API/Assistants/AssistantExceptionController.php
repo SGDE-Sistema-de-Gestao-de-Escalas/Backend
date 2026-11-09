@@ -28,7 +28,7 @@ class AssistantExceptionController extends Controller
     {
         Gate::authorize('viewAny', AssistantException::class);
 
-        $schoolId = $request->header('X-School-ID');
+        $schoolId = $this->resolveSchoolId($request);
         $assistantId = $request->query('assistant_id');
         $user = $request->user();
 

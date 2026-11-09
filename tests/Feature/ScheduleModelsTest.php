@@ -59,9 +59,9 @@ class ScheduleModelsTest extends TestCase
         $this->assertSame('2026-11-01', $profile->fresh()->toArray()['valid_from']);
         $this->assertSame('2027-06-30', $profile->fresh()->toArray()['valid_until']);
         $this->assertTrue($profile->assistant->is($this->assistant));
-        $this->assertTrue($profile->assistantScheduleShifts->first()->is($shift));
+        $this->assertTrue($profile->shifts->first()->is($shift));
         $this->assertTrue($shift->assistantScheduleProfile->is($profile));
-        $this->assertTrue($shift->assistantScheduleShiftDays->first()->is($day));
+        $this->assertTrue($shift->shiftDays->first()->is($day));
         $this->assertTrue($day->assistantScheduleShift->is($shift));
         $this->assertSame(1, $day->fresh()->day_of_week);
         $this->assertSame(60, $shift->fresh()->lunch_duration_minutes);

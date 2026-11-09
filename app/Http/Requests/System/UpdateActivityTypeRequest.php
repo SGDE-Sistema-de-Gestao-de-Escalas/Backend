@@ -4,10 +4,9 @@ namespace App\Http\Requests\System;
 
 use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateActivityTypeRequest extends FormRequest
+class UpdateActivityTypeRequest extends StoreActivityTypeRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -15,6 +14,11 @@ class UpdateActivityTypeRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user()?->can('update', $this->route('activity_type')) ?? false;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // A escola não é alterável na atualização.
     }
 
     /**
@@ -37,14 +41,6 @@ class UpdateActivityTypeRequest extends FormRequest
             ],
             'color' => ['sometimes', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'active' => ['sometimes', 'boolean'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'name.unique' => 'Esta escola já tem uma atividade com este nome.',
-            'color.regex' => 'A cor deve estar no formato #RRGGBB.',
         ];
     }
 

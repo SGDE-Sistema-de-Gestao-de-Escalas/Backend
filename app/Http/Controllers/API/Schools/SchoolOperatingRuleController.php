@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\Schools;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Schools\StoreSchoolOperatingRuleRequest;
 use App\Http\Requests\Schools\UpdateSchoolOperatingRuleRequest;
-use App\Http\Resources\SchoolOperatingRuleResource;
+use App\Http\Resources\Schools\SchoolOperatingRuleResource;
 use App\Models\Schools\SchoolOperatingRule;
 use App\Services\SchoolOperatingRuleService;
 use Illuminate\Http\JsonResponse;
@@ -81,7 +81,7 @@ class SchoolOperatingRuleController extends Controller
     {
         Gate::authorize('view', $operatingRule);
 
-        $this->ensureInSchoolContext($request, $operatingRule);
+        $this->ensureInSchoolContext($request, $operatingRule->school_id);
 
         return new SchoolOperatingRuleResource($this->operatingRuleService->find($operatingRule->getKey()));
     }
@@ -91,7 +91,7 @@ class SchoolOperatingRuleController extends Controller
      */
     public function update(UpdateSchoolOperatingRuleRequest $request, SchoolOperatingRule $operatingRule): SchoolOperatingRuleResource
     {
-        $this->ensureInSchoolContext($request, $operatingRule);
+        $this->ensureInSchoolContext($request, $operatingRule->school_id);
 
         $updated = $this->operatingRuleService->update($operatingRule, $request->validated());
 
@@ -109,21 +109,10 @@ class SchoolOperatingRuleController extends Controller
     {
         Gate::authorize('delete', $operatingRule);
 
-        $this->ensureInSchoolContext($request, $operatingRule);
+        $this->ensureInSchoolContext($request, $operatingRule->school_id);
 
         $this->operatingRuleService->delete($operatingRule);
 
         return response()->json(['message' => 'Versão do horário fixo removida com sucesso.']);
-    }
-
-    /**
-     * Se o pedido indica uma escola (X-School-ID), a versão tem de ser dessa
-     * escola. Responde 404 para não revelar versões de outras escolas.
-     */
-    private function ensureInSchoolContext(Request $request, SchoolOperatingRule $rule): void
-    {
-        $schoolId = $request->attributes->get('school_id');
-
-        abort_if($schoolId !== null && $schoolId !== $rule->school_id, 404);
     }
 }

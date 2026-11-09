@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\Auth\UserResource;
 use App\Services\AuthService;
 use App\Services\UserService;
 use App\Http\Requests\Auth\UpdateUserRequest;
@@ -33,17 +33,7 @@ class AuthController extends Controller
 
         $authData = $this->authService->attemptLogin($credentials, $cookieMinutes);
 
-        $cookie = cookie(
-            name: 'access_token',
-            value: $authData['token'],
-            minutes: $cookieMinutes,
-            path: '/',
-            domain: null,
-            secure: config('app.env') === 'production' || $request->isSecure(),
-            httpOnly: true,
-            raw: false,
-            sameSite: 'Lax'
-        );
+        $cookie = $this->authService->makeAuthCookie($authData['token'], $cookieMinutes, $request);
 
         return response()->json([
             'user' => new UserResource($authData['user']),

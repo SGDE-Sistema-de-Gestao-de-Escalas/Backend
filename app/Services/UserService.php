@@ -12,11 +12,13 @@ use Illuminate\Validation\ValidationException;
 use App\Models\Assistants\Assistant;
 use App\Mail\PrivacyDeactivationRequestMail;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 
 class UserService
 {
+    public function __construct(
+        private readonly AssistantDocumentStorageService $documentStorage
+    ) {}
+
     public function create(array $data): User
     {   
         $adminRole = Role::where('slug', 'admin')->firstOrFail();
@@ -193,50 +195,19 @@ class UserService
                     ->whereNotNull('document_name')
                     ->update(['document_name' => null]);
 
-                $absenceDocuments = DB::table('absences')
+                $hasAbsenceDocs = DB::table('absences')
                     ->where('assistant_id', $assistantId)
                     ->whereNotNull('document_path')
                     ->where('document_path', '<>', '')
-                    ->get(['id', 'document_path']);
+                    ->exists();
 
-                if ($criminalRecordPath !== null && $criminalRecordPath !== '') {
+                if (($criminalRecordPath !== null && $criminalRecordPath !== '') || $hasAbsenceDocs) {
                     DB::afterCommit(function () use ($criminalRecordPath, $assistantId) {
-                        $configuredDisk = config('filesystems.documents_disk');
-                        $disk = str_contains($criminalRecordPath, 'criminal_record') ? $configuredDisk : 'local';
-                        if (! Storage::disk($disk)->delete($criminalRecordPath)) {
-                            throw new RuntimeException(
-                                'Não foi possível remover o ficheiro do registo criminal.'
-                            );
-                        }
-
-                        Assistant::withTrashed()
-                            ->whereKey($assistantId)
-                            ->where('criminal_record_path', $criminalRecordPath)
-                            ->update(['criminal_record_path' => null]);
-                    });
-                }
-
-                if ($absenceDocuments->isNotEmpty()) {
-                    DB::afterCommit(function () use ($absenceDocuments) {
-                        $configuredDisk = config('filesystems.documents_disk');
-
-                        foreach ($absenceDocuments as $absenceDoc) {
-                            $disk = str_contains($absenceDoc->document_path, 'absences_files') ? $configuredDisk : 'local';
-
-                            if (! Storage::disk($disk)->delete($absenceDoc->document_path)) {
-                                throw new RuntimeException(
-                                    'Não foi possível remover o ficheiro comprovativo de ausência.'
-                                );
-                            }
-
-                            DB::table('absences')
-                                ->where('id', $absenceDoc->id)
-                                ->where('document_path', $absenceDoc->document_path)
-                                ->update([
-                                    'document_path' => null,
-                                    'document_name' => null,
-                                ]);
-                        }
+                        $this->documentStorage->purgeAllAssistantFiles(
+                            $assistantId,
+                            $criminalRecordPath,
+                            strict: true
+                        );
                     });
                 }
             }
@@ -337,12 +308,7 @@ class UserService
 
     public function activeAdminCount(): int
     {
-        return User::query()
-            ->where('is_active', true)
-            ->whereHas('role', function ($query) {
-                $query->where('slug', 'admin');
-            })
-            ->count();
+        return User::activeAdmins()->count();
     }  
 
     public function cannotDeleteReason(

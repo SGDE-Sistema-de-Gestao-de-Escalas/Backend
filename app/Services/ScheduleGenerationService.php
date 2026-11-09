@@ -1957,13 +1957,6 @@ class ScheduleGenerationService
                 ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
                 ->get();
 
-            $hasAbsence = $absences->contains(function (Absence $abs) use ($startMin, $endMin) {
-                $aStart = $abs->start_time ? $this->toMinutes(substr((string) $abs->start_time, 0, 5)) : 0;
-                $aEnd = $abs->end_time ? $this->toMinutes(substr((string) $abs->end_time, 0, 5)) : 1440;
-
-                return $this->intervalsOverlap($startMin, $endMin, $aStart, $aEnd);
-            });
-
             foreach ($absences as $abs) {
                 if (empty($abs->start_time) && empty($abs->end_time)) {
                     $fullDayAbsence = true;
@@ -1971,7 +1964,7 @@ class ScheduleGenerationService
                 } else {
                     $aStart = $abs->start_time ? substr((string) $abs->start_time, 0, 5) : '00:00';
                     $aEnd = $abs->end_time ? substr((string) $abs->end_time, 0, 5) : '24:00';
-                    $partialAbsenceDetail = "Ausência {$aStart}–{$aEnd}";
+                    $partialAbsenceDetail = "Ausência: {$aStart}–{$aEnd}";
                     if ($this->intervalsOverlap($startMin, $endMin, $this->toMinutes($aStart), $this->toMinutes($aEnd))) {
                         $absenceOverlapsDeficit = true;
                     }
@@ -2063,6 +2056,7 @@ class ScheduleGenerationService
             // Avaliar sobreposição e cobertura do défice
             $shiftCoversDeficit = 'outside';
             $overlapMinutes = 0;
+            $deficitDurationMinutes = max(1, $endMin - $startMin);
 
             if ($worksToday && $shiftStart && $shiftEnd) {
                 $sStartMin = $this->toMinutes($shiftStart);
@@ -2727,16 +2721,11 @@ class ScheduleGenerationService
 
     private function toMinutes(string $time): int
     {
-        $parts = explode(':', substr($time, 0, 5));
-
-        return ((int) ($parts[0] ?? 0) * 60) + (int) ($parts[1] ?? 0);
+        return \App\Support\TimeHelper::toMinutes($time);
     }
 
     private function toTimeStr(int $minutes): string
     {
-        $h = intdiv($minutes, 60);
-        $m = $minutes % 60;
-
-        return sprintf('%02d:%02d', $h, $m);
+        return \App\Support\TimeHelper::toTimeString($minutes);
     }
 }

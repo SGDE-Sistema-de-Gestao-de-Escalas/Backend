@@ -8,18 +8,19 @@ use App\Mail\AbsenceStatusUpdatedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
-use App\Support\DocumentExtension;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class AbsenceService
 {
+    public function __construct(
+        private readonly AssistantDocumentStorageService $documentStorage
+    ) {}
+
     /**
      * Create a new absence record.
      */
@@ -48,7 +49,7 @@ class AbsenceService
                 if ($document) {
                     $assistant = Assistant::with('user')->findOrFail($data['assistant_id']);
                     $documentName = $document->getClientOriginalName();
-                    $documentPath = $this->storeAbsenceDocument($document, $assistant);
+                    $documentPath = $this->documentStorage->storeAbsenceDocument($document, $assistant);
                     $storedDocumentPath = $documentPath;
                 }
 
@@ -79,7 +80,7 @@ class AbsenceService
                 return $absence->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
             });
         } catch (Throwable $e) {
-            $this->deleteAbsenceDocument($storedDocumentPath);
+            $this->documentStorage->deleteFile($storedDocumentPath);
             throw $e;
         }
 
@@ -154,7 +155,7 @@ class AbsenceService
                     $assistant = Assistant::with('user')->findOrFail($targetAssistantId);
 
                     $documentName = $document->getClientOriginalName();
-                    $documentPath = $this->storeAbsenceDocument($document, $assistant);
+                    $documentPath = $this->documentStorage->storeAbsenceDocument($document, $assistant);
                     $storedDocumentPath = $documentPath;
                 }
 
@@ -201,13 +202,13 @@ class AbsenceService
                 $absence->update($updatePayload);
 
                 if ($obsoleteDocumentPath !== null) {
-                    DB::afterCommit(fn () => $this->deleteAbsenceDocument($obsoleteDocumentPath));
+                    DB::afterCommit(fn () => $this->documentStorage->deleteFile($obsoleteDocumentPath));
                 }
 
                 return $absence->fresh()->load(['assistant.user', 'assistant.school', 'absenceType', 'createdByUser', 'justifiedByUser']);
             });
         } catch (Throwable $e) {
-            $this->deleteAbsenceDocument($storedDocumentPath);
+            $this->documentStorage->deleteFile($storedDocumentPath);
             throw $e;
         }
 
@@ -244,10 +245,8 @@ class AbsenceService
             return;
         }
 
-        $admins = User::query()
-            ->where('is_active', true)
+        $admins = User::activeAdmins()
             ->whereNotNull('email')
-            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
             ->get();
 
         if ($admins->isEmpty()) {
@@ -339,73 +338,11 @@ class AbsenceService
             $deleted = (bool) $absence->delete();
 
             if ($deleted && $documentPath) {
-                DB::afterCommit(fn () => $this->deleteAbsenceDocument($documentPath));
+                DB::afterCommit(fn () => $this->documentStorage->deleteFile($documentPath));
             }
 
             return $deleted;
         });
-    }
-
-    /**
-     * Obtém o disco configurado para documentos (ex: 'public' ou 'r2').
-     */
-    public function getDocumentDisk(): string
-    {
-        return config('filesystems.documents_disk');
-    }
-
-    /**
-     * Gera o caminho da pasta para os comprovativos de faltas do assistente:
-     * {nome_assistente}_{nr_interno}/absences_files
-     *
-     * Sanitiza carateres especiais (acentos, cedilhas, barras, símbolos)
-     * para segurança em qualquer sistema de ficheiros (Windows/Linux) ou S3/R2.
-     */
-    public function getAssistantAbsenceDirectory(Assistant $assistant): string
-    {
-        $assistant->loadMissing('user');
-
-        $firstName = $assistant->user?->first_name ?? 'assistente';
-        $lastName = $assistant->user?->last_name ?? '';
-        $internalNumber = $assistant->internal_number ?? (string) $assistant->id;
-
-        $normalizedName = preg_replace('/[\/\\\_\-\.]+/', ' ', trim("{$firstName} {$lastName}"));
-        $normalizedInternal = preg_replace('/[\/\\\_\-\.]+/', ' ', trim((string) $internalNumber));
-
-        $safeName = Str::slug($normalizedName, '_') ?: 'assistente';
-        $safeInternal = Str::slug($normalizedInternal, '_') ?: 'sem_numero';
-
-        return "{$safeName}_{$safeInternal}/absences_files";
-    }
-
-    /**
-     * Guarda o ficheiro comprovativo da falta no disco configurado (public ou r2) na pasta do assistente.
-     * Gera um nome padronizado no disco: ausencia_{timestamp}_{random}.{ext}
-     */
-    public function storeAbsenceDocument(UploadedFile $file, Assistant $assistant): string
-    {
-        $folder = $this->getAssistantAbsenceDirectory($assistant);
-        $extension = DocumentExtension::for($file); // do conteúdo, não do nome do cliente (F-03)
-        $filename = 'ausencia_' . time() . '_' . Str::random(6) . ".{$extension}";
-
-        $disk = $this->getDocumentDisk();
-
-        return $file->storeAs($folder, $filename, $disk);
-    }
-
-    /**
-     * Remove o ficheiro comprovativo da falta do disco configurado.
-     */
-    public function deleteAbsenceDocument(?string $path): void
-    {
-        if ($path) {
-            $disk = $this->getDocumentDisk();
-
-            try {
-                Storage::disk($disk)->delete($path);
-            } catch (\Throwable) {
-            }
-        }
     }
 
     /**
@@ -466,9 +403,7 @@ class AbsenceService
             return $default;
         }
 
-        [$hours, $minutes] = array_map('intval', explode(':', $time));
-
-        return $hours * 60 + $minutes;
+        return \App\Support\TimeHelper::toMinutes($time);
     }
 
     /**

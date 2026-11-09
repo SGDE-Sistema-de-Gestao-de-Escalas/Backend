@@ -12,7 +12,8 @@ use Illuminate\Validation\ValidationException;
 class AssistantExceptionService
 {
     public function __construct(
-        private readonly OperatingHoursResolver $operatingHoursResolver
+        private readonly OperatingHoursResolver $operatingHoursResolver,
+        private readonly ScheduleIntegrityService $integrityService
     ) {}
 
     /**
@@ -20,22 +21,14 @@ class AssistantExceptionService
      */
     public function hasPastSchedules(AssistantException $exception): bool
     {
-        $todayStr = Carbon::today()->toDateString();
         $validFromStr = $exception->valid_from ? Carbon::parse($exception->valid_from)->toDateString() : null;
+        $validUntilStr = $exception->valid_until ? Carbon::parse($exception->valid_until)->toDateString() : null;
 
-        if (! $validFromStr || $validFromStr >= $todayStr) {
-            return false;
-        }
-
-        $yesterdayStr = Carbon::yesterday()->toDateString();
-        $validUntilStr = $exception->valid_until ? Carbon::parse($exception->valid_until)->toDateString() : $yesterdayStr;
-        $pastEndStr = min($validUntilStr, $yesterdayStr);
-
-        return ScheduleEntry::query()
-            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $exception->assistant_id)->whereNull('deleted_at'))
-            ->whereDate('date', '>=', $validFromStr)
-            ->whereDate('date', '<=', $pastEndStr)
-            ->exists();
+        return $this->integrityService->hasPastSchedulesForPeriod(
+            (string) $exception->assistant_id,
+            $validFromStr,
+            $validUntilStr
+        );
     }
 
     /**

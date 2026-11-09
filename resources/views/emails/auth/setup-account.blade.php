@@ -21,13 +21,7 @@ Para concluir a ativação da sua conta e fazer o seu primeiro acesso, crie a su
 Criar a Minha Palavra-passe
 </x-mail::button>
 
-<div class="link-fallback-label">
-Se o botão não funcionar, copie e cole a seguinte ligação no seu navegador:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $setupUrl }}" target="_blank" rel="noopener">{{ $setupUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $setupUrl, 'label' => 'Se o botão não funcionar, copie e cole a seguinte ligação no seu navegador:'])
 
 <p class="help-note">
 Por motivos de segurança, esta ligação é válida durante 60 minutos. Caso expire antes de concluir o acesso, poderá pedir um novo link em "Esqueci-me da palavra-passe" na página de login.

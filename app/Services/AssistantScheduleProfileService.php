@@ -10,27 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class AssistantScheduleProfileService
 {
+    public function __construct(
+        private readonly ScheduleIntegrityService $integrityService
+    ) {}
+
     /**
      * Verifica se o perfil de horário já regeu escalas em datas passadas (< hoje).
      */
     public function hasPastSchedules(AssistantScheduleProfile $profile): bool
     {
-        $todayStr = Carbon::today()->toDateString();
         $validFromStr = $profile->valid_from ? Carbon::parse($profile->valid_from)->toDateString() : null;
+        $validUntilStr = $profile->valid_until ? Carbon::parse($profile->valid_until)->toDateString() : null;
 
-        if (! $validFromStr || $validFromStr >= $todayStr) {
-            return false;
-        }
-
-        $yesterdayStr = Carbon::yesterday()->toDateString();
-        $validUntilStr = $profile->valid_until ? Carbon::parse($profile->valid_until)->toDateString() : $yesterdayStr;
-        $pastEndStr = min($validUntilStr, $yesterdayStr);
-
-        return ScheduleEntry::query()
-            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $profile->assistant_id)->whereNull('deleted_at'))
-            ->whereDate('date', '>=', $validFromStr)
-            ->whereDate('date', '<=', $pastEndStr)
-            ->exists();
+        return $this->integrityService->hasPastSchedulesForPeriod(
+            (string) $profile->assistant_id,
+            $validFromStr,
+            $validUntilStr
+        );
     }
 
     /**

@@ -24,7 +24,7 @@ class AssistantScheduleProfileController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $schoolId = $request->header('X-School-ID') ?? $request->attributes->get('currentSchoolId');
+        $schoolId = $this->resolveSchoolId($request);
         $assistantId = $request->query('assistant_id');
         $assistantIds = $request->query('assistant_ids');
         $user = $request->user();

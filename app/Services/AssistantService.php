@@ -5,12 +5,10 @@ namespace App\Services;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
-use App\Support\DocumentExtension;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -23,7 +21,8 @@ class AssistantService
     private const USER_FIELDS = ['first_name', 'last_name', 'email'];
 
     public function __construct(
-        private readonly AuthService $authService
+        private readonly AuthService $authService,
+        private readonly AssistantDocumentStorageService $documentStorage
     ) {}
 
     /**
@@ -52,7 +51,7 @@ class AssistantService
 
                 if ($criminalRecordFile) {
                     $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
-                    $storedPath = $this->storeCriminalRecordFile(
+                    $storedPath = $this->documentStorage->storeCriminalRecord(
                         $criminalRecordFile,
                         $data['first_name'],
                         $data['last_name'],
@@ -66,7 +65,7 @@ class AssistantService
                 return $assistant;
             });
         } catch (Throwable $e) {
-            $this->deleteCriminalRecordFile($storedPath);
+            $this->documentStorage->deleteFile($storedPath);
             throw $e;
         }
 
@@ -112,11 +111,11 @@ class AssistantService
                     $internalNumber = $data['internal_number'] ?? $assistant->internal_number ?? $assistant->id;
 
                     $assistantData['criminal_record_name'] = $criminalRecordFile->getClientOriginalName();
-                    $storedPath = $this->storeCriminalRecordFile(
+                    $storedPath = $this->documentStorage->storeCriminalRecord(
                         $criminalRecordFile,
                         $firstName,
                         $lastName,
-                        $internalNumber
+                        (string) $internalNumber
                     );
                     $assistantData['criminal_record_path'] = $storedPath;
                 }
@@ -124,107 +123,15 @@ class AssistantService
                 $assistant->update($assistantData);
 
                 if ($obsoletePath !== null) {
-                    DB::afterCommit(fn () => $this->deleteCriminalRecordFile($obsoletePath));
+                    DB::afterCommit(fn () => $this->documentStorage->deleteFile($obsoletePath));
                 }
 
                 return $assistant->refresh()->load(['user', 'school', 'assistantScheduleProfiles.shifts.shiftDays']);
             });
         } catch (Throwable $e) {
-            $this->deleteCriminalRecordFile($storedPath);
+            $this->documentStorage->deleteFile($storedPath);
             throw $e;
         }
-    }
-
-    /**
-     * Obtém o disco configurado para documentos (ex: 'public' ou 'r2').
-     */
-    public function getDocumentDisk(): string
-    {
-        return config('filesystems.documents_disk');
-    }
-
-    /**
-     * Gera o caminho da pasta para o registo criminal do assistente:
-     * {nome_assistente}_{nr_interno}/criminal_record
-     *
-     * Sanitiza carateres especiais (acentos, cedilhas, barras, símbolos)
-     * para segurança em qualquer sistema de ficheiros (Windows/Linux) ou S3/R2.
-     */
-    public function getAssistantCriminalRecordDirectory(string $firstName, string $lastName, string $internalNumber): string
-    {
-        // Converte separadores como barras, hífens e pontos em espaços antes de normalizar
-        $normalizedName = preg_replace('/[\/\\\_\-\.]+/', ' ', trim("{$firstName} {$lastName}"));
-        $normalizedInternal = preg_replace('/[\/\\\_\-\.]+/', ' ', trim($internalNumber));
-
-        $safeName = Str::slug($normalizedName, '_') ?: 'assistente';
-        $safeInternal = Str::slug($normalizedInternal, '_') ?: 'sem_numero';
-
-        return "{$safeName}_{$safeInternal}/criminal_record";
-    }
-
-    /**
-     * Guarda o ficheiro de registo criminal no disco configurado (public ou r2) na pasta do assistente.
-     * Gera um nome padronizado no disco: registo_criminal_{timestamp}_{random}.{ext}
-     */
-    public function storeCriminalRecordFile(UploadedFile $file, string $firstName, string $lastName, string $internalNumber): string
-    {
-        $folder = $this->getAssistantCriminalRecordDirectory($firstName, $lastName, $internalNumber);
-        $extension = DocumentExtension::for($file); // do conteúdo, não do nome do cliente (F-03)
-        $filename = "registo_criminal_" . time() . '_' . Str::random(6) . ".{$extension}";
-
-        $disk = $this->getDocumentDisk();
-
-        return $file->storeAs($folder, $filename, $disk);
-    }
-
-    /**
-     * Remove o ficheiro de registo criminal do disco configurado.
-     */
-    public function deleteCriminalRecordFile(?string $path): void
-    {
-        if ($path) {
-            $disk = $this->getDocumentDisk();
-
-            try {
-                Storage::disk($disk)->delete($path);
-            } catch (\Throwable) {
-            }
-        }
-    }
-
-    /**
-     * Remove todos os ficheiros comprovativos de ausências do assistente do disco
-     * e limpa as respetivas referências na base de dados.
-     */
-    public function deleteAssistantAbsenceFiles(Assistant $assistant): void
-    {
-        $absencesWithDocs = DB::table('absences')
-            ->where('assistant_id', $assistant->id)
-            ->whereNotNull('document_path')
-            ->where('document_path', '<>', '')
-            ->get(['id', 'document_path']);
-
-        if ($absencesWithDocs->isNotEmpty()) {
-            $disk = $this->getDocumentDisk();
-
-            foreach ($absencesWithDocs as $absenceDoc) {
-                try {
-                    Storage::disk($disk)->delete($absenceDoc->document_path);
-                } catch (\Throwable) {
-                }
-            }
-        }
-
-        DB::table('absences')
-            ->where('assistant_id', $assistant->id)
-            ->where(function ($q) {
-                $q->whereNotNull('document_path')
-                  ->orWhereNotNull('document_name');
-            })
-            ->update([
-                'document_path' => null,
-                'document_name' => null,
-            ]);
     }
 
     /**
@@ -341,17 +248,18 @@ class AssistantService
             $assistant->criminal_record_expiry = null;
             $assistant->is_anonymized = true;
 
-            // Remove documento do registo criminal do disco
-            if ($assistant->criminal_record_path) {
-                $this->deleteCriminalRecordFile($assistant->criminal_record_path);
-                $assistant->criminal_record_path = null;
-            }
+            // Remove documento do registo criminal e documentos de justificações de faltas do disco
+            $criminalRecordPath = $assistant->criminal_record_path;
+            $assistant->criminal_record_path = null;
             $assistant->criminal_record_name = null;
-
-            // Remove todos os documentos comprovativos de ausências do assistente
-            $this->deleteAssistantAbsenceFiles($assistant);
-
             $assistant->save();
+
+            $this->documentStorage->purgeAllAssistantFiles($assistant->id, $criminalRecordPath, strict: false);
+
+            DB::table('absences')
+                ->where('assistant_id', $assistant->id)
+                ->whereNotNull('document_name')
+                ->update(['document_name' => null]);
 
             // 2. Inativar utilizador e revogar tokens de login
             $user = $assistant->user;

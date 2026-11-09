@@ -6,7 +6,7 @@ use App\Models\Schools\School;
 use App\Http\Requests\Schools\StoreSchoolRequest;
 use App\Http\Requests\Schools\UpdateSchoolRequest;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\SchoolResource;
+use App\Http\Resources\Schools\SchoolResource;
 use App\Services\SchoolAccessService;
 use App\Services\SchoolService;
 use Illuminate\Http\JsonResponse;

@@ -57,10 +57,7 @@ class NotificationService
         bool $excludeActor = false,
     ): int {
         try {
-            $recipients = User::query()
-                ->where('is_active', true)
-                ->whereNull('anonymized_at')
-                ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
+            $recipients = User::activeAdmins()
                 ->when($excludeActor && $actor, fn ($q) => $q->whereKeyNot($actor->getKey()))
                 ->pluck('id');
 

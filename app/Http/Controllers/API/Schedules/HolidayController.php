@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\Schedules;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Schedules\StoreHolidayRequest;
 use App\Http\Requests\Schedules\UpdateHolidayRequest;
-use App\Http\Resources\HolidayResource;
+use App\Http\Resources\Schedules\HolidayResource;
 use App\Models\Auth\User;
 use App\Models\Schedules\Holiday;
 use App\Models\Schedules\ScheduleEntry;

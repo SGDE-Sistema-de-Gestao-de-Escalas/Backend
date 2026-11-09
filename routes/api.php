@@ -20,13 +20,12 @@ use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Http\Controllers\API\Dashboard\DashboardBootstrapController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 
 Route::get('/teste', function () {
     return response()->json([
         'status' => 'success',
-        'message' => 'API is working!'
-        ]);
+        'message' => 'API is working!',
+    ]);
 });
 
 // Login público, limitado por email + IP (e por IP): ver config/rate_limits.php.

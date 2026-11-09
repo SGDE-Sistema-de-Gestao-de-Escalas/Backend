@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Schedules\ScheduleRuleRequest;
 use App\Http\Requests\Schedules\StoreScheduleRuleRequest;
 use App\Http\Requests\Schedules\UpdateScheduleRuleRequest;
-use App\Http\Resources\ScheduleRuleResource;
+use App\Http\Resources\Schedules\ScheduleRuleResource;
 use App\Models\Schedules\ScheduleRule;
 use App\Services\NotificationService;
 use App\Services\ScheduleRuleService;

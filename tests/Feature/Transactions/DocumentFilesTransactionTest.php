@@ -69,7 +69,7 @@ class DocumentFilesTransactionTest extends TestCase
 
     private function absenceWithDocument(): Absence
     {
-        $path = app(AbsenceService::class)->storeAbsenceDocument($this->pdf('antigo.pdf'), $this->assistant);
+        $path = app(\App\Services\AssistantDocumentStorageService::class)->storeAbsenceDocument($this->pdf('antigo.pdf'), $this->assistant);
 
         return Absence::create([
             'assistant_id' => $this->assistant->id,
@@ -85,8 +85,8 @@ class DocumentFilesTransactionTest extends TestCase
 
     private function assistantWithRecord(): Assistant
     {
-        $service = app(AssistantService::class);
-        $path = $service->storeCriminalRecordFile($this->pdf('antigo.pdf'), 'Maria', 'Santos', 'A001');
+        $service = app(\App\Services\AssistantDocumentStorageService::class);
+        $path = $service->storeCriminalRecord($this->pdf('antigo.pdf'), 'Maria', 'Santos', 'A001');
         $this->assistant->update(['criminal_record_name' => 'antigo.pdf', 'criminal_record_path' => $path]);
 
         return $this->assistant->fresh();

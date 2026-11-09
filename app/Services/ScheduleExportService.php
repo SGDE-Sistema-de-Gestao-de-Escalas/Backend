@@ -219,7 +219,7 @@ class ScheduleExportService
     ): DomPdfInstance {
         $schoolModel = $school instanceof School ? $school : School::findOrFail($school);
 
-        $logoPath = resource_path('views/exports/logo-horizontal.svg');
+        $logoPath = public_path('images/logo-horizontal.svg');
         $logoBase64 = is_file($logoPath)
             ? 'data:image/svg+xml;base64,' . base64_encode((string) file_get_contents($logoPath))
             : null;
@@ -1439,11 +1439,7 @@ class ScheduleExportService
 
     private function timeToMin(string $t): int
     {
-        $parts = explode(':', substr($t, 0, 5));
-        $h = (int) ($parts[0] ?? 0);
-        $m = (int) ($parts[1] ?? 0);
-
-        return $h * 60 + $m;
+        return \App\Support\TimeHelper::toMinutes($t);
     }
 
     private function tintHex(string $hex, float $ratio = 0.86): string

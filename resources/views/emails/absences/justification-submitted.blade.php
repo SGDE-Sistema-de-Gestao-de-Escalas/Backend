@@ -18,13 +18,7 @@ O(A) assistente operacional **{{ $assistantLabel }}** atualizou a sua falta pend
 Analisar e Validar Falta
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $absencesAdminUrl }}" target="_blank" rel="noopener">{{ $absencesAdminUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $absencesAdminUrl])
 
 <p class="help-note">
 A validação da ausência como Justificada ou Injustificada deve ser efetuada na área de gestão de faltas do portal SGDE.

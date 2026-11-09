@@ -21,13 +21,7 @@ Caso exista documento comprovativo para justificar esta ausência, a submissão 
 Consultar Faltas na Plataforma
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $absencesUrl }}" target="_blank" rel="noopener">{{ $absencesUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $absencesUrl])
 
 <p class="help-note">
 O histórico completo de ausências e justificações encontra-se disponível para consulta na área pessoal.

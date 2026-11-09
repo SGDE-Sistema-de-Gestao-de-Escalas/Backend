@@ -356,11 +356,31 @@ class ScheduleIntegrityService
         return $conflicts;
     }
 
+    /**
+     * Verifica se um assistente já tem escalas geradas em datas passadas (< hoje) dentro do período indicado.
+     */
+    public function hasPastSchedulesForPeriod(string $assistantId, ?string $validFromStr, ?string $validUntilStr): bool
+    {
+        $todayStr = CarbonImmutable::today()->toDateString();
+
+        if (! $validFromStr || $validFromStr >= $todayStr) {
+            return false;
+        }
+
+        $yesterdayStr = CarbonImmutable::yesterday()->toDateString();
+        $untilStr = $validUntilStr ?: $yesterdayStr;
+        $pastEndStr = min($untilStr, $yesterdayStr);
+
+        return ScheduleEntry::query()
+            ->whereHas('schedule', fn ($q) => $q->where('assistant_id', $assistantId)->whereNull('deleted_at'))
+            ->whereDate('date', '>=', $validFromStr)
+            ->whereDate('date', '<=', $pastEndStr)
+            ->exists();
+    }
+
     private function toMinutes(string $time): int
     {
-        $parts = explode(':', $time);
-
-        return ((int) $parts[0] * 60) + (int) ($parts[1] ?? 0);
+        return \App\Support\TimeHelper::toMinutes($time);
     }
 
     private function intervalsOverlap(int $s1, int $e1, int $s2, int $e2): bool

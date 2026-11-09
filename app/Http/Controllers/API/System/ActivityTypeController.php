@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\System;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\System\StoreActivityTypeRequest;
 use App\Http\Requests\System\UpdateActivityTypeRequest;
-use App\Http\Resources\ActivityTypeResource;
+use App\Http\Resources\System\ActivityTypeResource;
 use App\Models\System\ActivityType;
 use App\Services\ActivityTypeService;
 use App\Services\SchoolAccessService;

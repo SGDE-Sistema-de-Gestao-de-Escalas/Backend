@@ -335,8 +335,6 @@ class SchoolOperatingRuleService
 
     private function minutes(string $time): int
     {
-        [$hours, $minutes] = explode(':', $time);
-
-        return ((int) $hours * 60) + (int) $minutes;
+        return \App\Support\TimeHelper::toMinutes($time);
     }
 }

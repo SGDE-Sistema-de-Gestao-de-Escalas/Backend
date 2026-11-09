@@ -35,7 +35,7 @@ class PrivacyController extends Controller
         $data = $this->userService->exportPersonalData($user);
 
         if (strtolower((string) $request->query('format', 'json')) === 'pdf') {
-            $logoPath = resource_path('views/exports/logo-horizontal.svg');
+            $logoPath = public_path('images/logo-horizontal.svg');
             $logoBase64 = is_file($logoPath)
                 ? 'data:image/svg+xml;base64,' . base64_encode((string) file_get_contents($logoPath))
                 : null;

@@ -19,13 +19,7 @@ O certificado de registo criminal de **{{ $assistantLabel }}** irá expirar dent
 Consultar Ficha do Assistente
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $assistantsAdminUrl }}" target="_blank" rel="noopener">{{ $assistantsAdminUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $assistantsAdminUrl])
 
 <p class="help-note">
 Solicite a renovação do documento comprovativo e proceda à atualização da ficha do assistente na plataforma SGDE.
