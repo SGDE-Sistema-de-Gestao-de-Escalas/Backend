@@ -193,6 +193,41 @@ class AssistantService
     }
 
     /**
+     * Remove todos os ficheiros comprovativos de ausências do assistente do disco
+     * e limpa as respetivas referências na base de dados.
+     */
+    public function deleteAssistantAbsenceFiles(Assistant $assistant): void
+    {
+        $absencesWithDocs = DB::table('absences')
+            ->where('assistant_id', $assistant->id)
+            ->whereNotNull('document_path')
+            ->where('document_path', '<>', '')
+            ->get(['id', 'document_path']);
+
+        if ($absencesWithDocs->isNotEmpty()) {
+            $disk = $this->getDocumentDisk();
+
+            foreach ($absencesWithDocs as $absenceDoc) {
+                try {
+                    Storage::disk($disk)->delete($absenceDoc->document_path);
+                } catch (\Throwable) {
+                }
+            }
+        }
+
+        DB::table('absences')
+            ->where('assistant_id', $assistant->id)
+            ->where(function ($q) {
+                $q->whereNotNull('document_path')
+                  ->orWhereNotNull('document_name');
+            })
+            ->update([
+                'document_path' => null,
+                'document_name' => null,
+            ]);
+    }
+
+    /**
      * Soft delete (eliminação) do assistente e da respetiva conta,
      * e revoga as sessões abertas para que deixe de ter acesso imediatamente.
      */
@@ -312,6 +347,9 @@ class AssistantService
                 $assistant->criminal_record_path = null;
             }
             $assistant->criminal_record_name = null;
+
+            // Remove todos os documentos comprovativos de ausências do assistente
+            $this->deleteAssistantAbsenceFiles($assistant);
 
             $assistant->save();
 
