@@ -1978,54 +1978,6 @@ class ScheduleGenerationService
                 }
             }
 
-            // Buscar perfil e turno contratual do assistente para o dia
-            $profile = AssistantScheduleProfile::with(['shifts.shiftDays'])
-                ->where('assistant_id', $candidate->id)
-                ->whereDate('valid_from', '<=', $date)
-                ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
-                ->orderByDesc('valid_from')
-                ->first();
-
-            $shiftStart = null;
-            $shiftEnd = null;
-            $lunchStart = null;
-            $lunchEnd = null;
-            $lunchDuration = null;
-            $worksToday = false;
-
-            if ($profile) {
-                $targetLabel = 'A';
-                if ($profile->type === 'rotativo') {
-                    $anchorDate = CarbonImmutable::parse($profile->valid_from->format('Y-m-d'));
-                    $currentDate = CarbonImmutable::parse($date);
-                    $startsWith = $profile->starts_with === 'B' ? 'B' : 'A';
-                    $opposite = $startsWith === 'A' ? 'B' : 'A';
-                    $weeksDiff = (int) floor($anchorDate->startOfWeek()->diffInDays($currentDate->startOfWeek(), false) / 7);
-                    $index = abs($weeksDiff) % 2;
-                    $targetLabel = $index === 0 ? $startsWith : $opposite;
-                }
-                $shift = $profile->shifts->firstWhere('shift_label', $targetLabel) ?? $profile->shifts->first();
-                if ($shift) {
-                    $worksToday = $shift->shiftDays->contains(fn ($d) => (int) $d->day_of_week === $weekday);
-                    if ($worksToday) {
-                        $shiftStart = substr((string) $shift->entry_time, 0, 5);
-                        $shiftEnd = substr((string) $shift->exit_time, 0, 5);
-                        $lunchStart = $shift->lunch_start ? substr((string) $shift->lunch_start, 0, 5) : null;
-                        $lunchEnd = $shift->lunch_end ? substr((string) $shift->lunch_end, 0, 5) : null;
-                        $lunchDuration = $shift->lunch_enabled ? (int) $shift->lunch_duration_minutes : null;
-                    }
-                }
-            }
-
-            $partialAbsenceDetail = null;
-            foreach ($absences as $abs) {
-                if ($abs->start_time && $abs->end_time) {
-                    $s = substr((string) $abs->start_time, 0, 5);
-                    $e = substr((string) $abs->end_time, 0, 5);
-                    $partialAbsenceDetail = "Ausência: {$s}–{$e}";
-                }
-            }
-
             // Resolver o turno ativo na data e dia da semana (respeitando exceções e perfis rotativos/fixos)
             $activeException = $candidate->assistantExceptions->first(function ($exc) use ($date, $weekday) {
                 $from = $exc->valid_from?->format('Y-m-d');
@@ -2176,8 +2128,9 @@ class ScheduleGenerationService
                 'shift_covers_deficit' => $shiftCoversDeficit,
                 'overlap_minutes' => $overlapMinutes,
                 'deficit_duration_minutes' => max(0, $endMin - $startMin),
-                'is_absent' => false,
+                'is_absent' => $fullDayAbsence,
                 'partial_absence' => $partialAbsenceDetail,
+                'absence_overlaps' => $absenceOverlapsDeficit,
             ];
         }
 
@@ -2353,7 +2306,6 @@ class ScheduleGenerationService
                     ]);
                     $schedule->assistant_schedule_profile_id = $profile?->id;
                     $schedule->status = 'draft';
-                    $schedule->published_at = null;
                     $schedule->generated_at = $now;
                     $schedule->save();
 

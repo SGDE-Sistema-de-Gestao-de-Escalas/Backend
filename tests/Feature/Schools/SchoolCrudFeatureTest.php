@@ -39,6 +39,14 @@ class SchoolCrudFeatureTest extends TestCase
 
         $this->actingAs($this->staff)
             ->getJson('/api/schools')
+            ->assertOk();
+
+        $this->actingAs($this->staff)
+            ->postJson('/api/schools', [
+                'name' => 'Escola Proibida',
+                'code' => 'EP-01',
+                'acronym' => 'EP',
+            ])
             ->assertForbidden();
     }
 

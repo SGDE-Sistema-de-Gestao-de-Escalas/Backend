@@ -346,7 +346,9 @@ class ScheduleGenerationTest extends TestCase
 
     public function test_generates_complete_schedule_with_mandatory_optional_lunch_and_fallback(): void
     {
-        $assistant = $this->createAssistantWithShift(
+        \Carbon\Carbon::setTestNow('2026-10-26 09:00:00');
+        try {
+            $assistant = $this->createAssistantWithShift(
             name: 'Ana Silva',
             internalNumber: 'A001',
             entryTime: '08:00:00',
@@ -447,6 +449,9 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonPath('published_schedules_count', 1);
 
         $this->assertSame('published', Schedule::first()->status);
+        } finally {
+            \Carbon\Carbon::setTestNow();
+        }
     }
 
     public function test_round_b_partitions_mandatory_rule_across_two_assistants(): void

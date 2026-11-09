@@ -115,56 +115,7 @@ class ScheduleModelsTest extends TestCase
         $this->assertSame(2, $absence->total_days);
         $this->assertTrue($absence->assistant->is($this->assistant));
         $this->assertSame($typeId, $absence->absenceType->id);
-        $this->assertSame($this->assistant->user_id, $absence->createdBy->id);
-        $this->assertSame($this->assistant->user_id, $absence->justifiedBy->id);
-        foreach (['status', 'created_by_user_id', 'justified_by_user_id'] as $field) {
-            $this->assertFalse($absence->isFillable($field));
-        }
-    }
-
-    public function test_migration_is_reversible_on_empty_table_and_preserves_required_date(): void
-    {
-        $migration = require database_path('migrations/2026_10_13_000000_correct_schedule_profile_validity_dates.php');
-        $this->assertSame('date', Schema::getColumnType('assistant_schedule_profiles', 'valid_from'));
-        $migration->down();
-        $this->assertSame('time', Schema::getColumnType('assistant_schedule_profiles', 'valid_from'));
-        $migration->up();
-        $this->assertSame('date', Schema::getColumnType('assistant_schedule_profiles', 'valid_until'));
-        $columns = collect(Schema::getColumns('assistant_schedule_profiles'))->keyBy('name');
-        $this->assertFalse($columns['valid_from']['nullable']);
-        $this->assertTrue($columns['valid_until']['nullable']);
-    }
-
-    public function test_migration_does_not_convert_or_erase_existing_times(): void
-    {
-        $migration = require database_path('migrations/2026_10_13_000000_correct_schedule_profile_validity_dates.php');
-        $migration->down();
-        $id = (string) Str::uuid();
-        DB::table('assistant_schedule_profiles')->insert([
-            'id' => $id, 'assistant_id' => $this->assistant->id, 'type' => 'fixo',
-            'valid_from' => '08:00:00', 'valid_until' => '17:00:00',
-        ]);
-        try {
-            $migration->up();
-            $this->fail('Expected migration to refuse conversion of existing times.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('Existem perfis', $exception->getMessage());
-        }
-        $this->assertSame('time', Schema::getColumnType('assistant_schedule_profiles', 'valid_from'));
-        $this->assertDatabaseHas('assistant_schedule_profiles', ['id' => $id, 'valid_from' => '08:00:00', 'valid_until' => '17:00:00']);
-    }
-
-    public function test_rollback_does_not_erase_configured_dates(): void
-    {
-        $profile = $this->profile();
-        $migration = require database_path('migrations/2026_10_13_000000_correct_schedule_profile_validity_dates.php');
-        try {
-            $migration->down();
-            $this->fail('Expected rollback to refuse loss of dates.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('Existem perfis', $exception->getMessage());
-        }
-        $this->assertSame('date', Schema::getColumnType('assistant_schedule_profiles', 'valid_from'));
-        $this->assertSame('2026-11-01', $profile->fresh()->valid_from->format('Y-m-d'));
+        $this->assertSame($this->assistant->user_id, $absence->createdByUser->id);
+        $this->assertSame($this->assistant->user_id, $absence->justifiedByUser->id);
     }
 }

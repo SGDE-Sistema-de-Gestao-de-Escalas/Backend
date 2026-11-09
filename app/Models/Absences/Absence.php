@@ -35,8 +35,8 @@ class Absence extends Model
     protected function casts(): array
     {
         return [
-            'valid_from' => 'date',
-            'valid_until' => 'date',
+            'valid_from' => 'date:Y-m-d',
+            'valid_until' => 'date:Y-m-d',
             'total_days' => 'integer',
         ];
     }

@@ -191,6 +191,31 @@ class AssistantScheduleProfileTest extends TestCase
             'valid_until' => null,
         ]);
 
+        // Simular que existem escalas passadas geradas para o assistente
+        $pastDate = Carbon::today()->subDay()->format('Y-m-d');
+        $activityType = \App\Models\System\ActivityType::create([
+            'school_id' => $this->school->id,
+            'name' => 'Apoio Teste',
+            'color' => '#3B82F6',
+            'active' => true,
+        ]);
+        $pastSchedule = \App\Models\Schedules\Schedule::create([
+            'school_id' => $this->school->id,
+            'assistant_id' => $assistant->id,
+            'assistant_schedule_profile_id' => $currentProfile->id,
+            'week_start' => $pastDate,
+            'week_end' => $pastDate,
+            'status' => 'published',
+        ]);
+        \App\Models\Schedules\ScheduleEntry::create([
+            'schedule_id' => $pastSchedule->id,
+            'activity_type_id' => $activityType->id,
+            'activity_name' => $activityType->name,
+            'date' => $pastDate,
+            'start_time' => '09:00',
+            'end_time' => '13:00',
+        ]);
+
         // Consulta resource do perfil em vigor
         $response = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
