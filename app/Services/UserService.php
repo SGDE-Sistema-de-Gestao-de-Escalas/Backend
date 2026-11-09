@@ -184,6 +184,21 @@ class UserService
                     $assistant->delete();
                 }
 
+                DB::table('absences')
+                    ->where('assistant_id', $assistantId)
+                    ->where(function ($q) {
+                        $q->whereNull('document_path')
+                          ->orWhere('document_path', '');
+                    })
+                    ->whereNotNull('document_name')
+                    ->update(['document_name' => null]);
+
+                $absenceDocuments = DB::table('absences')
+                    ->where('assistant_id', $assistantId)
+                    ->whereNotNull('document_path')
+                    ->where('document_path', '<>', '')
+                    ->get(['id', 'document_path']);
+
                 if ($criminalRecordPath !== null && $criminalRecordPath !== '') {
                     DB::afterCommit(function () use ($criminalRecordPath, $assistantId) {
                         $configuredDisk = config('filesystems.documents_disk');
@@ -198,6 +213,30 @@ class UserService
                             ->whereKey($assistantId)
                             ->where('criminal_record_path', $criminalRecordPath)
                             ->update(['criminal_record_path' => null]);
+                    });
+                }
+
+                if ($absenceDocuments->isNotEmpty()) {
+                    DB::afterCommit(function () use ($absenceDocuments) {
+                        $configuredDisk = config('filesystems.documents_disk');
+
+                        foreach ($absenceDocuments as $absenceDoc) {
+                            $disk = str_contains($absenceDoc->document_path, 'absences_files') ? $configuredDisk : 'local';
+
+                            if (! Storage::disk($disk)->delete($absenceDoc->document_path)) {
+                                throw new RuntimeException(
+                                    'Não foi possível remover o ficheiro comprovativo de ausência.'
+                                );
+                            }
+
+                            DB::table('absences')
+                                ->where('id', $absenceDoc->id)
+                                ->where('document_path', $absenceDoc->document_path)
+                                ->update([
+                                    'document_path' => null,
+                                    'document_name' => null,
+                                ]);
+                        }
                     });
                 }
             }
