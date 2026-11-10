@@ -5,11 +5,12 @@ namespace App\Http\Controllers\API\Absences;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Absences\StoreAbsenceRequest;
 use App\Http\Requests\Absences\UpdateAbsenceRequest;
-use App\Http\Resources\AbsenceResource;
+use App\Http\Resources\Absences\AbsenceResource;
 use App\Models\Absences\Absence;
-use App\Services\AbsenceService;
-use App\Services\NotificationService;
-use App\Services\ScheduleIntegrityService;
+use App\Services\Absences\AbsenceService;
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\System\NotificationService;
+use App\Services\Schedules\ScheduleIntegrityService;
 use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -288,20 +289,14 @@ class AbsenceController extends Controller
     /**
      * Download or view the justification document for the specified absence.
      */
-    public function downloadDocument(Absence $absence): StreamedResponse
+    public function downloadDocument(Absence $absence, AssistantDocumentStorageService $documentStorage): StreamedResponse
     {
         Gate::authorize('view', $absence);
 
-        if (! $absence->document_path) {
-            abort(404, 'Documento comprovativo não encontrado.');
-        }
-
-        $disk = config('filesystems.documents_disk');
-
-        if (! Storage::disk($disk)->exists($absence->document_path)) {
-            abort(404, 'Ficheiro do documento comprovativo não encontrado no servidor.');
-        }
-
-        return Storage::disk($disk)->response($absence->document_path, null, ['X-Content-Type-Options' => 'nosniff']);
+        return $documentStorage->downloadResponse(
+            $absence->document_path,
+            'Documento comprovativo não encontrado.',
+            'Ficheiro do documento comprovativo não encontrado no servidor.'
+        );
     }
 }

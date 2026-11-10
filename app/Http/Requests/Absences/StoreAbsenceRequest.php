@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Absences;
 
+use App\Models\Absences\Absence;
 use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ class StoreAbsenceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('create', \App\Models\Absences\Absence::class) ?? false;
+        return $this->user()?->can('create', Absence::class) ?? false;
     }
 
     /**
@@ -39,8 +40,8 @@ class StoreAbsenceRequest extends FormRequest
         return [
             'assistant_id' => ['required', 'uuid', 'exists:assistants,id'],
             'absence_type_id' => ['required', 'uuid', 'exists:absence_types,id'],
-            'valid_from' => ['required', 'date'],
-            'valid_until' => ['required', 'date', 'after_or_equal:valid_from'],
+            'valid_from' => ['required', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31'],
+            'valid_until' => ['required', 'date', 'after_or_equal:valid_from', 'before_or_equal:2100-12-31'],
             'start_time' => ['nullable', 'date_format:H:i'],
             'end_time' => ['nullable', 'date_format:H:i'],
             'total_days' => ['nullable', 'integer', 'min:1', 'max:366'],
@@ -91,6 +92,8 @@ class StoreAbsenceRequest extends FormRequest
             'absence_type_id.exists' => 'O tipo de ausência selecionado não existe.',
             'valid_from.required' => 'A data de início da ausência é obrigatória.',
             'valid_from.date' => 'A data de início da ausência é inválida.',
+            'valid_from.after_or_equal' => 'A data de início não pode ser anterior a 2000.',
+            'valid_from.before_or_equal' => 'A data de início não pode ser posterior a 2100.',
             'valid_until.required' => 'A data de fim da ausência é obrigatória.',
             'valid_until.date' => 'A data de fim da ausência é inválida.',
             'valid_until.after_or_equal' => 'A data de fim tem de ser posterior ou igual à data de início.',

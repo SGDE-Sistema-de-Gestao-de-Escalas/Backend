@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\NotificationService;
+use App\Services\System\NotificationService;
 use Illuminate\Console\Command;
 
 class CheckNotificationExpirations extends Command

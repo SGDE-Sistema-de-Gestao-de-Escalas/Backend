@@ -5,13 +5,11 @@ namespace App\Models\Schedules;
 use App\Models\Assistants\Assistant;
 use App\Models\System\ActivityType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ScheduleEntry extends Model
 {
-    /** @use HasFactory<\Database\Factories\ScheduleEntryFactory> */
-    use HasFactory, HasUuids;
+    use HasUuids;
 
     protected $fillable = [
         'schedule_id',

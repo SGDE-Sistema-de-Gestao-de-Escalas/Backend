@@ -3,17 +3,14 @@
 namespace App\Models\Schedules;
 
 use App\Models\Assistants\Assistant;
-use Database\Factories\AssistantScheduleProfileFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssistantScheduleProfile extends Model
 {
-    /** @use HasFactory<AssistantScheduleProfileFactory> */
-    use HasFactory, HasUuids;
+    use HasUuids;
 
     protected $fillable = [
         'assistant_id',
@@ -32,14 +29,9 @@ class AssistantScheduleProfile extends Model
         ];
     }
 
-    public function assistant()
+    public function assistant(): BelongsTo
     {
         return $this->belongsTo(Assistant::class);
-    }
-
-    public function assistantScheduleShifts(): HasMany
-    {
-        return $this->hasMany(AssistantScheduleShift::class);
     }
 
     public function shifts(): HasMany

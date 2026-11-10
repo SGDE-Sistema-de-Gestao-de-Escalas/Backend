@@ -1,15 +1,20 @@
 <?php
 
 namespace App\Providers;
+use App\Models\Auth\PersonalAccessToken;
 use App\Models\Auth\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Support\ServiceProvider;
-use App\Models\Auth\PersonalAccessToken;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use SocialiteProviders\Azure\Provider as AzureProvider;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,15 +41,15 @@ class AppServiceProvider extends ServiceProvider
         );
         
 
-        \Illuminate\Support\Facades\Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
-            $event->extendSocialite('azure', \SocialiteProviders\Azure\Provider::class);
+        Event::listen(function (SocialiteWasCalled $event) {
+            $event->extendSocialite('azure', AzureProvider::class);
         });
 
-        \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function (User $user, string $token) {
+        ResetPassword::createUrlUsing(function (User $user, string $token) {
             return config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
         });
 
-        \Illuminate\Support\Facades\Event::listen(function (\Illuminate\Mail\Events\MessageSending $event) {
+        Event::listen(function (MessageSending $event) {
             $iconPath = public_path('images/icon.png');
             if (is_file($iconPath) && str_contains((string) $event->message->getHtmlBody(), 'cid:sgde-logo')) {
                 $event->message->embedFromPath($iconPath, 'sgde-logo', 'image/png');

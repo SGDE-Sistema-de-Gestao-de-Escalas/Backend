@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Absences\Absence;
+use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
+use App\Models\Assistants\AssistantException;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
 use App\Models\Schedules\AssistantScheduleProfile;
@@ -16,6 +18,8 @@ use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Schools\SchoolOperatingRuleDay;
 use App\Models\System\ActivityType;
+use App\Services\Schedules\ScheduleGenerationService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -181,7 +185,7 @@ class ScheduleGenerationTest extends TestCase
         // Marta é titular (prioridade 1), Joana é suplente (prioridade 2 > min)
         $rule->assistants()->attach([$marta->id => ['priority' => 1], $joana->id => ['priority' => 2]]);
 
-        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+        app(ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
 
         // Titular cobre a vaga
         $martaEntries = ScheduleEntry::where('schedule_rule_id', $rule->id)
@@ -202,9 +206,9 @@ class ScheduleGenerationTest extends TestCase
         $joana = $this->createAssistantWithShift('Joana', 'J001', entryTime: '07:30:00', lunchEnabled: false);
 
         // Marta está ausente
-        $absenceTypeId = (string) \Illuminate\Support\Str::uuid();
-        \Illuminate\Support\Facades\DB::table('absence_types')->insert(['id' => $absenceTypeId, 'name' => 'Falta']);
-        \App\Models\Absences\Absence::create([
+        $absenceTypeId = (string) Str::uuid();
+        DB::table('absence_types')->insert(['id' => $absenceTypeId, 'name' => 'Falta']);
+        Absence::create([
             'assistant_id' => $marta->id,
             'absence_type_id' => $absenceTypeId,
             'valid_from' => '2026-11-02',
@@ -219,7 +223,7 @@ class ScheduleGenerationTest extends TestCase
         ]);
         $rule->assistants()->attach([$marta->id => ['priority' => 1], $joana->id => ['priority' => 2]]);
 
-        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+        app(ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
 
         // Joana (suplente) assume a vaga na ausência de Marta
         $joanaEntries = ScheduleEntry::where('schedule_rule_id', $rule->id)
@@ -244,7 +248,7 @@ class ScheduleGenerationTest extends TestCase
         // Ambas são titulares (min = 2)
         $rule->assistants()->attach([$susana->id => ['priority' => 1], $joana->id => ['priority' => 2]]);
 
-        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+        app(ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
 
         foreach ([[$susana, '07:30:00'], [$joana, '07:45:00']] as [$assistant, $start]) {
             $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)
@@ -281,7 +285,7 @@ class ScheduleGenerationTest extends TestCase
         ]);
         $rule->assistants()->attach([$joana->id => ['priority' => 1]]);
 
-        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+        app(ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
 
         $entries = ScheduleEntry::where('schedule_rule_id', $rule->id)
             ->whereHas('schedule', fn ($query) => $query->where('assistant_id', $joana->id))->get();
@@ -304,7 +308,7 @@ class ScheduleGenerationTest extends TestCase
         ]);
         $rule->assistants()->attach($assistant->id, ['priority' => 1]);
 
-        app(\App\Services\ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
+        app(ScheduleGenerationService::class)->generate($this->school->id, '2026-11-02', '2026-11-02');
 
         $actual = ScheduleEntry::where('schedule_rule_id', $rule->id)->orderBy('start_time')->get()
             ->map(fn ($entry) => [substr($entry->getRawOriginal('start_time'), 0, 5), substr($entry->getRawOriginal('end_time'), 0, 5)])->all();
@@ -346,7 +350,9 @@ class ScheduleGenerationTest extends TestCase
 
     public function test_generates_complete_schedule_with_mandatory_optional_lunch_and_fallback(): void
     {
-        $assistant = $this->createAssistantWithShift(
+        Carbon::setTestNow('2026-10-26 09:00:00');
+        try {
+            $assistant = $this->createAssistantWithShift(
             name: 'Ana Silva',
             internalNumber: 'A001',
             entryTime: '08:00:00',
@@ -447,6 +453,9 @@ class ScheduleGenerationTest extends TestCase
             ->assertJsonPath('published_schedules_count', 1);
 
         $this->assertSame('published', Schedule::first()->status);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_round_b_partitions_mandatory_rule_across_two_assistants(): void
@@ -989,7 +998,7 @@ public function test_idempotency_key_reused_with_other_range_generates_fresh_sch
             ->assertJsonPath('entries_count', 2);
 
         // 2. Registar uma falta para este assistente no mesmo dia
-        $absenceType = \App\Models\Absences\AbsenceType::firstOrCreate(
+        $absenceType = AbsenceType::firstOrCreate(
             ['name' => 'Doença'],
             ['code' => 'DOENCA', 'requires_document' => false, 'active' => true]
         );
@@ -1076,7 +1085,7 @@ public function test_idempotency_key_reused_with_other_range_generates_fresh_sch
         $resp1->assertStatus(200);
 
         // Criar uma exceção de horário que altera a entrada para as 09:00
-        \App\Models\Assistants\AssistantException::create([
+        AssistantException::create([
             'assistant_id' => $assistant->id,
             'type' => 'specific_dates',
             'valid_from' => '2026-11-02',

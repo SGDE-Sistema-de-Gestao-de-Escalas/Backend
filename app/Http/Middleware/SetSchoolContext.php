@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\SchoolAccessService;
+use App\Services\Schools\SchoolAccessService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;

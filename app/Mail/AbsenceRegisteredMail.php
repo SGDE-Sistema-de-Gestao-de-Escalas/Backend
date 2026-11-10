@@ -30,22 +30,7 @@ class AbsenceRegisteredMail extends Mailable
 
     public function content(): Content
     {
-        $validFrom = $this->absence->valid_from
-            ? Carbon::parse($this->absence->valid_from)->format('d/m/Y')
-            : '';
-        $validUntil = $this->absence->valid_until
-            ? Carbon::parse($this->absence->valid_until)->format('d/m/Y')
-            : $validFrom;
-
-        $periodLabel = ($validFrom === $validUntil || $validUntil === '')
-            ? $validFrom
-            : "{$validFrom} a {$validUntil}";
-
-        if ($this->absence->start_time && $this->absence->end_time) {
-            $start = substr((string) $this->absence->start_time, 0, 5);
-            $end = substr((string) $this->absence->end_time, 0, 5);
-            $periodLabel .= " ({$start} às {$end})";
-        }
+        $periodLabel = $this->absence->formatPeriod();
 
         $statusLabels = [
             'pending' => 'Pendente de Justificação',
@@ -57,7 +42,7 @@ class AbsenceRegisteredMail extends Mailable
         $requiresDocument = (bool) ($this->absence->absenceType?->requires_document ?? false)
             && empty($this->absence->document_path);
 
-        $absencesUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/staff/absences';
+        $absencesUrl = rtrim((string) config('app.frontend_url'), '/') . '/staff/absences';
 
         return new Content(
             markdown: 'emails.absences.registered',

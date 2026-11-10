@@ -9,7 +9,7 @@ use App\Models\Auth\User;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
-use App\Services\ScheduleRuleAllocationService;
+use App\Services\Schedules\ScheduleRuleAllocationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

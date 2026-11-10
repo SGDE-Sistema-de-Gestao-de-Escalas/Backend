@@ -1,10 +1,16 @@
 <?php
 
+use App\Http\Middleware\AuthenticateFromCookie;
+use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetSchoolContext;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\EnsureUserIsActive;
-use App\Http\Middleware\SetSchoolContext;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -24,12 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ? '*'
             : array_values(array_filter(array_map('trim', explode(',', $trusted)))));
 
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->api(prepend: [
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \App\Http\Middleware\AuthenticateFromCookie::class,
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            AuthenticateFromCookie::class,
         ]);
 
         $middleware->alias([
@@ -42,7 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Dois pedidos em simultâneo podem passar a validação e só falhar na base de
         // dados (índice único). Para quem chama é um dado repetido, não um erro do servidor.
-        $exceptions->render(function (\Illuminate\Database\UniqueConstraintViolationException $e, \Illuminate\Http\Request $request) {
+        $exceptions->render(function (UniqueConstraintViolationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'message' => 'Já existe um registo com estes dados.',
@@ -51,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->shouldRenderJsonWhen(function (\Illuminate\Http\Request $request, Throwable $e) {
+        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
             return $request->is('api/*') || $request->expectsJson();
         });
     })->create();

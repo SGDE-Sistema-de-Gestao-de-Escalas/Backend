@@ -8,18 +8,13 @@ use App\Models\Schedules\AssistantScheduleProfile;
 use App\Models\Schedules\Schedule;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
-use Database\Factories\AssistantFactory;
-use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[UseFactory(AssistantFactory::class)]
 class Assistant extends Model
 {
-    /** @use HasFactory<\Database\Factories\AssistantFactory> */
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasUuids, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -112,5 +107,35 @@ class Assistant extends Model
     public function assistantScheduleProfiles()
     {
         return $this->hasMany(AssistantScheduleProfile::class);
+    }
+
+    /**
+     * Nome de exibição do assistente (devolve "Assistente Anonimizado" se anonimizado).
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if ($this->is_anonymized) {
+            return 'Assistente Anonimizado';
+        }
+
+        $name = trim(($this->user?->first_name ?? '') . ' ' . ($this->user?->last_name ?? ''));
+
+        return $name !== '' ? $name : ($this->user?->name ?: 'Assistente');
+    }
+
+    /**
+     * Iniciais do nome do assistente (ex: "AS").
+     */
+    public function getInitialsAttribute(): string
+    {
+        if ($this->is_anonymized) {
+            return 'AA';
+        }
+
+        $first = mb_substr(trim((string) ($this->user?->first_name ?? '')), 0, 1);
+        $last = mb_substr(trim((string) ($this->user?->last_name ?? '')), 0, 1);
+        $initials = mb_strtoupper($first . $last);
+
+        return $initials !== '' ? $initials : 'A';
     }
 }

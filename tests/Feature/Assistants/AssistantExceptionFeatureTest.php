@@ -6,8 +6,11 @@ use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingRule;
+use App\Models\System\ActivityType;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -146,16 +149,16 @@ class AssistantExceptionFeatureTest extends TestCase
             'description' => 'Licença em curso',
         ]);
 
-        // Consulta e valida flags do resource
+        // Consulta e valida flags do resource (sem horários passados gerados, ainda permite eliminar)
         $showResponse = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
             ->getJson("/api/assistant-exceptions/{$currentException->id}");
 
         $showResponse->assertOk()
             ->assertJsonPath('data.status', 'current')
-            ->assertJsonPath('data.can_edit', false)
+            ->assertJsonPath('data.can_edit', true)
             ->assertJsonPath('data.can_change_end_date', true)
-            ->assertJsonPath('data.can_delete', false);
+            ->assertJsonPath('data.can_delete', true);
 
         // Alterar apenas valid_until (prolongar licença para a sexta seguinte) é permitido
         $extendedFriday = Carbon::parse($nextFriday)->addWeek()->format('Y-m-d');
@@ -167,16 +170,36 @@ class AssistantExceptionFeatureTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.valid_until', $extendedFriday);
 
-        // Tentar alterar valid_from retroativamente é rejeitado com 422
+        // Quando já existe horário passado gerado na vigência, eliminar a exceção em vigor é proibido
+        $pastDate = Carbon::today()->subDays(1)->format('Y-m-d');
+        $activityType = ActivityType::create([
+            'school_id' => $this->school->id,
+            'name' => 'Apoio Teste',
+            'color' => '#3B82F6',
+            'active' => true,
+        ]);
+        $pastSchedule = Schedule::create([
+            'school_id' => $this->school->id,
+            'assistant_id' => $this->assistant->id,
+            'week_start' => $pastDate,
+            'week_end' => $pastDate,
+            'status' => 'published',
+        ]);
+        ScheduleEntry::create([
+            'schedule_id' => $pastSchedule->id,
+            'activity_type_id' => $activityType->id,
+            'activity_name' => $activityType->name,
+            'date' => $pastDate,
+            'start_time' => '09:00',
+            'end_time' => '13:00',
+        ]);
+
         $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
-            ->putJson("/api/assistant-exceptions/{$currentException->id}", [
-                'valid_from' => Carbon::today()->subDays(5)->format('Y-m-d'),
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['valid_from']);
+            ->getJson("/api/assistant-exceptions/{$currentException->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_delete', false);
 
-        // Eliminar exceção em vigor é proibido
         $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
             ->deleteJson("/api/assistant-exceptions/{$currentException->id}")
@@ -420,7 +443,7 @@ class AssistantExceptionFeatureTest extends TestCase
                 'days' => [0, 1, 2],
             ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['days']);
+        $response->assertOk()
+            ->assertJsonPath('data.days', [0, 1, 2]);
     }
 }

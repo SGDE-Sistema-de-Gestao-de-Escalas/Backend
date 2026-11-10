@@ -22,9 +22,11 @@ use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Schools\SchoolOperatingRuleDay;
 use App\Models\System\ActivityType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -341,7 +343,7 @@ class AssistantEmailNotificationsTest extends TestCase
     public function test_assistant_submitting_justification_or_document_sends_email_to_admins(): void
     {
         Mail::fake();
-        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
+        Storage::fake(config('filesystems.documents_disk'));
 
         $absence = Absence::create([
             'assistant_id' => $this->assistant->id,
@@ -353,7 +355,7 @@ class AssistantEmailNotificationsTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $file = \Illuminate\Http\UploadedFile::fake()->create('atestado_medico.pdf', 120, 'application/pdf');
+        $file = UploadedFile::fake()->create('atestado_medico.pdf', 120, 'application/pdf');
 
         $this->actingAs($this->assistantUser)
             ->withHeader('X-School-ID', $this->school->id)

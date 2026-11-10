@@ -4,16 +4,15 @@ namespace App\Models\Absences;
 
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Absence extends Model
 {
-    /** @use HasFactory<AbsenceFactory> */
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasUuids, SoftDeletes;
 
     protected $fillable = [
         'assistant_id',
@@ -35,8 +34,8 @@ class Absence extends Model
     protected function casts(): array
     {
         return [
-            'valid_from' => 'date',
-            'valid_until' => 'date',
+            'valid_from' => 'date:Y-m-d',
+            'valid_until' => 'date:Y-m-d',
             'total_days' => 'integer',
         ];
     }
@@ -59,5 +58,30 @@ class Absence extends Model
     public function justifiedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'justified_by_user_id');
+    }
+
+    /**
+     * Formata o período da falta para exibição nos emails e notificações (ex: "10/01/2026 a 12/01/2026 (09:00 às 12:00)").
+     */
+    public function formatPeriod(): string
+    {
+        $validFrom = $this->valid_from
+            ? Carbon::parse($this->valid_from)->format('d/m/Y')
+            : '';
+        $validUntil = $this->valid_until
+            ? Carbon::parse($this->valid_until)->format('d/m/Y')
+            : $validFrom;
+
+        $periodLabel = ($validFrom === $validUntil || $validUntil === '')
+            ? $validFrom
+            : "{$validFrom} a {$validUntil}";
+
+        if ($this->start_time && $this->end_time) {
+            $start = substr((string) $this->start_time, 0, 5);
+            $end = substr((string) $this->end_time, 0, 5);
+            $periodLabel .= " ({$start} às {$end})";
+        }
+
+        return $periodLabel;
     }
 }

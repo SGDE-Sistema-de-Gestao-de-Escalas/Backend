@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Security;
 
+use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
@@ -9,6 +10,7 @@ use App\Models\Schools\School;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -168,7 +170,7 @@ class MalformedInputTest extends TestCase
     #[DataProvider('arraysInAbsenceFields')]
     public function test_a_list_in_an_absence_field_is_a_422(string $field): void
     {
-        $absenceType = \App\Models\Absences\AbsenceType::create(['name' => 'Assuntos Pessoais', 'requires_document' => false]);
+        $absenceType = AbsenceType::create(['name' => 'Assuntos Pessoais', 'requires_document' => false]);
 
         $payload = array_merge([
             'assistant_id' => $this->assistant->id,
@@ -229,7 +231,7 @@ class MalformedInputTest extends TestCase
     public function test_malformed_data_in_a_schedule_rule_is_a_422(string $field, mixed $value): void
     {
         $payload = array_merge([
-            'activity_type_id' => (string) \Illuminate\Support\Str::uuid(),
+            'activity_type_id' => (string) Str::uuid(),
             'period_start' => '09:00',
             'period_end' => '10:00',
             'min' => 1,

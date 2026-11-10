@@ -4,18 +4,16 @@ namespace App\Http\Controllers\API\Schedules;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Schedules\GenerateScheduleRequest;
-use App\Http\Requests\Schedules\StoreScheduleRequest;
-use App\Http\Requests\Schedules\UpdateScheduleRequest;
 use App\Http\Resources\Schedules\ScheduleResource;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
-use App\Services\NotificationService;
-use App\Services\ScheduleGenerationService;
+use App\Services\System\NotificationService;
+use App\Services\Schedules\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use App\Services\ScheduleIntegrityService;
-use App\Services\ScheduleExportService;
+use App\Services\Schedules\ScheduleIntegrityService;
+use App\Services\Schedules\ScheduleExportService;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\JsonResponse;
 use Carbon\CarbonImmutable;
@@ -38,7 +36,7 @@ class ScheduleController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $user = $request->user();
-        $schoolId = $request->attributes->get('currentSchoolId') ?? $request->header('X-School-ID');
+        $schoolId = $this->resolveSchoolId($request);
 
         $query = Schedule::query()
             ->with([
@@ -89,13 +87,7 @@ class ScheduleController extends Controller
      */
     public function pendingRecalculations(Request $request): JsonResponse
     {
-        $schoolId = (string) (
-            $request->attributes->get('school_id')
-            ?? $request->attributes->get('currentSchoolId')
-            ?? $request->header('X-School-ID')
-            ?? $request->user()?->school_id
-            ?? $request->user()?->assistant?->school_id
-        );
+        $schoolId = (string) ($this->resolveSchoolId($request, fallbackToAssistant: true) ?? '');
 
         if ($schoolId === '') {
             return response()->json([
@@ -458,14 +450,6 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreScheduleRequest $request)
-    {
-        //
-    }
-
-    /**
      * Display the specified resource.
      */
     public function show(Schedule $schedule): ScheduleResource
@@ -473,28 +457,12 @@ class ScheduleController extends Controller
         $schedule->load([
             'assistant.user',
             'school',
-                'assistant.school',
+            'assistant.school',
             'scheduleEntries.activityType',
             'scheduleEntries.scheduleRule',
             'scheduleEntries.replacedAssistant.user',
         ]);
 
         return new ScheduleResource($schedule);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateScheduleRequest $request, Schedule $schedule)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Schedule $schedule)
-    {
-        //
     }
 }

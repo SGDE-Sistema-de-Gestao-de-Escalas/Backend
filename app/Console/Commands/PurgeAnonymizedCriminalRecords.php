@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Assistants\AssistantDocumentStorageService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class PurgeAnonymizedCriminalRecords extends Command
@@ -21,17 +21,19 @@ class PurgeAnonymizedCriminalRecords extends Command
      *
      * @var string
      */
-    protected $description = 'Remove registos criminais pendentes de contas anonimizadas';
+    protected $description = 'Remove registos criminais e comprovativos de faltas pendentes de contas anonimizadas';
 
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(AssistantDocumentStorageService $documentStorage): int
     {
         $pendingRecords = DB::table('assistants')
             ->join('users', 'users.id', '=', 'assistants.user_id')
-            ->whereNotNull('users.anonymized_at')
-            ->whereNotNull('assistants.deleted_at')
+            ->where(function ($query) {
+                $query->whereNotNull('users.anonymized_at')
+                    ->orWhere('assistants.is_anonymized', true);
+            })
             ->whereNotNull('assistants.criminal_record_path')
             ->where('assistants.criminal_record_path', '<>', '')
             ->select('assistants.id', 'assistants.criminal_record_path')
@@ -41,16 +43,17 @@ class PurgeAnonymizedCriminalRecords extends Command
 
         foreach ($pendingRecords as $record) {
             try {
-                $configuredDisk = config('filesystems.documents_disk');
-                $disk = str_contains($record->criminal_record_path, 'criminal_record') ? $configuredDisk : 'local';
-                if (! Storage::disk($disk)->delete($record->criminal_record_path)) {
+                if (! $documentStorage->deleteFile($record->criminal_record_path, strict: true)) {
                     throw new \RuntimeException('Falha ao remover o ficheiro.');
                 }
 
                 DB::table('assistants')
                     ->where('id', $record->id)
                     ->where('criminal_record_path', $record->criminal_record_path)
-                    ->update(['criminal_record_path' => null]);
+                    ->update([
+                        'criminal_record_path' => null,
+                        'criminal_record_name' => null,
+                    ]);
             } catch (Throwable $exception) {
                 report($exception);
 
@@ -74,9 +77,7 @@ class PurgeAnonymizedCriminalRecords extends Command
 
         foreach ($pendingAbsenceDocs as $absenceDoc) {
             try {
-                $configuredDisk = config('filesystems.documents_disk');
-                $disk = str_contains($absenceDoc->document_path, 'absences_files') ? $configuredDisk : 'local';
-                if (! Storage::disk($disk)->delete($absenceDoc->document_path)) {
+                if (! $documentStorage->deleteFile($absenceDoc->document_path, strict: true)) {
                     throw new \RuntimeException('Falha ao remover o ficheiro comprovativo de ausência.');
                 }
 

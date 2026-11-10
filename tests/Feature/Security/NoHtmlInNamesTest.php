@@ -8,7 +8,7 @@ use App\Models\Auth\User;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
 use App\Rules\NoHtmlCharacters;
-use App\Services\AssistantImportService;
+use App\Services\Assistants\AssistantImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Sanctum\Sanctum;

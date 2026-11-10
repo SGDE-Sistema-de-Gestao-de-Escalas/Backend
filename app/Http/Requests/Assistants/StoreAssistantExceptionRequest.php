@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Assistants;
 
 use App\Models\Assistants\Assistant;
-use App\Services\AssistantExceptionService;
+use App\Services\Assistants\AssistantExceptionService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 

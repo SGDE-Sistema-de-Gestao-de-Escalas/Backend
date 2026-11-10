@@ -40,7 +40,7 @@ class SchedulePublishedMail extends Mailable
             ? $formattedStart
             : "{$formattedStart} a {$formattedEnd}";
 
-        $scheduleUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/staff/schedule';
+        $scheduleUrl = rtrim((string) config('app.frontend_url'), '/') . '/staff/schedule';
 
         return new Content(
             markdown: 'emails.schedules.published',

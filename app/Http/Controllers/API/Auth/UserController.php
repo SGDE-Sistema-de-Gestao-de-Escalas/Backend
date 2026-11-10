@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\Auth\UserResource;
 use App\Models\Auth\User;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 use App\Http\Requests\Auth\StoreUserRequest;
 use App\Http\Requests\Auth\UpdateUserRequest;
-use App\Services\UserService;
+use App\Services\Auth\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

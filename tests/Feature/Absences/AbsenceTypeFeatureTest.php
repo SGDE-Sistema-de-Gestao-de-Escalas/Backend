@@ -39,6 +39,10 @@ class AbsenceTypeFeatureTest extends TestCase
 
         $this->actingAs($this->staff)
             ->getJson('/api/absence-types')
+            ->assertOk();
+
+        $this->actingAs($this->staff)
+            ->postJson('/api/absence-types', ['name' => 'Teste', 'requires_document' => false])
             ->assertForbidden();
     }
 

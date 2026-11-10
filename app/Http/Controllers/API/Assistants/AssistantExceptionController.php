@@ -7,8 +7,8 @@ use App\Http\Requests\Assistants\StoreAssistantExceptionRequest;
 use App\Http\Requests\Assistants\UpdateAssistantExceptionRequest;
 use App\Http\Resources\Assistants\AssistantExceptionResource;
 use App\Models\Assistants\AssistantException;
-use App\Services\AssistantExceptionService;
-use App\Services\ScheduleIntegrityService;
+use App\Services\Assistants\AssistantExceptionService;
+use App\Services\Schedules\ScheduleIntegrityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -28,7 +28,7 @@ class AssistantExceptionController extends Controller
     {
         Gate::authorize('viewAny', AssistantException::class);
 
-        $schoolId = $request->header('X-School-ID');
+        $schoolId = $this->resolveSchoolId($request);
         $assistantId = $request->query('assistant_id');
         $user = $request->user();
 

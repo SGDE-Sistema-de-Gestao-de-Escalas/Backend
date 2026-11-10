@@ -4,9 +4,8 @@ namespace App\Http\Requests\Schools;
 
 use App\Rules\NoHtmlCharacters;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateSchoolOperatingExceptionRequest extends FormRequest
+class UpdateSchoolOperatingExceptionRequest extends StoreSchoolOperatingExceptionRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -14,6 +13,11 @@ class UpdateSchoolOperatingExceptionRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user()?->can('update', $this->route('operating_exception')) ?? false;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // A escola não é alterável na atualização.
     }
 
     /**
@@ -38,10 +42,5 @@ class UpdateSchoolOperatingExceptionRequest extends FormRequest
             'valid_from' => ['sometimes', 'required', 'date_format:Y-m-d'],
             'valid_until' => ['sometimes', 'required', 'date_format:Y-m-d'],
         ];
-    }
-
-    public function messages(): array
-    {
-        return SchoolOperatingExceptionMessages::all();
     }
 }

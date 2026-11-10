@@ -68,7 +68,7 @@ class AssistantSeeder extends Seeder
             return;
         }
 
-        $password = Hash::make(env('SEED_STAFF_PASSWORD') ?: 'staff123');
+        $password = Hash::make((string) (config('app.seed_staff_password') ?: 'Password123!'));
 
         foreach (self::ROSTER as $internalNumber => [$acronym, $firstName, $email]) {
             $user = User::firstOrCreate(

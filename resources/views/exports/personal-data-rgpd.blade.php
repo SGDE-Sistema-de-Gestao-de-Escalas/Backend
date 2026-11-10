@@ -3,160 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <title>Ficha de Dados Pessoais (RGPD) — {{ $fullName }}</title>
-<style>
-  @page {
-    size: A4 portrait;
-    margin: 16mm 16mm 18mm 16mm;
-  }
-  body {
-    font-family: DejaVu Sans, Helvetica, Arial, sans-serif;
-    font-size: 9pt;
-    color: #0f172a;
-    margin: 0;
-    padding: 0;
-    line-height: 1.45;
-  }
-
-  /* Header */
-  .header-table {
-    width: 100%;
-    border-collapse: collapse;
-    border-bottom: 1.5pt solid #0f172a;
-    margin-bottom: 14pt;
-  }
-  .header-table td {
-    vertical-align: bottom;
-    padding: 0 0 8pt 0;
-  }
-  .doc-title {
-    font-size: 13pt;
-    font-weight: bold;
-    color: #0f172a;
-    margin: 0;
-  }
-  .doc-subtitle {
-    font-size: 7.5pt;
-    color: #475569;
-    margin: 2pt 0 0 0;
-  }
-  .meta-right {
-    text-align: right;
-    font-size: 7.5pt;
-    color: #64748b;
-    white-space: nowrap;
-  }
-
-  /* Intro Banner */
-  .intro-box {
-    background-color: #f8fafc;
-    border: 0.5pt solid #cbd5e1;
-    border-left: 3pt solid #0e7c59;
-    border-radius: 3pt;
-    padding: 8pt 10pt;
-    margin-bottom: 14pt;
-    font-size: 8pt;
-    color: #334155;
-  }
-
-  /* Section */
-  .section-title {
-    font-size: 9.5pt;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.4pt;
-    color: #0e7c59;
-    border-bottom: 0.75pt solid #cbd5e1;
-    padding-bottom: 3pt;
-    margin: 14pt 0 7pt 0;
-  }
-
-  .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 6pt;
-  }
-  .data-table th,
-  .data-table td {
-    padding: 5.5pt 8pt;
-    border: 0.5pt solid #e2e8f0;
-    font-size: 8.5pt;
-    text-align: left;
-    vertical-align: top;
-  }
-  .data-table th {
-    width: 36%;
-    background-color: #f8fafc;
-    color: #475569;
-    font-weight: bold;
-  }
-  .data-table td {
-    color: #0f172a;
-  }
-
-  .badge-active {
-    display: inline-block;
-    padding: 1pt 5pt;
-    border-radius: 2pt;
-    font-size: 7.5pt;
-    font-weight: bold;
-    background-color: #dcfce7;
-    color: #166534;
-  }
-  .badge-inactive {
-    display: inline-block;
-    padding: 1pt 5pt;
-    border-radius: 2pt;
-    font-size: 7.5pt;
-    font-weight: bold;
-    background-color: #fee2e2;
-    color: #991b1b;
-  }
-
-  .legal-box {
-    margin-top: 18pt;
-    padding: 9pt 10pt;
-    background-color: #f1f5f9;
-    border: 0.5pt solid #cbd5e1;
-    border-radius: 3pt;
-    font-size: 7.3pt;
-    color: #475569;
-  }
-
-  /* Footer */
-  .footer {
-    position: fixed;
-    bottom: -6mm;
-    left: 0;
-    right: 0;
-    border-top: 0.5pt solid #cbd5e1;
-    padding-top: 4pt;
-    font-size: 6.5pt;
-    color: #64748b;
-  }
-  .footer-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-</style>
+<link rel="stylesheet" href="{{ resource_path('css/exports/personal-data-rgpd.css') }}">
 </head>
 <body>
 
   <div class="footer">
     <table class="footer-table">
       <tr>
-        <td style="text-align: left;">SGDE — Sistema de Gestão de Escalas · Documento de Portabilidade e Acesso (RGPD)</td>
-        <td style="text-align: right;">Emitido em {{ $exportedAtFormatted }}</td>
+        <td class="footer-left">SGDE — Sistema de Gestão de Escalas · Documento de Portabilidade e Acesso (RGPD)</td>
+        <td class="footer-right">Emitido em {{ $exportedAtFormatted }}</td>
       </tr>
     </table>
   </div>
 
   <table class="header-table">
     <tr>
-      <td style="width: 95pt;">
+      <td class="header-logo-cell">
         @if (!empty($logoBase64))
-          <img src="{{ $logoBase64 }}" style="height: 24pt; width: auto;" />
+          <img src="{{ $logoBase64 }}" class="header-logo-img" />
         @else
-          <strong style="font-size: 13pt; color: #0e7c59;">SGDE</strong>
+          <strong class="header-logo-fallback">SGDE</strong>
         @endif
       </td>
       <td>

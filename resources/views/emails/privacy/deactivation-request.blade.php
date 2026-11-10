@@ -14,20 +14,14 @@ O(A) utilizador(a) **{{ $user->first_name }} {{ $user->last_name }}** submeteu u
 </x-mail::panel>
 
 @php
-$adminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/assistants';
+$adminUrl = rtrim((string) config('app.frontend_url'), '/') . '/assistants';
 @endphp
 
 <x-mail::button :url="$adminUrl" color="primary">
 Analisar Pedido na Plataforma
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $adminUrl }}" target="_blank" rel="noopener">{{ $adminUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $adminUrl])
 
 <p class="help-note">
 Proceda à análise do pedido e posterior desativação ou anonimização da conta em conformidade com o Regulamento Geral sobre a Proteção de Dados (RGPD).

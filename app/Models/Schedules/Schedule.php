@@ -4,16 +4,13 @@ namespace App\Models\Schedules;
 
 use App\Models\Assistants\Assistant;
 use App\Models\Schools\School;
-use Database\Factories\ScheduleFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Schedule extends Model
 {
-    /** @use HasFactory<ScheduleFactory> */
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasUuids, SoftDeletes;
 
     protected $fillable = [
         'school_id',

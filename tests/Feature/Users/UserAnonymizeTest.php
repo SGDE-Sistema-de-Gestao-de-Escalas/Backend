@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
-use App\Services\UserService;
+use App\Services\Auth\UserService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -125,6 +125,34 @@ class UserAnonymizeTest extends TestCase
 
         $staffNotificationId = (string) Str::uuid();
         $adminNotificationId = (string) Str::uuid();
+
+        $docsDisk = config('filesystems.documents_disk', 'public');
+        Storage::fake($docsDisk);
+        $absenceDocPath = 'ana_silva_test_001/absences_files/ausencia_teste.pdf';
+        Storage::disk($docsDisk)->put($absenceDocPath, 'Conteúdo justificativo');
+
+        $absenceTypeId = (string) Str::uuid();
+        $absenceId = (string) Str::uuid();
+        DB::table('absence_types')->insert([
+            'id' => $absenceTypeId,
+            'name' => 'Doença',
+            'requires_document' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('absences')->insert([
+            'id' => $absenceId,
+            'assistant_id' => $assistantId,
+            'absence_type_id' => $absenceTypeId,
+            'valid_from' => '2026-01-10',
+            'valid_until' => '2026-01-10',
+            'total_days' => 1,
+            'document_name' => 'atestado.pdf',
+            'document_path' => $absenceDocPath,
+            'status' => 'justified',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         DB::table('notifications')->insert([
             [
@@ -261,6 +289,12 @@ class UserAnonymizeTest extends TestCase
 
         $this->assertDatabaseCount('assistants', 1);
         $this->assertDatabaseHas('schools', ['id' => $schoolId]);
+        Storage::disk($docsDisk)->assertMissing($absenceDocPath);
+        $this->assertDatabaseHas('absences', [
+            'id' => $absenceId,
+            'document_path' => null,
+            'document_name' => null,
+        ]);
 
         $this->getJson("/api/users/{$staff->id}")
             ->assertOk()
