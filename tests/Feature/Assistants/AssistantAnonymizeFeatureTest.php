@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Assistants;
 
+use App\Models\Absences\Absence;
+use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
@@ -86,14 +88,14 @@ class AssistantAnonymizeFeatureTest extends TestCase
         $assistant = $this->createInactiveAssistant();
         $assistant->update(['criminal_record_path' => 'criminal_records/doc.pdf']);
 
-        $absenceType = \App\Models\Absences\AbsenceType::create([
+        $absenceType = AbsenceType::create([
             'name' => 'Doença',
             'slug' => 'doenca',
             'requires_document' => true,
             'active' => true,
         ]);
 
-        $absence = \App\Models\Absences\Absence::create([
+        $absence = Absence::create([
             'assistant_id' => $assistant->id,
             'absence_type_id' => $absenceType->id,
             'valid_from' => now()->subDays(5)->toDateString(),

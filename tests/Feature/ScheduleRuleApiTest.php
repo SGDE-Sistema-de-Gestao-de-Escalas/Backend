@@ -8,7 +8,7 @@ use App\Models\Auth\User;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
-use App\Services\ScheduleRuleService;
+use App\Services\Schedules\ScheduleRuleService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;

@@ -7,7 +7,7 @@ use App\Http\Requests\Schools\StoreSchoolOperatingExceptionRequest;
 use App\Http\Requests\Schools\UpdateSchoolOperatingExceptionRequest;
 use App\Http\Resources\Schools\SchoolOperatingExceptionResource;
 use App\Models\Schools\SchoolOperatingException;
-use App\Services\SchoolOperatingExceptionService;
+use App\Services\Schools\SchoolOperatingExceptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;

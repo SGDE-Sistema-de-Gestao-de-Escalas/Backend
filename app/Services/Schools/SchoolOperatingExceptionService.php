@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schools;
 
 use App\Exceptions\SchoolOperatingExceptionConflictException;
 use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingException;
+use App\Support\TimeHelper;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -333,6 +334,6 @@ class SchoolOperatingExceptionService
 
     private function minutes(string $time): int
     {
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 }

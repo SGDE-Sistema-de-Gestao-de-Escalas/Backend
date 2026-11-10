@@ -11,7 +11,7 @@ use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Schools\SchoolOperatingRuleDay;
 use App\Models\System\ActivityType;
-use App\Services\ScheduleExportService;
+use App\Services\Schedules\ScheduleExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;

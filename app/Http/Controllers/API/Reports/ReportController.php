@@ -4,7 +4,7 @@ namespace App\Http\Controllers\API\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\ReportRequest;
-use App\Services\ReportService;
+use App\Services\Reports\ReportService;
 use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller

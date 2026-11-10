@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Schools\School;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,7 +13,7 @@ class SchoolSeeder extends Seeder
      */
     public function run(): void
     {
-        \App\Models\Schools\School::firstOrCreate(
+        School::firstOrCreate(
             ['acronym' => 'ESPL'],
             [
                 'name' => 'EB1 Miosótis',
@@ -23,7 +24,7 @@ class SchoolSeeder extends Seeder
             ]
         );
 
-        \App\Models\Schools\School::firstOrCreate(
+        School::firstOrCreate(
             ['acronym' => 'EB23S'],
             [
                 'name' => 'JI Miosótis',

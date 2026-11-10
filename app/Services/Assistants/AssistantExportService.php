@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Assistants;
 
 use App\Models\Assistants\Assistant;
 use App\Support\AssistantCsv;

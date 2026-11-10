@@ -3,7 +3,7 @@
 namespace App\Http\Resources\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Services\UserService;
+use App\Services\Auth\UserService;
 
 class UserResource extends JsonResource
 {

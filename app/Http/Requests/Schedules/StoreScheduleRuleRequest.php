@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
-use App\Services\ScheduleRuleService;
+use App\Services\Schedules\ScheduleRuleService;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 

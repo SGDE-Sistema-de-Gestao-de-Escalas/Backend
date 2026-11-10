@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\AssistantDocumentStorageService;
+use App\Services\Assistants\AssistantDocumentStorageService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;

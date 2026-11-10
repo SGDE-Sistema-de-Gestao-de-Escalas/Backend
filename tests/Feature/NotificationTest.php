@@ -13,14 +13,18 @@ use App\Models\Schedules\AssistantScheduleShift;
 use App\Models\Schedules\AssistantScheduleShiftDay;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
+use App\Models\Schools\SchoolOperatingException;
 use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Schools\SchoolOperatingRuleDay;
 use App\Models\System\ActivityType;
 use App\Models\System\Notification;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -199,8 +203,8 @@ class NotificationTest extends TestCase
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(), 'total_days' => 1,
         ]);
 
-        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
-        $file = \Illuminate\Http\UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
+        Storage::fake(config('filesystems.documents_disk'));
+        $file = UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
 
         $this->as($assistant->user)->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])->assertSuccessful();
 
@@ -348,11 +352,11 @@ class NotificationTest extends TestCase
             'valid_from' => $today->toDateString(), 'valid_until' => $today->addDays(40)->toDateString(),
         ]);
 
-        $closure = \App\Models\Schools\SchoolOperatingException::create([ // exceção de funcionamento (Motor) a terminar
+        $closure = SchoolOperatingException::create([ // exceção de funcionamento (Motor) a terminar
             'school_id' => $this->school->id, 'name' => 'Obras', 'is_closed' => true,
             'valid_from' => $today->subDays(3)->toDateString(), 'valid_until' => $today->addDays(4)->toDateString(),
         ]);
-        \App\Models\Schools\SchoolOperatingException::create([ // fora da janela de 7 dias: não notifica
+        SchoolOperatingException::create([ // fora da janela de 7 dias: não notifica
             'school_id' => $this->school->id, 'name' => 'Natal', 'is_closed' => true,
             'valid_from' => $today->addDays(20)->toDateString(), 'valid_until' => $today->addDays(30)->toDateString(),
         ]);
@@ -410,10 +414,10 @@ class NotificationTest extends TestCase
             'assistant_id' => $assistant->id, 'absence_type_id' => $this->absenceTypeId(),
             'valid_from' => $this->monday->toDateString(), 'valid_until' => $this->monday->toDateString(), 'total_days' => 1,
         ]);
-        \Illuminate\Support\Facades\Storage::fake(config('filesystems.documents_disk'));
-        \Illuminate\Support\Facades\Schema::drop('notifications');
+        Storage::fake(config('filesystems.documents_disk'));
+        Schema::drop('notifications');
 
-        $file = \Illuminate\Http\UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
+        $file = UploadedFile::fake()->create('comprovativo.pdf', 50, 'application/pdf');
 
         $this->as($assistant->user)
             ->post("/api/absences/{$absence->id}/document", ['document' => $file], ['Accept' => 'application/json'])

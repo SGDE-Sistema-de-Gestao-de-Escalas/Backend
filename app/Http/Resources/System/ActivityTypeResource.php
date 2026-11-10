@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Resources\System;
-use App\Services\ActivityTypeService;
+use App\Services\System\ActivityTypeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

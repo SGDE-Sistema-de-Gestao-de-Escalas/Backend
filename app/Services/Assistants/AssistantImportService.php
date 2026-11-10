@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Assistants;
 
 use App\Rules\NoHtmlCharacters;
 use App\Http\Requests\Assistants\StoreAssistantRequest;

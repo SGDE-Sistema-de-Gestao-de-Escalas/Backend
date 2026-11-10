@@ -3,21 +3,25 @@ use App\Http\Controllers\API\Absences\AbsenceController;
 use App\Http\Controllers\API\Absences\AbsenceTypeController;
 use App\Http\Controllers\API\Assistants\AssistantController;
 use App\Http\Controllers\API\Assistants\AssistantCsvController;
+use App\Http\Controllers\API\Assistants\AssistantExceptionController;
+use App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController;
+use App\Http\Controllers\API\Auth\AuthController;
+use App\Http\Controllers\API\Auth\OAuthController;
+use App\Http\Controllers\API\Auth\PrivacyController;
 use App\Http\Controllers\API\Auth\RoleController;
+use App\Http\Controllers\API\Auth\UserController;
+use App\Http\Controllers\API\Dashboard\DashboardBootstrapController;
+use App\Http\Controllers\API\Reports\ReportController;
+use App\Http\Controllers\API\Schedules\AssistantScheduleProfileController;
 use App\Http\Controllers\API\Schedules\HolidayController;
 use App\Http\Controllers\API\Schedules\ScheduleController;
 use App\Http\Controllers\API\Schedules\ScheduleRuleController;
-use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Schools\OperatingCalendarController;
+use App\Http\Controllers\API\Schools\SchoolController;
 use App\Http\Controllers\API\Schools\SchoolOperatingExceptionController;
 use App\Http\Controllers\API\Schools\SchoolOperatingRuleController;
 use App\Http\Controllers\API\System\ActivityTypeController;
 use App\Http\Controllers\API\System\NotificationController;
-use App\Http\Controllers\API\Auth\AuthController;
-use App\Http\Controllers\API\Auth\UserController;
-use App\Http\Controllers\API\Assistants\AssistantExceptionController;
-use App\Http\Controllers\API\Auth\PrivacyController;
-use App\Http\Controllers\API\Dashboard\DashboardBootstrapController;
 use App\Models\Schedules\Schedule;
 use Illuminate\Support\Facades\Route;
 
@@ -47,10 +51,10 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:password-reset');
 
 // Rotas OAuth
-Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\API\Auth\OAuthController::class, 'redirect'])
+Route::get('/auth/{provider}/redirect', [OAuthController::class, 'redirect'])
     ->middleware('throttle:oauth')
     ->name('oauth.redirect');
-Route::get('/auth/{provider}/callback', [\App\Http\Controllers\API\Auth\OAuthController::class, 'externalLoginCallback'])
+Route::get('/auth/{provider}/callback', [OAuthController::class, 'externalLoginCallback'])
     ->middleware('throttle:oauth')
     ->name('oauth.callback');
 
@@ -154,7 +158,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
 
     // Recursos acessíveis para consulta de horários e assistência por Staff (com escrita restrita a Admin)
     Route::apiResource('activity-types', ActivityTypeController::class);
-    Route::apiResource('assistant-schedule-profiles', \App\Http\Controllers\API\Schedules\AssistantScheduleProfileController::class);
+    Route::apiResource('assistant-schedule-profiles', AssistantScheduleProfileController::class);
     Route::apiResource('assistant-exceptions', AssistantExceptionController::class);
     Route::apiResource('schedule-rules', ScheduleRuleController::class);
     // Importação e exportação em CSV (só administradores). Têm de vir ANTES do
@@ -169,8 +173,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
     });
     Route::apiResource('assistants', AssistantController::class)
         ->withTrashed(['show', 'update', 'destroy']);
-    Route::get('/assistant-temporary-assignments', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'index']);
-    Route::get('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'show']);
+    Route::get('/assistant-temporary-assignments', [AssistantTemporaryAssignmentsController::class, 'index']);
+    Route::get('/assistant-temporary-assignments/{assistant_temporary_assignment}', [AssistantTemporaryAssignmentsController::class, 'show']);
 
     // Restringe a gestão destes recursos aos administradores.
     Route::middleware('can:manage-system')->group(function () {
@@ -179,11 +183,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api', 'school.context'])-
         Route::get('/dashboard/bootstrap', [DashboardBootstrapController::class, 'index'])
             ->name('dashboard.bootstrap');
 
-        Route::get('/reports', [\App\Http\Controllers\API\Reports\ReportController::class, 'index'])
+        Route::get('/reports', [ReportController::class, 'index'])
             ->name('reports.index');
         Route::get('/assistants/{assistant}/criminal-record', [AssistantController::class, 'downloadCriminalRecord'])
             ->name('assistants.criminal-record');
-        Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [\App\Http\Controllers\API\Assistants\AssistantTemporaryAssignmentsController::class, 'destroy']);
+        Route::delete('/assistant-temporary-assignments/{assistant_temporary_assignment}', [AssistantTemporaryAssignmentsController::class, 'destroy']);
         Route::post('/schedules/generate', [ScheduleController::class, 'generate'])
             ->middleware('throttle:heavy')
             ->name('schedules.generate');

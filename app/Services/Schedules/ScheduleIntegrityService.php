@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schedules;
+
+use App\Services\Schools\OperatingHoursResolver;
 
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
@@ -9,6 +11,7 @@ use App\Models\Schedules\Schedule;
 use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
+use App\Support\TimeHelper;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -380,7 +383,7 @@ class ScheduleIntegrityService
 
     private function toMinutes(string $time): int
     {
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 
     private function intervalsOverlap(int $s1, int $e1, int $s2, int $e2): bool

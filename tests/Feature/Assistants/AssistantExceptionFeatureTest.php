@@ -6,8 +6,11 @@ use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingRule;
+use App\Models\System\ActivityType;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -169,20 +172,20 @@ class AssistantExceptionFeatureTest extends TestCase
 
         // Quando já existe horário passado gerado na vigência, eliminar a exceção em vigor é proibido
         $pastDate = Carbon::today()->subDays(1)->format('Y-m-d');
-        $activityType = \App\Models\System\ActivityType::create([
+        $activityType = ActivityType::create([
             'school_id' => $this->school->id,
             'name' => 'Apoio Teste',
             'color' => '#3B82F6',
             'active' => true,
         ]);
-        $pastSchedule = \App\Models\Schedules\Schedule::create([
+        $pastSchedule = Schedule::create([
             'school_id' => $this->school->id,
             'assistant_id' => $this->assistant->id,
             'week_start' => $pastDate,
             'week_end' => $pastDate,
             'status' => 'published',
         ]);
-        \App\Models\Schedules\ScheduleEntry::create([
+        ScheduleEntry::create([
             'schedule_id' => $pastSchedule->id,
             'activity_type_id' => $activityType->id,
             'activity_name' => $activityType->name,

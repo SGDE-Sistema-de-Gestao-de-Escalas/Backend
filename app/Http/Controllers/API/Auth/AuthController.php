@@ -4,8 +4,8 @@ namespace App\Http\Controllers\API\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Auth\UserResource;
-use App\Services\AuthService;
-use App\Services\UserService;
+use App\Services\Auth\AuthService;
+use App\Services\Auth\UserService;
 use App\Http\Requests\Auth\UpdateUserRequest;
 use App\Rules\StrongPassword;
 use Illuminate\Http\Request;

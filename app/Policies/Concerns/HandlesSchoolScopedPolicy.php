@@ -3,7 +3,7 @@
 namespace App\Policies\Concerns;
 
 use App\Models\Auth\User;
-use App\Services\SchoolAccessService;
+use App\Services\Schools\SchoolAccessService;
 use Illuminate\Database\Eloquent\Model;
 
 trait HandlesSchoolScopedPolicy

@@ -4,6 +4,7 @@ namespace App\Models\Absences;
 
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -65,10 +66,10 @@ class Absence extends Model
     public function formatPeriod(): string
     {
         $validFrom = $this->valid_from
-            ? \Carbon\Carbon::parse($this->valid_from)->format('d/m/Y')
+            ? Carbon::parse($this->valid_from)->format('d/m/Y')
             : '';
         $validUntil = $this->valid_until
-            ? \Carbon\Carbon::parse($this->valid_until)->format('d/m/Y')
+            ? Carbon::parse($this->valid_until)->format('d/m/Y')
             : $validFrom;
 
         $periodLabel = ($validFrom === $validUntil || $validUntil === '')

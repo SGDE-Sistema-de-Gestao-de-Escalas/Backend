@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schools;
+
+use App\Services\System\ActivityTypeService;
 
 use App\Exceptions\SchoolDeletionConflictException;
 use App\Models\Schools\School;

@@ -40,7 +40,7 @@ class AbsenceJustificationSubmittedMail extends Mailable
             ? "{$assistantName} ({$internalNumber})"
             : $assistantName;
 
-        $absencesAdminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/absences';
+        $absencesAdminUrl = rtrim((string) config('app.frontend_url'), '/') . '/absences';
 
         return new Content(
             markdown: 'emails.absences.justification-submitted',

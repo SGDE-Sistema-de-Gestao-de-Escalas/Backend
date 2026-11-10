@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Resources\Absences;
-use App\Services\AbsenceTypeService;
+use App\Services\Absences\AbsenceTypeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Resources\Schools;
-use App\Services\SchoolService;
+use App\Services\Schools\SchoolService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

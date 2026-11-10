@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schools;
 
 use App\Exceptions\SchoolOperatingRuleConflictException;
 use App\Models\Schools\School;
 use App\Models\Schools\SchoolOperatingRule;
 use App\Models\Schools\SchoolOperatingRuleDay;
+use App\Support\TimeHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -335,6 +336,6 @@ class SchoolOperatingRuleService
 
     private function minutes(string $time): int
     {
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 }

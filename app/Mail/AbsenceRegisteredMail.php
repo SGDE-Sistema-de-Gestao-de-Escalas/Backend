@@ -42,7 +42,7 @@ class AbsenceRegisteredMail extends Mailable
         $requiresDocument = (bool) ($this->absence->absenceType?->requires_document ?? false)
             && empty($this->absence->document_path);
 
-        $absencesUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/staff/absences';
+        $absencesUrl = rtrim((string) config('app.frontend_url'), '/') . '/staff/absences';
 
         return new Content(
             markdown: 'emails.absences.registered',

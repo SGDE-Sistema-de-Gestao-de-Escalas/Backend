@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Assistants;
 
 use App\Models\Assistants\Assistant;
 use App\Support\DocumentExtension;
@@ -20,7 +20,7 @@ class AssistantDocumentStorageService
      */
     public function getDisk(?string $path = null): string
     {
-        $configuredDisk = (string) config('filesystems.documents_disk', 'public');
+        $configuredDisk = (string) config('filesystems.documents_disk');
 
         if ($path !== null && $path !== '') {
             return (str_contains($path, 'criminal_record') || str_contains($path, 'absences_files'))

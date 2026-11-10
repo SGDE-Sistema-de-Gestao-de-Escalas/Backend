@@ -8,8 +8,8 @@ use App\Http\Requests\Schedules\StoreScheduleRuleRequest;
 use App\Http\Requests\Schedules\UpdateScheduleRuleRequest;
 use App\Http\Resources\Schedules\ScheduleRuleResource;
 use App\Models\Schedules\ScheduleRule;
-use App\Services\NotificationService;
-use App\Services\ScheduleRuleService;
+use App\Services\System\NotificationService;
+use App\Services\Schedules\ScheduleRuleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 

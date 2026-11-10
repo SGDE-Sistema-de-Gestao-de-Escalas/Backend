@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Absences;
 
 use App\Exceptions\AbsenceTypeDeletionConflictException;
 use App\Models\Absences\AbsenceType;

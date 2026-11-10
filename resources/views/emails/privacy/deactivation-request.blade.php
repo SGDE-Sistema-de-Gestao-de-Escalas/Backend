@@ -14,7 +14,7 @@ O(A) utilizador(a) **{{ $user->first_name }} {{ $user->last_name }}** submeteu u
 </x-mail::panel>
 
 @php
-$adminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/assistants';
+$adminUrl = rtrim((string) config('app.frontend_url'), '/') . '/assistants';
 @endphp
 
 <x-mail::button :url="$adminUrl" color="primary">

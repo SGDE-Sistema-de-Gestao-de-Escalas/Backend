@@ -5,7 +5,10 @@ namespace Tests\Feature\Assistants;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
+use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schools\School;
+use App\Models\System\ActivityType;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -193,13 +196,13 @@ class AssistantScheduleProfileTest extends TestCase
 
         // Simular que existem escalas passadas geradas para o assistente
         $pastDate = Carbon::today()->subDay()->format('Y-m-d');
-        $activityType = \App\Models\System\ActivityType::create([
+        $activityType = ActivityType::create([
             'school_id' => $this->school->id,
             'name' => 'Apoio Teste',
             'color' => '#3B82F6',
             'active' => true,
         ]);
-        $pastSchedule = \App\Models\Schedules\Schedule::create([
+        $pastSchedule = Schedule::create([
             'school_id' => $this->school->id,
             'assistant_id' => $assistant->id,
             'assistant_schedule_profile_id' => $currentProfile->id,
@@ -207,7 +210,7 @@ class AssistantScheduleProfileTest extends TestCase
             'week_end' => $pastDate,
             'status' => 'published',
         ]);
-        \App\Models\Schedules\ScheduleEntry::create([
+        ScheduleEntry::create([
             'schedule_id' => $pastSchedule->id,
             'activity_type_id' => $activityType->id,
             'activity_name' => $activityType->name,

@@ -3,344 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Escala de Serviço — {{ $school->name }}</title>
-<style>
-  @page {
-    size: A4 landscape;
-    margin: 9mm 10mm 10mm 10mm;
-  }
-  body {
-    font-family: DejaVu Sans, Helvetica, Arial, sans-serif;
-    font-size: 7.5pt;
-    color: #0f172a;
-    margin: 0;
-    padding: 0;
-  }
-  .page-break {
-    page-break-after: always;
-  }
-
-  /* Header */
-  .header-table {
-    width: 100%;
-    border-collapse: collapse;
-    border-bottom: 1.2pt solid #0f172a;
-    margin-bottom: 6pt;
-  }
-  .header-table td {
-    vertical-align: bottom;
-    padding: 0 0 5pt 0;
-  }
-  .school-title {
-    font-size: 10pt;
-    font-weight: bold;
-    color: #0f172a;
-    letter-spacing: 0.1pt;
-    margin: 0;
-  }
-  .school-subtitle {
-    font-size: 6.4pt;
-    color: #64748b;
-    margin: 1.5pt 0 0 0;
-  }
-  .date-title {
-    font-size: 8.5pt;
-    font-weight: bold;
-    color: #0f172a;
-    text-align: right;
-    margin: 0;
-    white-space: nowrap;
-  }
-  .hours-subtitle {
-    font-size: 6.4pt;
-    color: #64748b;
-    text-align: right;
-    margin: 1.5pt 0 0 0;
-    white-space: nowrap;
-  }
-
-  /* Legend Bar */
-  .legend-bar {
-    margin-bottom: 6pt;
-    padding: 3.5pt 6pt;
-    background-color: #f8fafc;
-    border: 0.5pt solid #cbd5e1;
-    border-radius: 2pt;
-    font-size: 5.8pt;
-    color: #334155;
-  }
-  .legend-label {
-    font-weight: bold;
-    text-transform: uppercase;
-    color: #475569;
-    margin-right: 6pt;
-    letter-spacing: 0.3pt;
-  }
-  .legend-item {
-    display: inline-block;
-    margin-right: 9pt;
-    color: #1e293b;
-  }
-  .legend-swatch {
-    display: inline-block;
-    width: 7pt;
-    height: 5.5pt;
-    border-radius: 1pt;
-    margin-right: 3pt;
-    vertical-align: middle;
-  }
-
-  /* Unified Fixed-Timeline Schedule Table */
-  .schedule-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .schedule-table thead th {
-    border-top: 0.8pt solid #0f172a;
-    border-bottom: 0.8pt solid #0f172a;
-    background-color: #f8fafc;
-    font-size: 5.8pt;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.3pt;
-    color: #334155;
-    padding: 0;
-    vertical-align: middle;
-  }
-  .schedule-table tbody td {
-    border-bottom: 0.5pt solid #cbd5e1;
-    padding: 0;
-    vertical-align: middle;
-  }
-
-  .col-assistant {
-    width: 11.5%;
-    border-right: 0.5pt solid #cbd5e1;
-    padding: 0 5pt !important;
-    text-align: left;
-  }
-  .col-shift {
-    width: 9.5%;
-    border-right: 0.5pt solid #cbd5e1;
-    padding: 0 5pt !important;
-    text-align: left;
-  }
-  .col-timeline {
-    width: 79%;
-    padding: 0 !important;
-  }
-
-  .assistant-name {
-    font-size: 6.6pt;
-    font-weight: bold;
-    color: #0f172a;
-    display: block;
-  }
-  .assistant-code {
-    font-size: 5.3pt;
-    color: #64748b;
-    margin-top: 1pt;
-    display: block;
-  }
-
-  .shift-main {
-    font-size: 6.2pt;
-    font-weight: bold;
-    color: #0f172a;
-    display: block;
-  }
-  .shift-lunch {
-    font-size: 5pt;
-    color: #64748b;
-    margin-top: 1.5pt;
-    display: block;
-  }
-
-  /* Timeline Header Bar */
-  .tl-header-wrap {
-    position: relative;
-    width: 100%;
-    height: 17pt;
-  }
-  .tl-hour-header {
-    position: absolute;
-    top: 0;
-    height: 17pt;
-    border-left: 0.5pt solid #cbd5e1;
-  }
-  .tl-hour-text {
-    padding-top: 4.5pt;
-    padding-left: 2.5pt;
-    font-size: 5.5pt;
-    font-weight: bold;
-    color: #334155;
-    line-height: 8pt;
-  }
-
-  /* Timeline Row Track: fixed 32pt height */
-  .tl-row-wrap {
-    position: relative;
-    width: 100%;
-    height: 32pt;
-    background-color: #ffffff;
-  }
-  .tl-tick-line {
-    position: absolute;
-    top: 0;
-    height: 32pt;
-    width: 0;
-  }
-  .tl-tick-hour {
-    border-left: 0.5pt solid #e2e8f0;
-  }
-  .tl-tick-half {
-    border-left: 0.5pt dashed #e2e8f0;
-  }
-  .tl-tick-quarter {
-    border-left: 0.4pt dotted #f1f5f9;
-  }
-
-  /*
-   * Strict Uniform Height for ALL blocks on the timeline:
-   * top: 3pt + border-top: 2.2pt + height: 23.3pt + border-bottom: 0.5pt = 29.0pt
-   * Leaves exact 3.0pt margin at top and 3.0pt margin at bottom inside 32pt row.
-   */
-  .tl-block {
-    position: absolute;
-    top: 3pt;
-    height: 23.3pt;
-    padding: 0;
-    margin: 0;
-    border-radius: 1.5pt;
-    border-top-width: 2.2pt;
-    border-top-style: solid;
-    border-bottom-width: 0.5pt;
-    border-bottom-style: solid;
-    border-left-width: 0.4pt;
-    border-left-style: solid;
-    border-right-width: 0.4pt;
-    border-right-style: solid;
-    overflow: hidden;
-  }
-
-  .tl-inner-normal {
-    padding: 2.2pt 1.5pt 0 2pt;
-  }
-  .tl-inner-30 {
-    padding: 2.2pt 1pt 0 1.2pt;
-  }
-  .tl-inner-15 {
-    padding: 1.2pt 0.4pt 0 0.4pt;
-    text-align: center;
-  }
-  .tl-inner-lunch {
-    padding: 2.2pt 1.5pt 0 1.5pt;
-    text-align: center;
-  }
-  .tl-inner-absent {
-    padding-top: 7pt;
-    text-align: center;
-    font-size: 5.6pt;
-    font-weight: bold;
-    color: #64748b;
-    letter-spacing: 0.8pt;
-    line-height: 8pt;
-  }
-
-  .tl-block-time {
-    font-size: 4.3pt;
-    color: #475569;
-    display: block;
-    line-height: 5.2pt;
-    white-space: nowrap;
-  }
-  .tl-block-title {
-    font-size: 5pt;
-    font-weight: bold;
-    display: block;
-    line-height: 6.2pt;
-    margin-top: 1.2pt;
-    white-space: nowrap;
-  }
-
-  .tl-inner-30 .tl-block-time {
-    font-size: 3.85pt;
-    line-height: 4.8pt;
-  }
-  .tl-inner-30 .tl-block-title {
-    font-size: 4.55pt;
-    line-height: 5.8pt;
-    margin-top: 1.2pt;
-  }
-
-  .tl-inner-15 .tl-block-time {
-    font-size: 3.8pt;
-    line-height: 4.3pt;
-  }
-  .tl-inner-15 .tl-block-title {
-    font-size: 4pt;
-    line-height: 4.6pt;
-    margin-top: 0.6pt;
-  }
-
-  /* Lunch block colors */
-  .tl-block-lunch {
-    background-color: #f8fafc;
-    border-top-color: #94a3b8;
-    border-bottom-color: #cbd5e1;
-    border-left-color: #cbd5e1;
-    border-right-color: #cbd5e1;
-    border-bottom-style: dashed;
-    border-left-style: dashed;
-    border-right-style: dashed;
-  }
-  .tl-block-lunch .tl-block-time {
-    color: #64748b;
-  }
-  .tl-block-lunch .tl-block-title {
-    color: #475569;
-    font-weight: normal;
-  }
-
-  /* Absent block colors (top border like all other blocks, same exact height) */
-  .tl-block-absent {
-    background-color: #f8fafc;
-    border-top-color: #94a3b8;
-    border-bottom-color: #cbd5e1;
-    border-left-color: #cbd5e1;
-    border-right-color: #cbd5e1;
-  }
-
-  .closed-box {
-    border: 0.5pt solid #cbd5e1;
-    background-color: #f8fafc;
-    border-radius: 3pt;
-    padding: 18pt;
-    text-align: center;
-    color: #64748b;
-    font-size: 8pt;
-    font-weight: bold;
-    margin-top: 12pt;
-  }
-
-  /* Footer fixed at bottom */
-  .footer {
-    position: fixed;
-    bottom: -4mm;
-    left: 0;
-    right: 0;
-    border-top: 0.4pt solid #cbd5e1;
-    padding-top: 2.5pt;
-    font-size: 5.5pt;
-    color: #64748b;
-  }
-  .footer-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .footer-table td {
-    padding: 0;
-  }
-</style>
+<link rel="stylesheet" href="{{ resource_path('css/exports/schedules-wall.css') }}">
 </head>
 <body>
 
@@ -348,8 +11,8 @@
   <div class="footer">
     <table class="footer-table">
       <tr>
-        <td style="text-align:left;">Impresso em {{ $printedAt }}</td>
-        <td style="text-align:right;">{{ $appVersion }}</td>
+        <td class="footer-left">Impresso em {{ $printedAt }}</td>
+        <td class="footer-right">{{ $appVersion }}</td>
       </tr>
     </table>
   </div>
@@ -358,18 +21,18 @@
     <!-- HEADER -->
     <table class="header-table">
       <tr>
-        <td style="width: 88pt;">
+        <td class="header-logo-cell">
           @if (!empty($logoBase64))
-            <img src="{{ $logoBase64 }}" style="height: 20pt; width: auto;" />
+            <img src="{{ $logoBase64 }}" class="header-logo-img" />
           @else
-            <strong style="font-size: 12pt; color: #4c55a2;">SGDE</strong>
+            <strong class="header-logo-fallback">SGDE</strong>
           @endif
         </td>
         <td>
           <div class="school-title">{{ $school->name }} — {{ $docTitle }}</div>
           <div class="school-subtitle">Assistentes Operacionais{{ $school->address ? ' · ' . $school->address : '' }}</div>
         </td>
-        <td style="width: 280pt; white-space: nowrap;">
+        <td class="header-period-cell">
           <div class="date-title">{{ $day['formatted_date'] }}</div>
           @if ($day['is_open'])
             <div class="hours-subtitle">Funcionamento: {{ $day['open_time'] }} – {{ $day['close_time'] }}</div>
@@ -394,14 +57,14 @@
         <span class="legend-label">Legenda:</span>
         @foreach ($day['legend_activities'] as $act)
           <span class="legend-item">
-            <span class="legend-swatch" style="background-color: {{ $act['bg'] }}; border: 0.4pt solid {{ $act['border'] }}; border-top: 1.8pt solid {{ $act['color'] }};"></span>{{ $act['name'] }}
+            <span class="legend-swatch" style="background-color: {{ $act['bg'] }}; border-color: {{ $act['border'] }}; border-top-color: {{ $act['color'] }};"></span>{{ $act['name'] }}
           </span>
         @endforeach
         <span class="legend-item">
-          <span class="legend-swatch" style="background-color: #f8fafc; border: 0.4pt dashed #94a3b8; border-top: 1.8pt solid #94a3b8;"></span>Almoço
+          <span class="legend-swatch legend-swatch-lunch"></span>Almoço
         </span>
         <span class="legend-item">
-          <span class="legend-swatch" style="background-color: #f8fafc; border: 0.4pt solid #cbd5e1; border-top: 1.8pt solid #94a3b8;"></span>Ausente
+          <span class="legend-swatch legend-swatch-absent"></span>Ausente
         </span>
       </div>
 
@@ -409,12 +72,12 @@
       <table class="schedule-table">
         <thead>
           <tr>
-            <th class="col-assistant" style="padding: 4pt 5pt !important;">Assistente</th>
-            <th class="col-shift" style="padding: 4pt 5pt !important;">Turno / Almoço</th>
+            <th class="col-assistant">Assistente</th>
+            <th class="col-shift">Turno / Almoço</th>
             <th class="col-timeline">
               <div class="tl-header-wrap">
                 @foreach ($day['time_headers'] as $idx => $th)
-                  <div class="tl-hour-header" style="left: {{ $th['left'] }}%; width: {{ $th['width'] }}%; {{ $idx === 0 ? 'border-left:none;' : '' }}">
+                  <div class="tl-hour-header {{ $idx === 0 ? 'tl-hour-header-first' : '' }}" style="left: {{ $th['left'] }}%; width: {{ $th['width'] }}%;">
                     <div class="tl-hour-text">{{ $th['label'] }}</div>
                   </div>
                 @endforeach

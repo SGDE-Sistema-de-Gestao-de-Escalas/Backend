@@ -1,6 +1,9 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Reports;
+
+use App\Services\Schedules\ScheduleGenerationService;
+use App\Services\Schools\OperatingHoursResolver;
 
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
@@ -10,6 +13,7 @@ use App\Models\Schedules\AssistantScheduleProfile;
 use App\Models\Schedules\Schedule;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
+use App\Support\TimeHelper;
 use Illuminate\Support\Collection;
 
 /** Read-only reports: never generate, publish or modify schedules. */
@@ -311,12 +315,12 @@ class ReportService
 
     private function minutes(?string $time): int
     {
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 
     private function time(int $minutes): string
     {
-        return \App\Support\TimeHelper::toTimeString($minutes);
+        return TimeHelper::toTimeString($minutes);
     }
 
     private function name(?Assistant $assistant): string

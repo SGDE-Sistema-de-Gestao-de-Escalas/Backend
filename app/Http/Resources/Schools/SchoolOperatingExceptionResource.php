@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Resources\Schools;
-use App\Services\SchoolOperatingExceptionService;
+use App\Services\Schools\SchoolOperatingExceptionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

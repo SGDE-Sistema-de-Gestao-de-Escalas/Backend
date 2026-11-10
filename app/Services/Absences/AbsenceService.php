@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Absences;
+
+use App\Services\Assistants\AssistantDocumentStorageService;
 
 use App\Mail\AbsenceJustificationSubmittedMail;
 use App\Mail\AbsenceRegisteredMail;
@@ -8,6 +10,7 @@ use App\Mail\AbsenceStatusUpdatedMail;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\User;
+use App\Support\TimeHelper;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -403,7 +406,7 @@ class AbsenceService
             return $default;
         }
 
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 
     /**

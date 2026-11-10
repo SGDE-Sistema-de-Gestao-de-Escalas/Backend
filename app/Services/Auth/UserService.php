@@ -1,6 +1,9 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Auth;
+
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\System\NotificationService;
 
 use App\Models\Auth\User;
 use Illuminate\Support\Str;

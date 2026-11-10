@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schools;
 
 use App\Models\Schedules\Holiday;
 use App\Models\Schools\SchoolOperatingException;

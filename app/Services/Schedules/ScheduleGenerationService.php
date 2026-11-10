@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schedules;
+
+use App\Services\Schools\OperatingHoursResolver;
 
 use App\Mail\SchedulePublishedMail;
 use App\Models\Absences\Absence;
@@ -13,6 +15,7 @@ use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
+use App\Support\TimeHelper;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Database\Seeders\ActivityTypeSeeder;
@@ -2721,11 +2724,11 @@ class ScheduleGenerationService
 
     private function toMinutes(string $time): int
     {
-        return \App\Support\TimeHelper::toMinutes($time);
+        return TimeHelper::toMinutes($time);
     }
 
     private function toTimeStr(int $minutes): string
     {
-        return \App\Support\TimeHelper::toTimeString($minutes);
+        return TimeHelper::toTimeString($minutes);
     }
 }

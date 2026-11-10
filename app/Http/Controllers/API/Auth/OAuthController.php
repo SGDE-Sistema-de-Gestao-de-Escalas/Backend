@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Services\AuthService;
+use App\Services\Auth\AuthService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
-use Symfony\Component\HttpFoundation\Cookie as SymfonyCookie;
+use Throwable;
 
 class OAuthController extends Controller
 {
@@ -66,10 +68,10 @@ class OAuthController extends Controller
                 ->withCookie($cookie)
                 ->withoutCookie(self::STATE_COOKIE);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->redirectWithError($e->validator->errors()->first() ?: 'Falha na validação do utilizador.');
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Erro na autenticação OAuth (' . $provider . '): ' . $e->getMessage(), [
+        } catch (Throwable $e) {
+            Log::error('Erro na autenticação OAuth (' . $provider . '): ' . $e->getMessage(), [
                 'exception' => $e
             ]);
 

@@ -7,7 +7,7 @@ use App\Http\Requests\Schedules\StoreAssistantScheduleProfileRequest;
 use App\Http\Requests\Schedules\UpdateAssistantScheduleProfileRequest;
 use App\Http\Resources\Schedules\AssistantScheduleProfileResource;
 use App\Models\Schedules\AssistantScheduleProfile;
-use App\Services\AssistantScheduleProfileService;
+use App\Services\Schedules\AssistantScheduleProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;

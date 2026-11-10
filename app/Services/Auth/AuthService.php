@@ -1,15 +1,18 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Auth;
 
-use App\Models\Auth\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Mail;
 use App\Mail\ResetPasswordMail;
 use App\Mail\SetupAccountMail;
+use App\Models\Auth\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Cookie;
 
 class AuthService
 {
@@ -106,7 +109,7 @@ class AuthService
                 DB::transaction(function () use ($user, $password) {
                     $user->forceFill([
                         'password' => Hash::make($password)
-                    ])->setRememberToken(\Illuminate\Support\Str::random(60));
+                    ])->setRememberToken(Str::random(60));
 
                     $user->save();
 
@@ -141,7 +144,7 @@ class AuthService
         Mail::to($user->email)->send(new SetupAccountMail($user, $token));
     }
 
-    public function makeCookie(string $name, string $value, int $minutes, \Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\Cookie
+    public function makeCookie(string $name, string $value, int $minutes, Request $request): Cookie
     {
         return cookie(
             name: $name,
@@ -156,7 +159,7 @@ class AuthService
         );
     }
 
-    public function makeAuthCookie(string $token, int $minutes, \Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\Cookie
+    public function makeAuthCookie(string $token, int $minutes, Request $request): Cookie
     {
         return $this->makeCookie('access_token', $token, $minutes, $request);
     }

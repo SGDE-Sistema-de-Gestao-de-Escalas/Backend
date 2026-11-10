@@ -1,6 +1,9 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\System;
+
+use App\Services\Schedules\ScheduleGenerationService;
+use App\Services\Schedules\ScheduleIntegrityService;
 
 use App\Enums\NotificationEvent;
 use App\Enums\NotificationType;

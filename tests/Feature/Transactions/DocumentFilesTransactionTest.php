@@ -8,8 +8,9 @@ use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
 use App\Models\Schools\School;
-use App\Services\AbsenceService;
-use App\Services\AssistantService;
+use App\Services\Absences\AbsenceService;
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\Assistants\AssistantService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -69,7 +70,7 @@ class DocumentFilesTransactionTest extends TestCase
 
     private function absenceWithDocument(): Absence
     {
-        $path = app(\App\Services\AssistantDocumentStorageService::class)->storeAbsenceDocument($this->pdf('antigo.pdf'), $this->assistant);
+        $path = app(AssistantDocumentStorageService::class)->storeAbsenceDocument($this->pdf('antigo.pdf'), $this->assistant);
 
         return Absence::create([
             'assistant_id' => $this->assistant->id,
@@ -85,7 +86,7 @@ class DocumentFilesTransactionTest extends TestCase
 
     private function assistantWithRecord(): Assistant
     {
-        $service = app(\App\Services\AssistantDocumentStorageService::class);
+        $service = app(AssistantDocumentStorageService::class);
         $path = $service->storeCriminalRecord($this->pdf('antigo.pdf'), 'Maria', 'Santos', 'A001');
         $this->assistant->update(['criminal_record_name' => 'antigo.pdf', 'criminal_record_path' => $path]);
 

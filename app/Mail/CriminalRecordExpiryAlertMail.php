@@ -51,7 +51,7 @@ class CriminalRecordExpiryAlertMail extends Mailable
             ? 'Expirado Hoje'
             : "Expira dentro de {$this->daysRemaining} dias";
 
-        $assistantsAdminUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/assistants';
+        $assistantsAdminUrl = rtrim((string) config('app.frontend_url'), '/') . '/assistants';
 
         return new Content(
             markdown: 'emails.assistants.criminal-record-expiry',

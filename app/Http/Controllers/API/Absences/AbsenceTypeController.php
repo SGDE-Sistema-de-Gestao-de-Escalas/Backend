@@ -7,7 +7,7 @@ use App\Http\Requests\Absences\StoreAbsenceTypeRequest;
 use App\Http\Requests\Absences\UpdateAbsenceTypeRequest;
 use App\Http\Resources\Absences\AbsenceTypeResource;
 use App\Models\Absences\AbsenceType;
-use App\Services\AbsenceTypeService;
+use App\Services\Absences\AbsenceTypeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;

@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 use App\Http\Requests\Auth\StoreUserRequest;
 use App\Http\Requests\Auth\UpdateUserRequest;
-use App\Services\UserService;
+use App\Services\Auth\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

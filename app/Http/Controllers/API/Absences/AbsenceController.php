@@ -7,9 +7,10 @@ use App\Http\Requests\Absences\StoreAbsenceRequest;
 use App\Http\Requests\Absences\UpdateAbsenceRequest;
 use App\Http\Resources\Absences\AbsenceResource;
 use App\Models\Absences\Absence;
-use App\Services\AbsenceService;
-use App\Services\NotificationService;
-use App\Services\ScheduleIntegrityService;
+use App\Services\Absences\AbsenceService;
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\System\NotificationService;
+use App\Services\Schedules\ScheduleIntegrityService;
 use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -288,7 +289,7 @@ class AbsenceController extends Controller
     /**
      * Download or view the justification document for the specified absence.
      */
-    public function downloadDocument(Absence $absence, \App\Services\AssistantDocumentStorageService $documentStorage): StreamedResponse
+    public function downloadDocument(Absence $absence, AssistantDocumentStorageService $documentStorage): StreamedResponse
     {
         Gate::authorize('view', $absence);
 

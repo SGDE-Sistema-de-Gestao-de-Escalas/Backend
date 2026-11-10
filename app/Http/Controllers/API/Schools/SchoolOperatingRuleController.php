@@ -7,7 +7,7 @@ use App\Http\Requests\Schools\StoreSchoolOperatingRuleRequest;
 use App\Http\Requests\Schools\UpdateSchoolOperatingRuleRequest;
 use App\Http\Resources\Schools\SchoolOperatingRuleResource;
 use App\Models\Schools\SchoolOperatingRule;
-use App\Services\SchoolOperatingRuleService;
+use App\Services\Schools\SchoolOperatingRuleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;

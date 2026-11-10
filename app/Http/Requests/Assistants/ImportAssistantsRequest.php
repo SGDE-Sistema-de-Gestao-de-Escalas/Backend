@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Assistants;
 
 use App\Models\Assistants\Assistant;
-use App\Services\AssistantImportService;
+use App\Services\Assistants\AssistantImportService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

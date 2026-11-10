@@ -39,7 +39,7 @@ class AbsenceStatusUpdatedMail extends Mailable
         $isJustified = $this->absence->status === 'justified';
         $statusLabel = $isJustified ? 'Justificada' : 'Injustificada';
 
-        $absencesUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/staff/absences';
+        $absencesUrl = rtrim((string) config('app.frontend_url'), '/') . '/staff/absences';
 
         return new Content(
             markdown: 'emails.absences.status-updated',

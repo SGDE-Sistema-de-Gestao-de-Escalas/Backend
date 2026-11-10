@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schedules;
+
+use App\Services\System\NotificationService;
 
 use App\Models\Auth\User;
 use App\Models\Schedules\Holiday;
@@ -22,7 +24,7 @@ class HolidayImportService
      */
     public function getMunicipalities(): array
     {
-        $all = config('municipalities', []);
+        $all = (array) config('municipalities');
 
         return array_values(array_map(fn ($m) => [
             'slug' => $m['slug'],
@@ -141,7 +143,7 @@ class HolidayImportService
 
         // 2. Adicionar feriado municipal se município for selecionado
         if ($municipalitySlug) {
-            $allMun = config('municipalities', []);
+            $allMun = (array) config('municipalities');
             if (isset($allMun[$municipalitySlug])) {
                 $mun = $allMun[$municipalitySlug];
                 $munDate = $this->resolveMunicipalHolidayDate($mun['rule'], $year);

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Assistants;
 
-use App\Services\AssistantExceptionService;
+use App\Services\Assistants\AssistantExceptionService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 

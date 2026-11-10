@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
+use App\Services\Schedules\AssistantScheduleProfileService;
 use Illuminate\Contracts\Validation\ValidationRule;
 
 class UpdateAssistantScheduleProfileRequest extends StoreAssistantScheduleProfileRequest
@@ -34,7 +35,7 @@ class UpdateAssistantScheduleProfileRequest extends StoreAssistantScheduleProfil
                 return;
             }
 
-            $service = app(\App\Services\AssistantScheduleProfileService::class);
+            $service = app(AssistantScheduleProfileService::class);
             if (! $service->canEdit($profile)) {
                 $validator->errors()->add('profile', 'Não é possível editar um horário que já regeu escalas passadas.');
             }

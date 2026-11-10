@@ -1,6 +1,9 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Assistants;
+
+use App\Services\Schedules\ScheduleIntegrityService;
+use App\Services\Schools\OperatingHoursResolver;
 
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;

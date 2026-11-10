@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schedules;
+
+use App\Services\Schools\OperatingHoursResolver;
 
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
@@ -8,6 +10,7 @@ use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
 use App\Support\AssistantCsv;
+use App\Support\TimeHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdfInstance;
 use Carbon\Carbon;
@@ -225,7 +228,7 @@ class ScheduleExportService
             : null;
 
         $printedAt = Carbon::now()->format('d/m/Y H:i');
-        $appVersion = 'SGDE v1.0';
+        $appVersion = (string) config('app.version');
 
         if ($model === 'monthly') {
             $monthlyData = $this->buildMonthlyExportData(
@@ -1439,7 +1442,7 @@ class ScheduleExportService
 
     private function timeToMin(string $t): int
     {
-        return \App\Support\TimeHelper::toMinutes($t);
+        return TimeHelper::toMinutes($t);
     }
 
     private function tintHex(string $hex, float $ratio = 0.86): string

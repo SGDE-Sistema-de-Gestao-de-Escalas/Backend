@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Absences;
 
+use App\Models\Absences\Absence;
 use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ class StoreAbsenceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('create', \App\Models\Absences\Absence::class) ?? false;
+        return $this->user()?->can('create', Absence::class) ?? false;
     }
 
     /**
