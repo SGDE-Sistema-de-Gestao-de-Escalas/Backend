@@ -9,13 +9,7 @@ Para definir uma nova palavra-passe, utilize o botão abaixo:
 Repor Palavra-passe
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta para recuperação:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $resetUrl }}" target="_blank" rel="noopener">{{ $resetUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $resetUrl, 'label' => 'Hiperligação direta para recuperação:'])
 
 <p class="help-note">
 Se este pedido não foi efetuado pelo titular da conta, nenhuma ação é necessária. A palavra-passe atual permanece inalterada.

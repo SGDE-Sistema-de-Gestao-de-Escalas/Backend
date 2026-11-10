@@ -17,13 +17,7 @@ O estado da falta / ausência associada a **{{ $user->first_name }} {{ $user->la
 Ver Detalhes na Plataforma
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $absencesUrl }}" target="_blank" rel="noopener">{{ $absencesUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $absencesUrl])
 
 <p class="help-note">
 O histórico completo de faltas e justificações pode ser consultado na plataforma SGDE.

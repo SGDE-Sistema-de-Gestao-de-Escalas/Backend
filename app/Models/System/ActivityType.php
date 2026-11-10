@@ -5,13 +5,16 @@ namespace App\Models\System;
 use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
+use Database\Factories\ActivityTypeFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+#[UseFactory(ActivityTypeFactory::class)]
 class ActivityType extends Model
 {
-    /** @use HasFactory<\Database\Factories\ActivityTypeFactory> */
+    /** @use HasFactory<ActivityTypeFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [

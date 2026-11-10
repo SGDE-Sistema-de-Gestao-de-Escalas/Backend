@@ -17,13 +17,7 @@ Encontra-se **publicada** uma nova escala de serviço atribuída a **{{ $user->f
 Consultar Escala de Serviço
 </x-mail::button>
 
-<div class="link-fallback-label">
-Hiperligação direta de acesso:
-</div>
-
-<div class="link-fallback-box">
-<a href="{{ $scheduleUrl }}" target="_blank" rel="noopener">{{ $scheduleUrl }}</a>
-</div>
+@include('emails.partials.fallback-link', ['url' => $scheduleUrl])
 
 <p class="help-note">
 O detalhe completo dos turnos, horários e atividades pode ser consultado no portal institucional.

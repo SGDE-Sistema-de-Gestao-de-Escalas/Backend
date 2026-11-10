@@ -7,14 +7,12 @@ use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\System\ActivityType;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class School extends Model
 {
-    /** @use HasFactory<\Database\Factories\SchoolFactory> */
-    use HasFactory, HasUuids;
+    use HasUuids;
 
     protected $fillable = [
         'name',

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Schedules;
 
-use App\Services\ScheduleRuleService;
+use App\Services\Schedules\ScheduleRuleService;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -34,7 +34,7 @@ class StoreScheduleRuleRequest extends ScheduleRuleRequest
             'days_of_week.*' => ['required', 'integer', 'between:0,6', 'distinct'],
             'assistant_ids' => ['required', 'array', 'list', 'min:1'],
             'assistant_ids.*' => [
-                'required', 'uuid', 'distinct:ignore_case',
+                'bail', 'required', 'string', 'uuid', 'distinct:ignore_case',
                 Rule::exists('assistants', 'id')->where(function ($query) use ($schoolId) {
                     $query->where('school_id', $schoolId)->whereNull('deleted_at')
                         ->where(function ($query) {

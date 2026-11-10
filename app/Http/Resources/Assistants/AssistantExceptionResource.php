@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources\Assistants;
 
-use App\Services\AssistantExceptionService;
+use App\Services\Assistants\AssistantExceptionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;

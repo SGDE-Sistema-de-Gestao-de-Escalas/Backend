@@ -5,11 +5,13 @@ namespace App\Http\Controllers\API\Absences;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Absences\StoreAbsenceRequest;
 use App\Http\Requests\Absences\UpdateAbsenceRequest;
-use App\Http\Resources\AbsenceResource;
+use App\Http\Resources\Absences\AbsenceResource;
 use App\Models\Absences\Absence;
-use App\Services\AbsenceService;
-use App\Services\NotificationService;
-use App\Services\ScheduleIntegrityService;
+use App\Services\Absences\AbsenceService;
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\System\NotificationService;
+use App\Services\Schedules\ScheduleIntegrityService;
+use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -60,8 +62,9 @@ class AbsenceController extends Controller
             ->with(['assistant.user', 'absenceType', 'createdByUser', 'justifiedByUser']);
 
         // 1. Filtro por Assistente
-        if ($user && $user->isAdmin() && $request->filled('assistant_id') && $request->input('assistant_id') !== 'all') {
-            $query->where('assistant_id', $request->input('assistant_id'));
+        $assistantFilter = QueryInput::string($request, 'assistant_id');
+        if ($user && $user->isAdmin() && $assistantFilter !== '' && $assistantFilter !== 'all') {
+            $query->where('assistant_id', $assistantFilter);
         }
 
         // 2. Filtro por Estado (pending, justified, unjustified)
@@ -73,8 +76,8 @@ class AbsenceController extends Controller
         }
 
         // 3. Filtro por Datas (Lógica de sobreposição de intervalos)
-        if ($request->filled('start_date') || $request->filled('valid_from')) {
-            $startDate = $request->input('start_date', $request->input('valid_from'));
+        $startDate = QueryInput::string($request, 'start_date') ?: QueryInput::string($request, 'valid_from');
+        if ($startDate !== '') {
             $query->where(function ($q) use ($startDate) {
                 $q->whereDate('valid_until', '>=', $startDate)
                     ->orWhere(function ($sub) use ($startDate) {
@@ -83,13 +86,13 @@ class AbsenceController extends Controller
             });
         }
 
-        if ($request->filled('end_date') || $request->filled('valid_until')) {
-            $endDate = $request->input('end_date', $request->input('valid_until'));
+        $endDate = QueryInput::string($request, 'end_date') ?: QueryInput::string($request, 'valid_until');
+        if ($endDate !== '') {
             $query->whereDate('valid_from', '<=', $endDate);
         }
 
         // 4. Pesquisa Textual
-        $search = trim((string) $request->input('search', ''));
+        $search = QueryInput::string($request, 'search');
         if ($search !== '') {
             $query->where(function ($subQ) use ($search) {
                 $subQ->whereHas('assistant.user', function ($uq) use ($search) {
@@ -107,7 +110,7 @@ class AbsenceController extends Controller
         // 5. Ordenação (mais recentes primeiro por defeito)
         $allowedSorts = ['valid_from', 'valid_until', 'total_days', 'status', 'created_at'];
         $sortBy = in_array($request->input('sort_by'), $allowedSorts, true) ? $request->input('sort_by') : 'valid_from';
-        $sortDir = strtolower((string) $request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $sortDir = strtolower(QueryInput::string($request, 'sort_direction')) === 'asc' ? 'asc' : 'desc';
 
         $query->orderBy($sortBy, $sortDir)->orderByDesc('created_at');
 
@@ -286,20 +289,14 @@ class AbsenceController extends Controller
     /**
      * Download or view the justification document for the specified absence.
      */
-    public function downloadDocument(Absence $absence): StreamedResponse
+    public function downloadDocument(Absence $absence, AssistantDocumentStorageService $documentStorage): StreamedResponse
     {
         Gate::authorize('view', $absence);
 
-        if (! $absence->document_path) {
-            abort(404, 'Documento comprovativo não encontrado.');
-        }
-
-        $disk = config('filesystems.documents_disk');
-
-        if (! Storage::disk($disk)->exists($absence->document_path)) {
-            abort(404, 'Ficheiro do documento comprovativo não encontrado no servidor.');
-        }
-
-        return Storage::disk($disk)->response($absence->document_path, null, ['X-Content-Type-Options' => 'nosniff']);
+        return $documentStorage->downloadResponse(
+            $absence->document_path,
+            'Documento comprovativo não encontrado.',
+            'Ficheiro do documento comprovativo não encontrado no servidor.'
+        );
     }
 }

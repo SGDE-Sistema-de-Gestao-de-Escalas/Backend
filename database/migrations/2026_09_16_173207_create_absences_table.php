@@ -29,6 +29,9 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['assistant_id', 'valid_from', 'valid_until'], 'absences_asst_period_index');
+            $table->index(['status', 'valid_from']);
         });
     }
 

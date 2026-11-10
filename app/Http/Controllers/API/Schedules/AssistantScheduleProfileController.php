@@ -7,7 +7,7 @@ use App\Http\Requests\Schedules\StoreAssistantScheduleProfileRequest;
 use App\Http\Requests\Schedules\UpdateAssistantScheduleProfileRequest;
 use App\Http\Resources\Schedules\AssistantScheduleProfileResource;
 use App\Models\Schedules\AssistantScheduleProfile;
-use App\Services\AssistantScheduleProfileService;
+use App\Services\Schedules\AssistantScheduleProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -24,7 +24,7 @@ class AssistantScheduleProfileController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $schoolId = $request->header('X-School-ID') ?? $request->attributes->get('currentSchoolId');
+        $schoolId = $this->resolveSchoolId($request);
         $assistantId = $request->query('assistant_id');
         $assistantIds = $request->query('assistant_ids');
         $user = $request->user();

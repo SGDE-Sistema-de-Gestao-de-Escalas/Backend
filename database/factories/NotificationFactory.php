@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Auth\User;
 use App\Models\System\Notification;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,7 +19,7 @@ class NotificationFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => \App\Models\Auth\User::factory(),
+            'user_id' => User::factory(),
             'school_id' => null,
             'type' => 'info',
             'event' => 'schedule.generated',

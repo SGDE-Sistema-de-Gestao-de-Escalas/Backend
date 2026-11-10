@@ -6,41 +6,19 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<style>
-@media only screen and (max-width: 600px) {
-  .inner-body {
-    width: 100% !important;
-  }
-  .footer {
-    width: 100% !important;
-  }
-  .privacy-box {
-    width: 100% !important;
-  }
-  .content-cell {
-    padding: 28px 20px !important;
-  }
-}
-
-@media only screen and (max-width: 500px) {
-  .button {
-    width: 100% !important;
-  }
-}
-</style>
 {!! $head ?? '' !!}
 </head>
 <body>
 
 <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
 <tr>
-<td align="center" style="padding: 0 16px;">
+<td class="wrapper-cell" align="center">
 <table class="content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
 {!! $header ?? '' !!}
 
 <!-- Email Body -->
 <tr>
-<td class="body" width="100%" cellpadding="0" cellspacing="0" style="border: hidden !important;">
+<td class="body" width="100%" cellpadding="0" cellspacing="0">
 <table class="inner-body" align="center" width="570" cellpadding="0" cellspacing="0" role="presentation">
 <!-- Body content -->
 <tr>

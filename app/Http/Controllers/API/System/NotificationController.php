@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers\API\System;
 
+use App\Enums\NotificationType;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\NotificationResource;
+use App\Http\Resources\System\NotificationResource;
 use App\Models\System\Notification;
-use App\Services\NotificationService;
+use App\Services\System\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class NotificationController extends Controller
 {
@@ -27,7 +29,16 @@ class NotificationController extends Controller
         Gate::authorize('viewAny', Notification::class);
 
         $user = $request->user();
-        $schoolId = $request->attributes->get('school_id');
+        $activeSchoolId = $request->attributes->get('school_id');
+        $schoolFilter = $request->query('school_id');
+
+        if ($schoolFilter === 'all') {
+            $schoolId = null;
+        } elseif ($request->has('school_id')) {
+            $schoolId = $schoolFilter ?: null;
+        } else {
+            $schoolId = $activeSchoolId;
+        }
 
         $paginator = $this->notifications->paginateFor($user, $schoolId, [
             'type' => $request->query('type'),
@@ -36,7 +47,11 @@ class NotificationController extends Controller
         ]);
 
         return NotificationResource::collection($paginator)->additional([
-            'meta' => ['unread_counts' => $this->notifications->unreadCounts($user, $schoolId)],
+            'meta' => [
+                'unread_counts' => $this->notifications->unreadCounts($user, $schoolId),
+                'global_unread_counts' => $this->notifications->unreadCounts($user, null),
+                'unread_by_school' => $this->notifications->unreadCountsBySchool($user),
+            ],
         ]);
     }
 
@@ -64,10 +79,12 @@ class NotificationController extends Controller
     {
         Gate::authorize('viewAny', Notification::class);
 
+        $request->validate(['type' => ['nullable', 'string', Rule::in(NotificationType::values())]]);
+
         $user = $request->user();
         $schoolId = $request->attributes->get('school_id');
 
-        $updated = $this->notifications->markAllAsRead($user, $schoolId, $request->input('type', $request->query('type')));
+        $updated = $this->notifications->markAllAsRead($user, $schoolId, $request->input('type'));
 
         return response()->json([
             'message' => 'Notificações marcadas como lidas.',

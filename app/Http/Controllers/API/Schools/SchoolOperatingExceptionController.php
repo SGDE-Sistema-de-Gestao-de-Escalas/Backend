@@ -5,9 +5,9 @@ namespace App\Http\Controllers\API\Schools;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Schools\StoreSchoolOperatingExceptionRequest;
 use App\Http\Requests\Schools\UpdateSchoolOperatingExceptionRequest;
-use App\Http\Resources\SchoolOperatingExceptionResource;
+use App\Http\Resources\Schools\SchoolOperatingExceptionResource;
 use App\Models\Schools\SchoolOperatingException;
-use App\Services\SchoolOperatingExceptionService;
+use App\Services\Schools\SchoolOperatingExceptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -80,7 +80,7 @@ class SchoolOperatingExceptionController extends Controller
     {
         Gate::authorize('view', $operatingException);
 
-        $this->ensureInSchoolContext($request, $operatingException);
+        $this->ensureInSchoolContext($request, $operatingException->school_id);
 
         return new SchoolOperatingExceptionResource($operatingException);
     }
@@ -92,7 +92,7 @@ class SchoolOperatingExceptionController extends Controller
      */
     public function update(UpdateSchoolOperatingExceptionRequest $request, SchoolOperatingException $operatingException): SchoolOperatingExceptionResource
     {
-        $this->ensureInSchoolContext($request, $operatingException);
+        $this->ensureInSchoolContext($request, $operatingException->school_id);
 
         $updated = $this->exceptionService->update($operatingException, $request->validated());
 
@@ -110,21 +110,10 @@ class SchoolOperatingExceptionController extends Controller
     {
         Gate::authorize('delete', $operatingException);
 
-        $this->ensureInSchoolContext($request, $operatingException);
+        $this->ensureInSchoolContext($request, $operatingException->school_id);
 
         $this->exceptionService->delete($operatingException);
 
         return response()->json(['message' => 'Exceção ao horário removida com sucesso.']);
-    }
-
-    /**
-     * Se o pedido indica uma escola (X-School-ID), a exceção tem de ser dessa
-     * escola. Responde 404 para não revelar exceções de outras escolas.
-     */
-    private function ensureInSchoolContext(Request $request, SchoolOperatingException $exception): void
-    {
-        $schoolId = $request->attributes->get('school_id');
-
-        abort_if($schoolId !== null && $schoolId !== $exception->school_id, 404);
     }
 }

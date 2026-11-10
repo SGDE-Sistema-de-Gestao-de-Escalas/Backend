@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Schedules;
 
+use App\Services\Schedules\AssistantScheduleProfileService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,7 +16,7 @@ class AssistantScheduleProfileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $service = app(\App\Services\AssistantScheduleProfileService::class);
+        $service = app(AssistantScheduleProfileService::class);
         $today = Carbon::today();
         $validFrom = $this->valid_from ? Carbon::parse($this->valid_from)->startOfDay() : null;
         $validUntil = $this->valid_until ? Carbon::parse($this->valid_until)->startOfDay() : null;

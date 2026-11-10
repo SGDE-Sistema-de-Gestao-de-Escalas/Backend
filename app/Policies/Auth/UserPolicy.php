@@ -3,6 +3,7 @@
 namespace App\Policies\Auth;
 
 use App\Models\Auth\User;
+use Illuminate\Auth\Access\Response;
 
 class UserPolicy
 {
@@ -21,39 +22,39 @@ class UserPolicy
         return $actor->isAdmin();
     }
 
-    public function update(User $actor, User $target): \Illuminate\Auth\Access\Response
+    public function update(User $actor, User $target): Response
     {
         if ($actor->isAdmin() || $actor->is($target)) {
-            return \Illuminate\Auth\Access\Response::allow();
+            return Response::allow();
         }
 
-        return \Illuminate\Auth\Access\Response::deny('Não tem permissão para alterar dados de outros utilizadores.');
+        return Response::deny('Não tem permissão para alterar dados de outros utilizadores.');
     }
 
-    public function delete(User $actor, User $target): \Illuminate\Auth\Access\Response
+    public function delete(User $actor, User $target): Response
     {
         if (! $actor->isAdmin()) {
             if ($actor->is($target)) {
-                return \Illuminate\Auth\Access\Response::deny('Os assistentes não se podem auto-eliminar diretamente.');
+                return Response::deny('Os assistentes não se podem auto-eliminar diretamente.');
             }
 
-            return \Illuminate\Auth\Access\Response::deny('Não tem permissão para eliminar este utilizador.');
+            return Response::deny('Não tem permissão para eliminar este utilizador.');
         }
 
-        return \Illuminate\Auth\Access\Response::allow();
+        return Response::allow();
     }
 
-    public function deactivate(User $actor, User $target): \Illuminate\Auth\Access\Response
+    public function deactivate(User $actor, User $target): Response
     {
         if (! $actor->isAdmin()) {
-            return \Illuminate\Auth\Access\Response::deny('Não tem permissão para desativar este utilizador.');
+            return Response::deny('Não tem permissão para desativar este utilizador.');
         }
 
         if ($actor->is($target)) {
-            return \Illuminate\Auth\Access\Response::deny('Não pode desativar a sua própria conta.');
+            return Response::deny('Não pode desativar a sua própria conta.');
         }
 
-        return \Illuminate\Auth\Access\Response::allow();
+        return Response::allow();
     }
 
     public function forceDelete(User $actor, User $target): bool

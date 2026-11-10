@@ -97,5 +97,16 @@ class User extends Authenticatable
     {
         return $this->role?->slug === 'staff';
     }
+
+    /**
+     * Scope para obter apenas administradores ativos e não anonimizados.
+     */
+    public function scopeActiveAdmins($query)
+    {
+        return $query
+            ->where('is_active', true)
+            ->whereNull('anonymized_at')
+            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'));
+    }
 }
 

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Assistants;
 
+use App\Models\Absences\Absence;
+use App\Models\Absences\AbsenceType;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
@@ -81,9 +83,28 @@ class AssistantAnonymizeFeatureTest extends TestCase
         $disk = config('filesystems.documents_disk');
         Storage::fake($disk);
         Storage::disk($disk)->put('criminal_records/doc.pdf', 'fake-content');
+        Storage::disk($disk)->put('absences_files/atestado.pdf', 'fake-absence-doc');
 
         $assistant = $this->createInactiveAssistant();
         $assistant->update(['criminal_record_path' => 'criminal_records/doc.pdf']);
+
+        $absenceType = AbsenceType::create([
+            'name' => 'Doença',
+            'slug' => 'doenca',
+            'requires_document' => true,
+            'active' => true,
+        ]);
+
+        $absence = Absence::create([
+            'assistant_id' => $assistant->id,
+            'absence_type_id' => $absenceType->id,
+            'valid_from' => now()->subDays(5)->toDateString(),
+            'valid_until' => now()->subDays(4)->toDateString(),
+            'total_days' => 2,
+            'document_name' => 'atestado.pdf',
+            'document_path' => 'absences_files/atestado.pdf',
+            'status' => 'justified',
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)
@@ -93,12 +114,16 @@ class AssistantAnonymizeFeatureTest extends TestCase
             ->assertJsonPath('assistant.is_anonymized', true);
 
         $assistant->refresh();
+        $absence->refresh();
         $this->assertTrue((bool) $assistant->is_anonymized);
         $this->assertSame('anon_' . $assistant->id, $assistant->internal_number);
         $this->assertNull($assistant->phone);
         $this->assertNull($assistant->nif);
         $this->assertNull($assistant->criminal_record_path);
+        $this->assertNull($absence->document_path);
+        $this->assertNull($absence->document_name);
         Storage::disk($disk)->assertMissing('criminal_records/doc.pdf');
+        Storage::disk($disk)->assertMissing('absences_files/atestado.pdf');
 
         $this->actingAs($this->admin)
             ->withHeader('X-School-ID', $this->school->id)

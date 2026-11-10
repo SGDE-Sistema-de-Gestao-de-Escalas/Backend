@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
-use App\Services\UserService;
+use App\Services\Auth\UserService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -125,6 +125,34 @@ class UserAnonymizeTest extends TestCase
 
         $staffNotificationId = (string) Str::uuid();
         $adminNotificationId = (string) Str::uuid();
+
+        $docsDisk = config('filesystems.documents_disk', 'public');
+        Storage::fake($docsDisk);
+        $absenceDocPath = 'ana_silva_test_001/absences_files/ausencia_teste.pdf';
+        Storage::disk($docsDisk)->put($absenceDocPath, 'Conteúdo justificativo');
+
+        $absenceTypeId = (string) Str::uuid();
+        $absenceId = (string) Str::uuid();
+        DB::table('absence_types')->insert([
+            'id' => $absenceTypeId,
+            'name' => 'Doença',
+            'requires_document' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('absences')->insert([
+            'id' => $absenceId,
+            'assistant_id' => $assistantId,
+            'absence_type_id' => $absenceTypeId,
+            'valid_from' => '2026-01-10',
+            'valid_until' => '2026-01-10',
+            'total_days' => 1,
+            'document_name' => 'atestado.pdf',
+            'document_path' => $absenceDocPath,
+            'status' => 'justified',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         DB::table('notifications')->insert([
             [
@@ -261,6 +289,12 @@ class UserAnonymizeTest extends TestCase
 
         $this->assertDatabaseCount('assistants', 1);
         $this->assertDatabaseHas('schools', ['id' => $schoolId]);
+        Storage::disk($docsDisk)->assertMissing($absenceDocPath);
+        $this->assertDatabaseHas('absences', [
+            'id' => $absenceId,
+            'document_path' => null,
+            'document_name' => null,
+        ]);
 
         $this->getJson("/api/users/{$staff->id}")
             ->assertOk()
@@ -287,9 +321,12 @@ class UserAnonymizeTest extends TestCase
         Storage::fake('local');
 
         $path = 'criminal-records/documento-teste.pdf';
+        $absenceDocPath = 'absence-documents/atestado-teste.pdf';
 
         Storage::disk('local')->put($path, 'Conteúdo fictício de teste');
         Storage::disk('local')->assertExists($path);
+        Storage::disk('local')->put($absenceDocPath, 'Atestado médico de teste');
+        Storage::disk('local')->assertExists($absenceDocPath);
 
         $adminRole = Role::factory()->create([
             'name' => 'Administrator',
@@ -308,6 +345,8 @@ class UserAnonymizeTest extends TestCase
 
         $schoolId = (string) Str::uuid();
         $assistantId = (string) Str::uuid();
+        $absenceTypeId = (string) Str::uuid();
+        $absenceId = (string) Str::uuid();
 
         DB::table('schools')->insert([
             'id' => $schoolId,
@@ -330,9 +369,32 @@ class UserAnonymizeTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        DB::table('absence_types')->insert([
+            'id' => $absenceTypeId,
+            'name' => 'Doença',
+            'requires_document' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('absences')->insert([
+            'id' => $absenceId,
+            'assistant_id' => $assistantId,
+            'absence_type_id' => $absenceTypeId,
+            'valid_from' => '2025-05-01',
+            'valid_until' => '2025-05-02',
+            'total_days' => 2,
+            'document_name' => 'atestado-teste.pdf',
+            'document_path' => $absenceDocPath,
+            'status' => 'justified',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         app(UserService::class)->anonymize($admin, $target);
 
         Storage::disk('local')->assertMissing($path);
+        Storage::disk('local')->assertMissing($absenceDocPath);
 
         $this->assertDatabaseHas('assistants', [
             'id' => $assistantId,
@@ -340,6 +402,13 @@ class UserAnonymizeTest extends TestCase
             'school_id' => $schoolId,
             'criminal_record_path' => null,
             'criminal_record_expiry' => null,
+        ]);
+
+        $this->assertDatabaseHas('absences', [
+            'id' => $absenceId,
+            'assistant_id' => $assistantId,
+            'document_path' => null,
+            'document_name' => null,
         ]);
 
         $this->assertSoftDeleted('assistants', ['id' => $assistantId]);

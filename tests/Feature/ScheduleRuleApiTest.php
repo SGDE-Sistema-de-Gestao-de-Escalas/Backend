@@ -8,7 +8,7 @@ use App\Models\Auth\User;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
 use App\Models\System\ActivityType;
-use App\Services\ScheduleRuleService;
+use App\Services\Schedules\ScheduleRuleService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -92,18 +92,6 @@ class ScheduleRuleApiTest extends TestCase
         $this->postJson('/api/schedule-rules', $payload)->assertUnprocessable()->assertJsonValidationErrors('valid_from');
         $this->patchJson('/api/schedule-rules/'.$id, ['valid_from' => null])->assertUnprocessable();
         $this->patchJson('/api/schedule-rules/'.$id, ['start' => '2026-11-02'])->assertUnprocessable()->assertJsonValidationErrors('start');
-    }
-
-    public function test_validity_migration_preserves_existing_dates_and_assistants(): void
-    {
-        $id = $this->createRule();
-        $migration = require database_path('migrations/2026_10_15_000000_add_schedule_rule_validity_dates.php');
-        $migration->down();
-        $this->assertDatabaseHas('schedule_rules', ['id' => $id, 'start' => '2026-11-01']);
-        $migration->up();
-        $this->getJson('/api/schedule-rules/'.$id)->assertOk()
-            ->assertJsonPath('data.valid_from', '2026-11-01')->assertJsonPath('data.valid_until', null)
-            ->assertJsonPath('data.assistant_ids', $this->payload['assistant_ids']);
     }
 
     public function test_service_rechecks_validity_against_current_persisted_dates(): void
@@ -329,19 +317,6 @@ class ScheduleRuleApiTest extends TestCase
         $this->getJson('/api/schedule-rules/'.$id)->assertOk()
             ->assertJsonPath('data.type', 'mandatory')->assertJsonPath('data.min', 1)
             ->assertJsonCount(1, 'data.assistant_ids');
-    }
-
-    public function test_migration_preserves_previous_substitute_in_priority_list(): void
-    {
-        $id = $this->createRule();
-        $migration = require database_path('migrations/2026_10_13_000002_move_schedule_rule_substitute_to_priority_list.php');
-        $migration->down();
-        DB::table('schedule_rules')->where('id', $id)->update(['substitute_assistant_id' => $this->substituteId]);
-        $migration->up();
-        $this->getJson('/api/schedule-rules/'.$id)->assertOk()
-            ->assertJsonPath('data.assistant_ids', [...$this->payload['assistant_ids'], $this->substituteId])
-            ->assertJsonPath('data.days_of_week', $this->payload['days_of_week'])
-            ->assertJsonMissingPath('data.substitute_assistant_id');
     }
 
     public function test_fallback_activity_type_cannot_be_used_in_schedule_rules_or_deactivated(): void

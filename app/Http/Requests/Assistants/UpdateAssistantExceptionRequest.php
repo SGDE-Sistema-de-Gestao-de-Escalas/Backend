@@ -2,21 +2,12 @@
 
 namespace App\Http\Requests\Assistants;
 
-use App\Services\AssistantExceptionService;
+use App\Services\Assistants\AssistantExceptionService;
 use Carbon\Carbon;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 
-class UpdateAssistantExceptionRequest extends FormRequest
+class UpdateAssistantExceptionRequest extends StoreAssistantExceptionRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return $this->user()?->isAdmin() ?? false;
-    }
-
     /**
      * Get the validation rules that apply to the request.
      *
@@ -24,20 +15,13 @@ class UpdateAssistantExceptionRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'type' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'valid_from' => 'sometimes|required|date',
-            'valid_until' => 'nullable|date|after_or_equal:valid_from',
-            'start_time' => 'nullable|date_format:H:i',
-            'end_time' => 'nullable|date_format:H:i|after:start_time',
-            'days' => 'nullable|array',
-            'days.*' => 'integer|between:0,6',
-            'lunch_enabled' => 'sometimes|boolean',
-            'lunch_start' => 'nullable|date_format:H:i',
-            'lunch_end' => 'nullable|date_format:H:i|after:lunch_start',
-            'lunch_duration_minutes' => 'nullable|integer|min:0',
-        ];
+        return array_merge(
+            array_diff_key(parent::rules(), ['assistant_id' => true]),
+            [
+                'type' => 'sometimes|required|string|max:255',
+                'valid_from' => 'sometimes|required|date',
+            ]
+        );
     }
 
     /**
@@ -52,13 +36,16 @@ class UpdateAssistantExceptionRequest extends FormRequest
             }
 
             $today = Carbon::today();
-            $validFrom = $exception->valid_from ? Carbon::parse($exception->valid_from)->startOfDay() : null;
             $validUntil = $exception->valid_until ? Carbon::parse($exception->valid_until)->startOfDay() : null;
 
             // 1. Se a exceção for passada (valid_until < hoje)
             if ($validUntil && $validUntil->isBefore($today)) {
                 $validator->errors()->add('valid_until', 'Não é possível editar uma exceção cuja vigência já terminou no passado.');
 
+                return;
+            }
+
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 
@@ -88,32 +75,5 @@ class UpdateAssistantExceptionRequest extends FormRequest
                 }
             }
         });
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'type.required' => 'O tipo de exceção é obrigatório.',
-            'type.max' => 'O tipo de exceção não pode ter mais de 255 carateres.',
-            'valid_from.required' => 'A data de início é obrigatória.',
-            'valid_from.date' => 'A data de início introduzida não é válida.',
-            'valid_until.date' => 'A data de fim introduzida não é válida.',
-            'valid_until.after_or_equal' => 'A data de fim tem de ser igual ou posterior à data de início.',
-            'start_time.date_format' => 'A hora de início tem de estar no formato HH:mm (ex: 09:30).',
-            'end_time.date_format' => 'A hora de fim tem de estar no formato HH:mm (ex: 17:30).',
-            'end_time.after' => 'A hora de fim tem de ser posterior à hora de início.',
-            'days.array' => 'Os dias da semana devem ser indicados como uma lista.',
-            'days.*.integer' => 'Cada dia da semana tem de ser um número inteiro.',
-            'days.*.between' => 'O dia da semana tem de ser entre 0 (Segunda) e 6 (Domingo).',
-            'lunch_enabled.boolean' => 'O campo de pausa de almoço tem de ser verdadeiro ou falso.',
-            'lunch_start.date_format' => 'A hora de início de almoço tem de estar no formato HH:mm.',
-            'lunch_end.date_format' => 'A hora de fim de almoço tem de estar no formato HH:mm.',
-            'lunch_end.after' => 'A hora de fim de almoço tem de ser posterior à hora de início de almoço.',
-            'lunch_duration_minutes.integer' => 'A duração do almoço em minutos tem de ser um número inteiro.',
-            'lunch_duration_minutes.min' => 'A duração do almoço tem de ser de pelo menos 0 minutos.',
-        ];
     }
 }

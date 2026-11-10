@@ -26,6 +26,13 @@ class ScheduleRule extends Model
         'days_of_week',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (ScheduleRule $rule) {
+            $rule->assistants()->detach();
+        });
+    }
+
     protected function casts(): array
     {
         return [

@@ -26,11 +26,22 @@ class UpdateAbsenceRequest extends FormRequest
         $absence = $this->route('absence');
 
         if (is_string($absence)) {
-            $absence = \App\Models\Absences\Absence::find($absence);
+            $absence = Absence::find($absence);
         }
         if (! $absence) return false;
         $userAstId = $user->assistant?->id;
         return ($absence->assistant?->user_id === $user->id) || ($userAstId && (string) $absence->assistant_id === (string) $userAstId);
+    }
+
+    /**
+     * Uma lista no lugar da data de início trata-se como em falta: a regra
+     * "after_or_equal" rebenta com um TypeError se receber uma lista.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('valid_from') && ! is_string($this->input('valid_from'))) {
+            $this->merge(['valid_from' => null]);
+        }
     }
 
     /**
@@ -43,11 +54,11 @@ class UpdateAbsenceRequest extends FormRequest
         return [
             'assistant_id' => ['sometimes', 'required', 'uuid', 'exists:assistants,id'],
             'absence_type_id' => ['sometimes', 'required', 'uuid', 'exists:absence_types,id'],
-            'valid_from' => ['sometimes', 'required', 'date'],
-            'valid_until' => ['nullable', 'date', 'after_or_equal:valid_from'],
+            'valid_from' => ['sometimes', 'required', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31'],
+            'valid_until' => ['sometimes', 'required', 'date', 'after_or_equal:valid_from', 'before_or_equal:2100-12-31'],
             'start_time' => ['nullable', 'date_format:H:i'],
             'end_time' => ['nullable', 'date_format:H:i'],
-            'total_days' => ['nullable', 'integer', 'min:1'],
+            'total_days' => ['nullable', 'integer', 'min:1', 'max:366'],
             'justification' => ['nullable', 'string', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'status' => ['sometimes', 'required', 'in:pending,justified,unjustified'],
@@ -126,10 +137,31 @@ class UpdateAbsenceRequest extends FormRequest
                 }
             }
 
-            if ($this->filled('assistant_id') && $schoolId) {
+            if (is_string($this->input('assistant_id')) && $this->filled('assistant_id') && $schoolId) {
                 $assistant = Assistant::find($this->assistant_id);
                 if ($assistant && (string) $assistant->school_id !== (string) $schoolId) {
                     $validator->errors()->add('assistant_id', 'O assistente selecionado não pertence a esta escola.');
+                }
+            }
+
+            $datesChanged = $absence && (
+                ($this->has('valid_from') && $this->hasFieldChanged($absence, 'valid_from'))
+                || ($this->has('valid_until') && $this->hasFieldChanged($absence, 'valid_until'))
+            );
+
+            if ($datesChanged && ! $validator->errors()->hasAny(['valid_from', 'valid_until'])) {
+                $from = $this->filled('valid_from') ? $this->input('valid_from') : $absence->valid_from?->format('Y-m-d');
+                $until = $this->has('valid_until')
+                    ? ($this->input('valid_until') ?: $from)
+                    : $absence->valid_until?->format('Y-m-d');
+
+                if ($from && $until) {
+                    $start = Carbon::parse(substr((string) $from, 0, 10), 'UTC')->startOfDay();
+                    $end = Carbon::parse(substr((string) $until, 0, 10), 'UTC')->startOfDay();
+
+                    if ($start->diffInDays($end) > 365) {
+                        $validator->errors()->add('valid_until', 'Uma falta não pode ter mais de um ano de duração.');
+                    }
                 }
             }
         });
@@ -141,6 +173,10 @@ class UpdateAbsenceRequest extends FormRequest
     private function hasFieldChanged(Absence $absence, string $field): bool
     {
         $incoming = $this->input($field);
+
+        if (is_array($incoming)) {
+            return true;
+        }
 
         if (in_array($field, ['valid_from', 'valid_until'], true)) {
             $currentDate = $field === 'valid_until'
@@ -179,8 +215,13 @@ class UpdateAbsenceRequest extends FormRequest
             'absence_type_id.exists' => 'O tipo de ausência selecionado não existe.',
             'valid_from.required' => 'A data de início da ausência é obrigatória.',
             'valid_from.date' => 'A data de início da ausência é inválida.',
+            'valid_from.after_or_equal' => 'A data de início não pode ser anterior a 2000.',
+            'valid_from.before_or_equal' => 'A data de início não pode ser posterior a 2100.',
+            'valid_until.required' => 'A data de fim da ausência é obrigatória.',
             'valid_until.date' => 'A data de fim da ausência é inválida.',
             'valid_until.after_or_equal' => 'A data de fim tem de ser posterior ou igual à data de início.',
+            'valid_until.before_or_equal' => 'A data de fim não pode ser posterior a 2100.',
+            'total_days.max' => 'O número de dias não pode ser superior a 366.',
             'start_time.date_format' => 'A hora de início deve seguir o formato HH:mm.',
             'end_time.date_format' => 'A hora de fim deve seguir o formato HH:mm.',
             'status.in' => 'O estado da ausência é inválido.',

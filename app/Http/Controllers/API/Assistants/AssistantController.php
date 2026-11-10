@@ -7,8 +7,10 @@ use App\Models\Auth\User;
 use App\Http\Requests\Assistants\StoreAssistantRequest;
 use App\Http\Requests\Assistants\UpdateAssistantRequest;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\AssistantResource;
-use App\Services\AssistantService;
+use App\Http\Resources\Assistants\AssistantResource;
+use App\Services\Assistants\AssistantDocumentStorageService;
+use App\Services\Assistants\AssistantService;
+use App\Support\QueryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -86,7 +88,7 @@ class AssistantController extends Controller
         }
 
         // 3. Pesquisa Textual (name, first_name, last_name, email, internal_number)
-        $search = trim((string) $request->input('search', ''));
+        $search = QueryInput::string($request, 'search');
         if ($search !== '') {
             $words = array_values(array_filter(preg_split('/\s+/', $search) ?: []));
 
@@ -115,7 +117,7 @@ class AssistantController extends Controller
 
         // 4. Ordenação
         $sortBy = $request->input('sort_by', 'name');
-        $sortDir = strtolower((string) $request->input('sort_direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $sortDir = strtolower(QueryInput::string($request, 'sort_direction')) === 'desc' ? 'desc' : 'asc';
 
         if ($sortBy === 'internal_number') {
             $query->orderBy('assistants.internal_number', $sortDir);
@@ -193,21 +195,15 @@ class AssistantController extends Controller
     /**
      * Download or view the criminal record document.
      */
-    public function downloadCriminalRecord(Assistant $assistant): StreamedResponse
+    public function downloadCriminalRecord(Assistant $assistant, AssistantDocumentStorageService $documentStorage): StreamedResponse
     {
         Gate::authorize('view', $assistant);
 
-        if (! $assistant->criminal_record_path) {
-            abort(404, 'Registo criminal não encontrado.');
-        }
-
-        $disk = config('filesystems.documents_disk');
-
-        if (! Storage::disk($disk)->exists($assistant->criminal_record_path)) {
-            abort(404, 'Ficheiro do registo criminal não encontrado no servidor.');
-        }
-
-        return Storage::disk($disk)->response($assistant->criminal_record_path, null, ['X-Content-Type-Options' => 'nosniff']);
+        return $documentStorage->downloadResponse(
+            $assistant->criminal_record_path,
+            'Registo criminal não encontrado.',
+            'Ficheiro do registo criminal não encontrado no servidor.'
+        );
     }
 
 

@@ -3,12 +3,14 @@
 namespace App\Http\Requests\Auth;
 
 use App\Rules\NoHtmlCharacters;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
-    public function authorize(): \Illuminate\Auth\Access\Response|bool
+    public function authorize(): Response|bool
     {
         $target = $this->route('user') ?? $this->user();
 
@@ -16,7 +18,7 @@ class UpdateUserRequest extends FormRequest
             return false;
         }
 
-        $response = \Illuminate\Support\Facades\Gate::inspect('update', $target);
+        $response = Gate::inspect('update', $target);
 
         return $response->allowed() ? true : $response;
     }
@@ -39,8 +41,7 @@ class UpdateUserRequest extends FormRequest
                 // Ignora a própria conta: sem isto, guardar o perfil com o email
                 // inalterado dava "o email já existe" (em /me a rota não tem {user}).
                 Rule::unique('users', 'email')
-                    ->ignore($targetId)
-                    ->whereNull('deleted_at'),
+                    ->ignore($targetId),
             ],
         ];
 
