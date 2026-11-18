@@ -49,6 +49,7 @@ class AuthService
         DB::transaction(function () use ($user, $newPassword) {
             $user->update([
                 'password' => Hash::make($newPassword),
+                'has_password' => true,
             ]);
 
             $user->tokens()->delete();
@@ -108,7 +109,8 @@ class AuthService
             function ($user, $password) {
                 DB::transaction(function () use ($user, $password) {
                     $user->forceFill([
-                        'password' => Hash::make($password)
+                        'password' => Hash::make($password),
+                        'has_password' => true,
                     ])->setRememberToken(Str::random(60));
 
                     $user->save();

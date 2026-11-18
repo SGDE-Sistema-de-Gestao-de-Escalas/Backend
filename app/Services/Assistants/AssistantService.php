@@ -45,8 +45,9 @@ class AssistantService
                     'last_name' => $data['last_name'],
                     'email' => $data['email'],
                     'role_id' => $staffRole->id,
-                    // Password inutilizável; o assistente define a sua pelo link do email.
+                    // Password inutilizável; o assistente define a sua pelo link do email ou no perfil.
                     'password' => Hash::make(Str::random(64)),
+                    'has_password' => false,
                 ]);
 
                 $assistantData = Arr::except($data, array_merge(self::USER_FIELDS, ['criminal_record']));

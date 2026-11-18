@@ -76,14 +76,24 @@ class AuthController extends Controller
 
     public function updatePassword(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'current_password' => 'required|string|current_password:sanctum',
-            'new_password' => ['required', 'string', 'confirmed', new StrongPassword($request->user()->email)],
+        $user = $request->user();
+        $hasPassword = (bool) $user->has_password;
+
+        $rules = [
+            'new_password' => ['required', 'string', 'confirmed', new StrongPassword($user->email)],
+        ];
+
+        if ($hasPassword) {
+            $rules['current_password'] = 'required|string|current_password:sanctum';
+        }
+
+        $validated = $request->validate($rules);
+
+        $this->authService->updatePassword($user, $validated['new_password']);
+
+        return response()->json([
+            'message' => $hasPassword ? 'Password atualizada com sucesso.' : 'Password definida com sucesso.',
         ]);
-
-        $this->authService->updatePassword($request->user(), $validated['new_password']);
-
-        return response()->json(['message' => 'Password atualizada com sucesso.']);
     }
 
     public function logout(Request $request): JsonResponse

@@ -43,6 +43,8 @@ class UserResource extends JsonResource
                 'anonymize' => 'Os dados pessoais serão anonimizados e o histórico será mantido.',
                 default => null,
             },
+            'has_password' => (bool) ($this->has_password ?? true),
+            'provider' => $this->provider,
             'assistant_id' => $this->assistant?->id,
             'school_id' => $this->assistant?->school_id,
             'school_name' => $this->assistant?->school?->name,
