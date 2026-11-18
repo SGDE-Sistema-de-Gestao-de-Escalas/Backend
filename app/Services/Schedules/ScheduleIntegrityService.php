@@ -7,7 +7,9 @@ use App\Services\Schools\OperatingHoursResolver;
 use App\Models\Absences\Absence;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
+use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleRecalculationFlag;
 use App\Models\Schedules\ScheduleEntry;
 use App\Models\Schedules\ScheduleRule;
 use App\Models\Schools\School;
@@ -282,6 +284,66 @@ class ScheduleIntegrityService
                     }
                 }
             }
+        }
+
+        $outgoingTransfers = AssistantTemporaryAssignments::query()
+            ->with(['assistant.user', 'destinationSchool'])
+            ->where('origin_school_id', $schoolId)
+            ->whereDate('valid_from', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $date))
+            ->get();
+
+        foreach ($outgoingTransfers as $transfer) {
+            $trStart = $transfer->start_time ? $this->toMinutes(substr((string) $transfer->start_time, 0, 5)) : 0;
+            $trEnd = $transfer->end_time ? $this->toMinutes(substr((string) $transfer->end_time, 0, 5)) : 1440;
+            $destName = $transfer->destinationSchool?->name ?? 'outra escola';
+            $userName = $transfer->assistant?->user
+                ? trim($transfer->assistant->user->first_name . ' ' . $transfer->assistant->user->last_name)
+                : 'Assistente';
+
+            foreach ($entries as $entry) {
+                if ((string) $entry->schedule?->assistant_id !== (string) $transfer->assistant_id) {
+                    continue;
+                }
+
+                $entryStart = $this->toMinutes($entry->start_time);
+                $entryEnd = $this->toMinutes($entry->end_time);
+
+                if (! $this->intervalsOverlap($entryStart, $entryEnd, $trStart, $trEnd)) {
+                    continue;
+                }
+
+                $conflicts[] = [
+                    'date' => $date,
+                    'type' => 'assigned_assistant_transferred',
+                    'assistant_id' => $transfer->assistant_id,
+                    'assistant_name' => $userName,
+                    'start_time' => substr((string) $entry->start_time, 0, 5),
+                    'end_time' => substr((string) $entry->end_time, 0, 5),
+                    'activity_name' => $entry->activity_name ?? $entry->activityType?->name ?? 'Atividade',
+                    'message' => "O assistente {$userName} está cedido a {$destName} (" . ($transfer->start_time ? substr((string) $transfer->start_time, 0, 5) . ' - ' . substr((string) $transfer->end_time, 0, 5) : 'dia inteiro') . "), mas tem tarefa '{$entry->activity_name}' agendada nesta escola ({$entry->start_time} - {$entry->end_time}).",
+                ];
+            }
+        }
+
+        $flags = ScheduleRecalculationFlag::query()
+            ->where('school_id', $schoolId)
+            ->whereDate('date', $date)
+            ->get();
+
+        foreach ($flags as $flag) {
+            $flagAssistant = Assistant::with('user')->find($flag->assistant_id);
+            $flagName = $flagAssistant?->user
+                ? trim($flagAssistant->user->first_name . ' ' . $flagAssistant->user->last_name)
+                : 'Assistente';
+
+            $conflicts[] = [
+                'date' => $date,
+                'type' => 'transfer_removed_recalculation',
+                'assistant_id' => $flag->assistant_id,
+                'assistant_name' => $flagName,
+                'message' => "{$flagName}: " . ($flag->message ?? 'a cedência temporária foi removida.') . ' Recalcule o horário deste dia.',
+            ];
         }
 
         // 2. Verificar regras obrigatórias ativas nesta data
