@@ -28,6 +28,7 @@
 | **UK** | `email` | string()    · NN |
 | **—** | `email_verified_at` | timestamp()    · NULL |
 | **—** | `password` | string()    · NN |
+| **—** | `has_password` | boolean()    · NN; default true |
 | **—** | `provider` | string()    · NULL |
 | **—** | `provider_id` | string()    · NULL |
 | **—** | `remember_token` | string(100)    · NULL |
