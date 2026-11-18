@@ -110,4 +110,40 @@ class PasswordPolicyTest extends TestCase
 
         $this->assertStringContainsString('10 caracteres', $message);
     }
+
+    public function test_user_without_password_can_set_password_without_current_password(): void
+    {
+        $oauthUser = User::factory()->create([
+            'role_id' => $this->user->role_id,
+            'email' => 'joao.silva@escola.pt',
+            'is_active' => true,
+            'has_password' => false,
+            'provider' => 'google',
+            'provider_id' => '123456789',
+        ]);
+
+        Sanctum::actingAs($oauthUser);
+
+        // Can define password without providing current_password
+        $response = $this->postJson('/api/update-password', [
+            'new_password' => 'Cadeira-Azul-47x',
+            'new_password_confirmation' => 'Cadeira-Azul-47x',
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['message' => 'Password definida com sucesso.']);
+
+        $freshUser = $oauthUser->fresh();
+        $this->assertTrue($freshUser->has_password);
+        $this->assertTrue(Hash::check('Cadeira-Azul-47x', $freshUser->password));
+
+        // Now that password is set, current_password is required
+        $secondAttempt = $this->postJson('/api/update-password', [
+            'new_password' => 'Outra-Cadeira-48y',
+            'new_password_confirmation' => 'Outra-Cadeira-48y',
+        ]);
+
+        $secondAttempt->assertStatus(422)
+            ->assertJsonValidationErrors(['current_password']);
+    }
 }

@@ -32,6 +32,7 @@ class User extends Authenticatable
         'last_name',
         'email',
         'password',
+        'has_password',
         'provider',
         'provider_id',
         'is_active',
@@ -58,6 +59,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'has_password' => 'boolean',
             'is_active' => 'boolean',
             'anonymized_at' => 'datetime',
         ];
