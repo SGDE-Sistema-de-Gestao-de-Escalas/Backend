@@ -8,7 +8,9 @@ use App\Http\Resources\Schedules\ScheduleResource;
 use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Schedules\Schedule;
+use App\Models\Schedules\ScheduleRecalculationFlag;
 use App\Services\System\NotificationService;
+use App\Services\Assistants\TemporaryTransferService;
 use App\Services\Schedules\ScheduleGenerationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -28,6 +30,7 @@ class ScheduleController extends Controller
         private readonly ScheduleIntegrityService $integrityService,
         private readonly NotificationService $notifications,
         private readonly ScheduleExportService $exportService,
+        private readonly TemporaryTransferService $transfers,
     ) {}
 
     /**
@@ -114,7 +117,16 @@ class ScheduleController extends Controller
         // Assegurar previamente que a atividade base/fallback existe para a escola
         $this->generationService->ensureFallbackActivity($schoolId);
 
-        $result = DB::transaction(function () use ($request, $schoolId, $validated) {
+        $removedTransfers = [];
+        $createdTransfers = [];
+
+        $result = DB::transaction(function () use ($request, $schoolId, $validated, &$removedTransfers, &$createdTransfers) {
+            $removedTransfers = $this->transfers->clearIncomingForPeriod(
+                $schoolId,
+                $validated['start_date'],
+                $validated['end_date'],
+            );
+
             // Se o administrador aprovou designações de mobilidade inter-escolar (transferências),
             // registar os AssistantTemporaryAssignments atomicamente junto com a geração da escala.
             if (! empty($validated['transfers']) && is_array($validated['transfers'])) {
@@ -147,21 +159,50 @@ class ScheduleController extends Controller
 
                     if ($assignment->wasRecentlyCreated) {
                         $this->notifications->transferAssigned($assignment, $request->user());
+                        $createdTransfers[] = [
+                            'origin_school_id' => (string) $assignment->origin_school_id,
+                            'destination_school_id' => (string) $assignment->destination_school_id,
+                            'assistant_id' => (string) $assignment->assistant_id,
+                            'start_time' => $trStart,
+                            'end_time' => $trEnd,
+                            'dates' => [$tr['date']],
+                        ];
                     }
                 }
             }
 
-            return $this->generationService->generate(
+            $generated = $this->generationService->generate(
                 schoolId: $schoolId,
                 startDate: $validated['start_date'],
                 endDate: $validated['end_date'],
                 preserveLocked: (bool) ($validated['preserve_locked'] ?? true),
                 idempotencyKey: $validated['idempotency_key'] ?? null,
             );
+
+            $this->transfers->clearFlagsForPeriod($schoolId, $validated['start_date'], $validated['end_date']);
+
+            foreach ($removedTransfers as $item) {
+                $this->transfers->flagOriginForRecalculation(
+                    $item['origin_school_id'], $item['assistant_id'], $item['destination_school_id'],
+                    $item['dates'], ScheduleRecalculationFlag::REASON_TRANSFER_REMOVED, $item['start_time'], $item['end_time']
+                );
+            }
+
+            return $generated;
         });
 
         // Notificações para os administradores (nunca falham a operação principal).
         $actor = $request->user();
+        foreach ($removedTransfers as $item) {
+            $this->notifications->transferRecalculationRequired(
+                $item['origin_school_id'], $item['assistant_id'], $item['dates'], true, $actor
+            );
+        }
+        foreach ($createdTransfers as $item) {
+            $this->notifications->transferRecalculationRequired(
+                $item['origin_school_id'], $item['assistant_id'], $item['dates'], false, $actor
+            );
+        }
         if (! empty($result['conflicts'])) {
             $this->notifications->scheduleGenerationDeficit($schoolId, $result, $actor);
         } else {

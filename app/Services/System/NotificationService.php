@@ -8,6 +8,7 @@ use App\Services\Schedules\ScheduleIntegrityService;
 use App\Enums\NotificationEvent;
 use App\Enums\NotificationType;
 use App\Models\Absences\Absence;
+use App\Models\Assistants\Assistant;
 use App\Models\Assistants\AssistantException;
 use App\Models\Assistants\AssistantTemporaryAssignments;
 use App\Models\Auth\User;
@@ -123,6 +124,28 @@ class NotificationService
             $schoolId,
             ['affected_dates' => $dates, 'link' => count($dates) > 0 ? '/dashboard?date='.$dates[0] : '/dashboard'],
             actor: $actor,
+        );
+    }
+
+    public function transferRecalculationRequired(
+        string $originSchoolId,
+        string $assistantId,
+        array $dates,
+        bool $removed = false,
+        ?User $actor = null,
+    ): int {
+        if ($dates === []) {
+            return 0;
+        }
+
+        $assistant = Assistant::with('user')->find($assistantId);
+
+        return $this->scheduleRecalculationRequired(
+            $originSchoolId,
+            ['requires_recalculation' => true, 'affected_dates' => $dates],
+            $assistant ? $this->nameOf($assistant) : null,
+            $removed ? 'remoção da cedência temporária' : 'cedência temporária',
+            $actor,
         );
     }
 
