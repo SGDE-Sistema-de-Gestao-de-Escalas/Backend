@@ -44,7 +44,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        $user->load('role');
+        $user->load(['role', 'assistant.school']);
 
         return new UserResource($user);
     }
@@ -52,6 +52,9 @@ class AuthController extends Controller
     public function updateMe(UpdateUserRequest $request): UserResource
     {
         $user = $request->user();
+        if (! $user->isAdmin()) {
+            abort(403, 'Os assistentes operacionais não podem alterar os seus dados cadastrais diretamente. Contacte a administração escolar.');
+        }
         $updatedUser = $this->userService->update($user, $request->validated());
 
         return (new UserResource($updatedUser))

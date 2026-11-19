@@ -24,11 +24,11 @@ class UserPolicy
 
     public function update(User $actor, User $target): Response
     {
-        if ($actor->isAdmin() || $actor->is($target)) {
+        if ($actor->isAdmin()) {
             return Response::allow();
         }
 
-        return Response::deny('Não tem permissão para alterar dados de outros utilizadores.');
+        return Response::deny('Os assistentes operacionais não podem alterar os seus dados cadastrais diretamente. Contacte a administração escolar.');
     }
 
     public function delete(User $actor, User $target): Response
