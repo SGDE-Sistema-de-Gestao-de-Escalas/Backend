@@ -22,8 +22,9 @@ p,
 ul,
 ol,
 blockquote {
-    line-height: 1.6;
-    text-align: center;
+    line-height: 1.65;
+    text-align: justify;
+    text-justify: inter-word;
     color: #4B5563;
 }
 
@@ -75,7 +76,8 @@ p {
     line-height: 1.65em;
     margin-top: 0;
     margin-bottom: 16px;
-    text-align: center;
+    text-align: justify;
+    text-justify: inter-word;
 }
 
 p.sub {
@@ -121,44 +123,28 @@ img {
 
 .header a,
 .header-link {
-    color: #1B1C21;
     display: inline-block;
-    font-size: 19px;
-    font-weight: bold;
     text-decoration: none;
-}
-
-.header-brand-table {
-    margin: 0 auto;
-}
-
-.header-logo-cell {
-    padding-right: 12px;
+    text-align: center;
 }
 
 .header-logo {
     border: 0;
     display: block;
-    height: 44px;
-    width: 44px;
+    height: auto;
+    width: 200px;
+    max-width: 200px;
+    margin: 0 auto;
 }
 
-.header-title {
-    color: #4c57a2;
-    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
+.light-img {
+    display: block;
 }
 
-.header-subtitle {
-    color: #4c57a2;
-    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    margin-top: 2px;
+.dark-img-wrapper,
+.dark-img {
+    display: none;
+    mso-hide: all;
 }
 
 /* Body */
@@ -273,7 +259,7 @@ img {
 .content-cell {
     max-width: 100vw;
     padding: 38px 40px 36px 40px;
-    text-align: center;
+    text-align: left;
 }
 
 /* Buttons */
@@ -333,30 +319,39 @@ img {
 
 .panel-content {
     background-color: #F8FAFC;
-    color: #1B1C21;
+    color: #1F2937 !important;
     padding: 16px 20px;
     border-radius: 12px;
     text-align: left;
 }
 
 .panel-content p {
-    color: #1B1C21;
+    color: #1F2937 !important;
     font-size: 13.5px;
+    line-height: 1.7;
     margin-bottom: 6px;
     text-align: left;
 }
 
 .panel-item {
-    color: #1B1C21;
+    color: #1F2937 !important;
     font-size: 13.5px;
     line-height: 1.7;
     padding: 0;
     text-align: left;
 }
 
-.panel-item p:last-of-type {
-    margin-bottom: 0;
-    padding-bottom: 0;
+.panel-item p {
+    color: #1F2937 !important;
+    font-size: 13.5px;
+    line-height: 1.7;
+    text-align: left;
+}
+
+.panel-item strong,
+.panel-content strong {
+    color: #111827 !important;
+    font-weight: 700;
 }
 
 /* Link Box */

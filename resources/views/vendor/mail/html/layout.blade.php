@@ -4,8 +4,41 @@
 <title>{{ config('app.name') }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style type="text/css">
+@media (prefers-color-scheme: dark) {
+    .light-img {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        mso-hide: all !important;
+    }
+    .dark-img-wrapper,
+    .dark-img {
+        display: block !important;
+        visibility: visible !important;
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 200px !important;
+        margin: 0 auto !important;
+    }
+}
+
+/* Suporte para Webmail / Outlook com data-ogsc */
+[data-ogsc] .light-img {
+    display: none !important;
+}
+[data-ogsc] .dark-img-wrapper,
+[data-ogsc] .dark-img {
+    display: block !important;
+    width: 200px !important;
+    height: auto !important;
+    margin: 0 auto !important;
+}
+</style>
 {!! $head ?? '' !!}
 </head>
 <body>

@@ -50,9 +50,18 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(function (MessageSending $event) {
-            $iconPath = public_path('images/icon.png');
-            if (is_file($iconPath) && str_contains((string) $event->message->getHtmlBody(), 'cid:sgde-logo')) {
-                $event->message->embedFromPath($iconPath, 'sgde-logo', 'image/png');
+            $html = (string) $event->message->getHtmlBody();
+            $logoLight = public_path('images/logo-horizontal.png');
+            $logoDark = public_path('images/logo-horizontal-dark.png');
+
+            if (is_file($logoLight) && str_contains($html, 'cid:sgde-logo-light')) {
+                $event->message->embedFromPath($logoLight, 'sgde-logo-light', 'image/png');
+            }
+            if (is_file($logoDark) && str_contains($html, 'cid:sgde-logo-dark')) {
+                $event->message->embedFromPath($logoDark, 'sgde-logo-dark', 'image/png');
+            }
+            if (is_file($logoLight) && str_contains($html, 'cid:sgde-logo')) {
+                $event->message->embedFromPath($logoLight, 'sgde-logo', 'image/png');
             }
         });
     }

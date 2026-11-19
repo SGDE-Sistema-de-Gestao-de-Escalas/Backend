@@ -3,6 +3,11 @@
 
 Foi submetido um pedido de recuperação de acesso para a conta de **{{ $user->first_name }} {{ $user->last_name }}** no sistema **SGDE**.
 
+<x-mail::panel>
+**Nome do Utilizador:** {{ $user->first_name }} {{ $user->last_name }}<br>
+**Email de Acesso:** {{ $user->email }}
+</x-mail::panel>
+
 Para definir uma nova palavra-passe, utilize o botão abaixo:
 
 <x-mail::button :url="$resetUrl" color="primary">
