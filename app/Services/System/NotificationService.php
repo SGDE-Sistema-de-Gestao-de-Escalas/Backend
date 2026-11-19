@@ -205,13 +205,19 @@ class NotificationService
     public function deactivationRequested(User $requester, ?string $reason = null): int
     {
         $requester->loadMissing('assistant');
+        $assistantId = $requester->assistant?->id;
+        $link = $assistantId ? "/profile/{$assistantId}" : '/assistants';
 
         return $this->notifyAdmins(
             NotificationEvent::DeactivationRequested,
-            'Pedido de desativação de conta',
-            "{$requester->name} pediu a desativação da conta.".($reason ? " Motivo: {$reason}" : ''),
+            'Pedido de anonimização de dados',
+            "{$requester->name} pediu a anonimização dos dados e desativação da conta.".($reason ? " Motivo: {$reason}" : ''),
             $requester->assistant?->school_id,
-            ['user_id' => $requester->id, 'link' => '/assistants'],
+            [
+                'user_id' => $requester->id,
+                'assistant_id' => $assistantId,
+                'link' => $link,
+            ],
         );
     }
 

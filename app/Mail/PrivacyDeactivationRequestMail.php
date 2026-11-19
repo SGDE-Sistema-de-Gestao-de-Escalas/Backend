@@ -24,7 +24,7 @@ class PrivacyDeactivationRequestMail extends Mailable
         $userName = trim("{$this->user->first_name} {$this->user->last_name}");
 
         return new Envelope(
-            subject: "SGDE - Pedido de Desativação de Conta (RGPD) por {$userName}",
+            subject: "SGDE - Pedido de Anonimização / Desativação de Conta (RGPD) por {$userName}",
         );
     }
 

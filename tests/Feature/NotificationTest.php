@@ -333,6 +333,7 @@ class NotificationTest extends TestCase
             $this->assertSame('alert', $n->type);
             $this->assertStringContainsString('Joana Op', $n->body);
             $this->assertStringContainsString('Mudança de emprego', $n->body);
+            $this->assertSame("/profile/{$assistant->id}", $n->data['link']);
         }
     }
 

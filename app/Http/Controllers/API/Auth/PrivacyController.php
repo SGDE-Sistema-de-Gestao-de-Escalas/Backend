@@ -19,13 +19,19 @@ class PrivacyController extends Controller
 
     public function requestDeactivation(RequestDeactivationRequest $request): JsonResponse
     {
+        $user = $request->user();
+
         $this->userService->requestDeactivation(
-            $request->user(),
+            $user,
             $request->validated('reason')
         );
 
+        $fresh = $user->fresh();
+
         return response()->json([
             'message' => 'Pedido de desativação submetido com sucesso. Os administradores foram notificados por email.',
+            'deactivation_requested' => true,
+            'deactivation_requested_at' => $fresh?->deactivation_requested_at?->toIso8601String(),
         ]);
     }
 

@@ -37,6 +37,7 @@ class User extends Authenticatable
         'provider_id',
         'is_active',
         'anonymized_at',
+        'deactivation_requested_at',
     ];
 
     /**
@@ -62,6 +63,7 @@ class User extends Authenticatable
             'has_password' => 'boolean',
             'is_active' => 'boolean',
             'anonymized_at' => 'datetime',
+            'deactivation_requested_at' => 'datetime',
         ];
     }
 
