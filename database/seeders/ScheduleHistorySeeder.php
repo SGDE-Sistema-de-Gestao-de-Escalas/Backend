@@ -10,7 +10,8 @@ use Illuminate\Database\Seeder;
 class ScheduleHistorySeeder extends Seeder
 {
     /**
-     * Semeia histórico de escalas geradas e publicadas para alimentar os relatórios (taxa de cobertura, etc.),
+     * Semeia histórico de escalas geradas e publicadas desde setembro de 2025
+     * para alimentar os relatórios (taxa de cobertura, horas de trabalho, etc.),
      * e gera o mês corrente de Dezembro de 2026 em estado de rascunho (draft) para a demonstração prática.
      */
     public function run(): void
@@ -23,11 +24,14 @@ class ScheduleHistorySeeder extends Seeder
         $service = app(ScheduleGenerationService::class);
 
         foreach ($schools as $school) {
-            // 1. Gerar e publicar escalas para os meses anteriores do ano letivo 2026/2027
+            // 1. Gerar e publicar escalas históricas completas desde Setembro de 2025 até Novembro de 2026
             $historicalRanges = [
-                ['2026-09-01', '2026-09-30'],
-                ['2026-10-01', '2026-10-31'],
-                ['2026-11-01', '2026-11-30'],
+                // Ano Letivo 2025/2026
+                ['2025-09-01', '2025-12-31'],
+                ['2026-01-01', '2026-03-31'],
+                ['2026-04-01', '2026-06-30'],
+                // Ano Letivo 2026/2027 (meses anteriores a Dezembro)
+                ['2026-09-01', '2026-11-30'],
             ];
 
             foreach ($historicalRanges as [$from, $to]) {
