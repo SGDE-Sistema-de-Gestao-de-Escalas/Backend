@@ -21,11 +21,11 @@ class UserSeeder extends Seeder
 
 
 
-        $adminPassword = (string) (config('app.seed_admin_password') ?: 'Password123!');
-        $staffPassword = (string) (config('app.seed_staff_password') ?: 'Password123!');
+        $adminPassword = (string) (config('app.seed_admin_password'));
+        $staffPassword = (string) (config('app.seed_staff_password'));
 
         User::firstOrCreate(
-            ['email' => 'sgde@admin.com'],
+            ['email' => 'sgde.admin@gmail.com'],
             [
                 'first_name' => 'Miguel',
                 'last_name' => 'Silva',

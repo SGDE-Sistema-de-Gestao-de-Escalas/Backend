@@ -127,8 +127,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'seed_admin_password' => env('SEED_ADMIN_PASSWORD', 'Password123!'),
+    'seed_admin_password' => env('SEED_ADMIN_PASSWORD'),
 
-    'seed_staff_password' => env('SEED_STAFF_PASSWORD', 'Password123!'),
+    'seed_staff_password' => env('SEED_STAFF_PASSWORD'),
 
 ];
