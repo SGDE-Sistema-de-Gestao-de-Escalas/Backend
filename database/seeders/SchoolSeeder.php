@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Schools\School;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class SchoolSeeder extends Seeder
@@ -13,24 +12,24 @@ class SchoolSeeder extends Seeder
      */
     public function run(): void
     {
-        School::firstOrCreate(
+        School::updateOrCreate(
             ['acronym' => 'ESPL'],
             [
                 'name' => 'EB1 Miosótis',
-                'address' => 'Rua das Escolas, 123',
-                'phone' => '210000001',
-                'email' => 'espl@sgde.pt',
+                'address' => 'Rua das Escolas, 12',
+                'phone' => '219123451',
+                'email' => 'eb1.miosotis@sgde.pt',
                 'active' => true,
             ]
         );
 
-        School::firstOrCreate(
+        School::updateOrCreate(
             ['acronym' => 'EB23S'],
             [
                 'name' => 'JI Miosótis',
-                'address' => 'Avenida Central, 45',
-                'phone' => '210000002',
-                'email' => 'eb23s@sgde.pt',
+                'address' => 'Avenida das Oliveiras, 45',
+                'phone' => '219123452',
+                'email' => 'ji.miosotis@sgde.pt',
                 'active' => true,
             ]
         );

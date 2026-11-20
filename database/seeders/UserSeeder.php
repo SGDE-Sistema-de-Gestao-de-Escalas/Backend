@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Auth\User;
 use App\Models\Auth\Role;
@@ -15,33 +14,43 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-
         $adminRole = Role::where('slug', 'admin')->first();
+        if (! $adminRole) {
+            $this->call(RoleSeeder::class);
+            $adminRole = Role::where('slug', 'admin')->first();
+        }
+
         $staffRole = Role::where('slug', 'staff')->first();
 
+        $adminPassword = (string) (config('app.seed_admin_password') ?: 'admin123');
+        $staffPassword = (string) (config('app.seed_staff_password') ?: 'staff123');
 
-
-        $adminPassword = (string) (config('app.seed_admin_password'));
-        $staffPassword = (string) (config('app.seed_staff_password'));
-
-        User::firstOrCreate(
+        // Administrador Principal utilizado na apresentação (Miguel Silva)
+        User::updateOrCreate(
             ['email' => 'sgde@admin.com'],
             [
                 'first_name' => 'Miguel',
                 'last_name' => 'Silva',
                 'password' => Hash::make($adminPassword),
                 'role_id' => $adminRole->id,
+                'is_active' => true,
+                'has_password' => true,
             ]
         );
 
-        User::firstOrCreate(
-            ['email' => 'assistente@sgde.pt'],
-            [
-                'first_name' => 'Ana',
-                'last_name' => 'Costa',
-                'password' => Hash::make($staffPassword),
-                'role_id' => $staffRole->id,
-            ]
-        );
+        // Utilizador Staff genérico / assistente
+        if ($staffRole) {
+            User::updateOrCreate(
+                ['email' => 'assistente@sgde.pt'],
+                [
+                    'first_name' => 'Ana',
+                    'last_name' => 'Costa',
+                    'password' => Hash::make($staffPassword),
+                    'role_id' => $staffRole->id,
+                    'is_active' => true,
+                    'has_password' => true,
+                ]
+            );
+        }
     }
 }
