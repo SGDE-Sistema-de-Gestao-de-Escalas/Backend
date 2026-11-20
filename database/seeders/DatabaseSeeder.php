@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             // 2. Utilizadores (Administrador Miguel Silva e Staff Ana Costa)
             UserSeeder::class,
 
-            // 3. Escolas (EB1 Miosótis e JI Miosótis)
+            // 3. Escolas fictícias (EB1 de Vale Verde e JI de Vale Verde)
             SchoolSeeder::class,
 
             // 4. Feriados Nacionais (2025 e 2026; 2027 fica por importar para a live demo)
@@ -45,10 +45,10 @@ class DatabaseSeeder extends Seeder
             // 10. Regras de cobertura por escola
             ScheduleRuleSeeder::class,
 
-            // 11. Histórico de faltas (desde setembro de 2025 até 1 de dezembro de 2026)
+            // 11. Histórico de faltas (desde setembro de 2025 até final de novembro de 2026)
             AbsenceHistorySeeder::class,
 
-            // 12. Histórico de escalas publicadas (outono 2026) e rascunho de Dezembro 2026
+            // 12. Histórico de escalas publicadas (desde setembro de 2025) e rascunho de Dezembro 2026
             ScheduleHistorySeeder::class,
         ]);
     }

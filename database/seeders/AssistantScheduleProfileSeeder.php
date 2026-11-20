@@ -12,8 +12,8 @@ use Illuminate\Database\Seeder;
  * Todos os assistentes cumprem rigorosamente turnos de 7 horas diárias de trabalho
  * e 1 hora de pausa de almoço (duração total decorrida de 8 horas certas).
  *
- *  - 1.º ciclo (EB1 Miosótis - ESPL): Horário fixo por assistente.
- *  - Pré-escolar (JI Miosótis - EB23S): Horário rotativo quinzenal em pares.
+ *  - 1.º ciclo (EB1 de Vale Verde - EB1VV): Horário fixo por assistente.
+ *  - Pré-escolar (JI de Vale Verde - JIVV): Horário rotativo quinzenal em pares.
  *
  * Vigência desde 2025-09-01 para garantir histórico de escalas e relatórios.
  */
@@ -28,44 +28,52 @@ class AssistantScheduleProfileSeeder extends Seeder
     {
         $this->call(AssistantSeeder::class);
 
-        // 1.º ciclo (EB1 Miosótis): Horário fixo (7h de trabalho + 1h almoço = 8h)
+        // 1.º ciclo (EB1 de Vale Verde): Horário fixo (7h de trabalho + 1h almoço = 8h)
         // [Entrada, Saída, Início Almoço, Fim Almoço]
+        //
+        // Calibração exata para a apresentação:
+        // - 07:45–08:30 (Limpeza min 3): ME-2001, ME-2002, ME-2003 (3/3 -> 0 défices!)
+        // - 12:15–13:30 (Vigilância almoço min 4): apenas ME-2002, ME-2004 e ME-2005 estão livres (3/4).
+        //   Quando o novo assistente (08:30–16:30, almoço 13:30–14:30) for adicionado -> 4/4 (0 défices!).
+        //   Quando o novo assistente faltar a 7 de Dezembro -> volta a 3/4 -> ÚNICO alerta: Vigilância almoço!
         $fixed = [
-            'ME-2001' => ['07:30', '15:30', '12:30', '13:30'], // Patrícia Neves (7h trabalho)
-            'ME-2002' => ['07:45', '15:45', '13:30', '14:30'], // Anabela Ferreira (7h trabalho)
-            'ME-2003' => ['08:00', '16:00', '12:45', '13:45'], // Joana Antunes (7h trabalho)
-            'ME-2004' => ['09:30', '17:30', '13:30', '14:30'], // Maria João Bastos (7h trabalho)
-            'ME-2005' => ['10:00', '18:00', '13:45', '14:45'], // Marta Rodrigues (7h trabalho)
-            'ME-2006' => ['10:00', '18:00', '12:45', '13:45'], // Sandra Carvalho (7h trabalho)
+            'ME-2001' => ['07:30', '15:30', '12:30', '13:30'], // Beatriz Almeida (7h trabalho)
+            'ME-2002' => ['07:45', '15:45', '13:30', '14:30'], // Cláudia Teixeira (7h trabalho - livre 12:15–13:30)
+            'ME-2003' => ['07:45', '15:45', '12:45', '13:45'], // Inês Monteiro (7h trabalho - cobre Limpeza 07:45)
+            'ME-2004' => ['09:30', '17:30', '13:30', '14:30'], // Sofia Marques (7h trabalho - livre 12:15–13:30)
+            'ME-2005' => ['10:00', '18:00', '13:45', '14:45'], // Raquel Nogueira (7h trabalho - livre 12:15–13:30)
+            'ME-2006' => ['10:00', '18:00', '12:45', '13:45'], // Helena Cardoso (7h trabalho)
         ];
 
         foreach ($fixed as $internalNumber => $shift) {
             $this->createProfile($internalNumber, 'fixo', null, ['A' => $shift]);
         }
 
-        // Pré-escolar (JI Miosótis): Horário rotativo quinzenal (todos com 7h trabalho + 1h almoço)
-        // starts_with calibrado para que a 7 de Dezembro de 2026:
-        // - Carla Moreira esteja no Turno A (08:30–16:30, almoço 13:30–14:30), idêntico ao novo assistente!
+        // Pré-escolar (JI de Vale Verde): Horário rotativo quinzenal em pares (7h trabalho + 1h almoço = 8h)
+        // Calibração a 7 de Dezembro de 2026 (index 1 de rotação desde 2025-09-01):
+        // - ME-3002 (Mariana Correia): Turno A (08:30–16:30, almoço 13:30–14:30) -> IDÊNTICO ao novo assistente!
+        // - ME-3003 (Catarina Mendes): Turno A (07:30–15:30, almoço 12:00–13:00) -> cobre Acolhimento 07:30 e Sesta 13:00–14:30
+        // - ME-3004 (Lúcia Gonçalves): Turno B (09:30–17:30, almoço 12:00–13:00) -> cobre Sesta, Recreio JI e Limpeza
+        // - ME-3001 (Teresa Lopes):    Turno B (10:30–18:30, almoço 14:00–15:00) -> cobre Recreio JI, Limpeza e Entrega 18:30
+        // => Ao transferir Mariana Correia para a EB1 a 7/Dez, o JI mantém 0 défices obrigatórios!
         $rotating = [
-            // Jacinta Pires (Turno A: 08:00–16:00; Turno B: 10:30–18:30)
+            // Par 1 (Abertura 07:30 / Fecho 18:30)
             'ME-3001' => ['A', [
-                'A' => ['08:00', '16:00', '12:00', '13:00'],
+                'A' => ['07:30', '15:30', '12:00', '13:00'],
                 'B' => ['10:30', '18:30', '14:00', '15:00'],
             ]],
-            // Filipa Santos (Turno A: 08:00–16:00; Turno B: 10:30–18:30)
             'ME-3003' => ['B', [
-                'A' => ['08:00', '16:00', '14:00', '15:00'],
-                'B' => ['10:30', '18:30', '12:00', '13:00'],
+                'A' => ['07:30', '15:30', '12:00', '13:00'],
+                'B' => ['10:30', '18:30', '14:00', '15:00'],
             ]],
-            // Carla Moreira (Candidata ideal: no dia 7 Dez está no Turno A 08:30–16:30, almoço 13:30–14:30)
+            // Par 2 (Turnos Intermédios — ME-3002 Mariana Correia é a candidata ideal para 7 de Dezembro)
             'ME-3002' => ['B', [
                 'A' => ['08:30', '16:30', '13:30', '14:30'],
-                'B' => ['09:45', '17:45', '12:30', '13:30'],
+                'B' => ['09:30', '17:30', '12:00', '13:00'],
             ]],
-            // Diana Ribeiro (Turno A: 08:30–16:30; Turno B: 09:45–17:45)
             'ME-3004' => ['A', [
-                'A' => ['08:30', '16:30', '12:30', '13:30'],
-                'B' => ['09:45', '17:45', '13:30', '14:30'],
+                'A' => ['08:30', '16:30', '13:30', '14:30'],
+                'B' => ['09:30', '17:30', '12:00', '13:00'],
             ]],
         ];
 
@@ -83,7 +91,6 @@ class AssistantScheduleProfileSeeder extends Seeder
             return;
         }
 
-        // Se já existir perfil, remove os turnos associados para sincronizar os horários corretos de 7h
         $existingProfile = AssistantScheduleProfile::where('assistant_id', $assistant->id)->first();
         if ($existingProfile) {
             $existingProfile->shifts()->delete();

@@ -10,8 +10,8 @@ use Illuminate\Database\Seeder;
 /**
  * Horário de funcionamento fixo das escolas (segunda a sexta):
  *
- *  - ESPL (EB1 Miosótis): 07:30 – 18:00
- *  - EB23S (JI Miosótis): 07:30 – 18:30
+ *  - EB1VV / ESPL (1.º ciclo):   07:30 – 18:00
+ *  - JIVV  / EB23S (pré-escolar): 07:30 – 18:30
  *
  * Vigência desde 2025-09-01 para abranger todo o histórico.
  */
@@ -23,7 +23,9 @@ class SchoolOperatingRuleSeeder extends Seeder
     private const WEEK_DAYS = [0, 1, 2, 3, 4];
 
     private const CLOSING_TIMES = [
+        'EB1VV' => '18:00',
         'ESPL' => '18:00',
+        'JIVV' => '18:30',
         'EB23S' => '18:30',
     ];
 

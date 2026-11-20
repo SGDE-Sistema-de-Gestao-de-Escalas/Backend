@@ -8,28 +8,31 @@ use Illuminate\Database\Seeder;
 class SchoolSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Escolas fictícias criadas para a demonstração prática (privacidade preservada).
+     *
+     *  - EB1VV → EB1 de Vale Verde (1.º ciclo)
+     *  - JIVV  → JI de Vale Verde (pré-escolar)
      */
     public function run(): void
     {
         School::updateOrCreate(
-            ['acronym' => 'ESPL'],
+            ['acronym' => 'EB1VV'],
             [
-                'name' => 'EB1 Miosótis',
-                'address' => 'Rua das Escolas, 12',
+                'name' => 'EB1 de Vale Verde',
+                'address' => 'Rua do Vale Verde, 14',
                 'phone' => '219123451',
-                'email' => 'eb1.miosotis@sgde.pt',
+                'email' => 'eb1.valeverde@sgde.pt',
                 'active' => true,
             ]
         );
 
         School::updateOrCreate(
-            ['acronym' => 'EB23S'],
+            ['acronym' => 'JIVV'],
             [
-                'name' => 'JI Miosótis',
-                'address' => 'Avenida das Oliveiras, 45',
+                'name' => 'JI de Vale Verde',
+                'address' => 'Largo das Acácias, 8',
                 'phone' => '219123452',
-                'email' => 'ji.miosotis@sgde.pt',
+                'email' => 'ji.valeverde@sgde.pt',
                 'active' => true,
             ]
         );

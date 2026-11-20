@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  * Seeder de Regras de Horário e Cobertura (Schedule Rules) por escola.
  *
  * Vigência desde 2025-09-01 para assegurar histórico analítico nos relatórios.
- * "Apoio NEE" NÃO é semeada (é adicionada na demonstração ao vivo pela Pessoa 3).
+ * "Apoio Alunos NEE" NÃO é semeada (é adicionada na demonstração ao vivo pela Pessoa 3).
  * "Apoio Turmas/escola" foi removida por ser redundante com a atividade de fallback.
  */
 class ScheduleRuleSeeder extends Seeder
@@ -24,7 +24,7 @@ class ScheduleRuleSeeder extends Seeder
     private const WEEK_DAYS = [0, 1, 2, 3, 4];
 
     /**
-     * Regras da EB1 Miosótis (ESPL).
+     * Regras da EB1 de Vale Verde (EB1VV / ESPL).
      */
     public const ESPL_RULES = [
         [
@@ -34,11 +34,12 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 3,
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2005' => 3,
+                'ME-2001' => 1,
+                'ME-2002' => 2,
+                'ME-2003' => 3,
                 'ME-2004' => 4,
-                'ME-2006' => 5,
+                'ME-2005' => 5,
+                'ME-2006' => 6,
             ],
         ],
         [
@@ -48,11 +49,12 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 3,
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2004' => 3,
-                'ME-2005' => 4,
-                'ME-2006' => 5,
+                'ME-2001' => 1,
+                'ME-2002' => 2,
+                'ME-2003' => 3,
+                'ME-2004' => 4,
+                'ME-2005' => 5,
+                'ME-2006' => 6,
             ],
         ],
         [
@@ -62,11 +64,12 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 4,
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2004' => 3,
-                'ME-2005' => 4,
-                'ME-2006' => 5,
+                'ME-2001' => 1,
+                'ME-2002' => 2,
+                'ME-2003' => 3,
+                'ME-2004' => 4,
+                'ME-2005' => 5,
+                'ME-2006' => 6,
             ],
         ],
         [
@@ -90,11 +93,12 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 3,
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2005' => 3,
-                'ME-2006' => 4,
-                'ME-2004' => 5,
+                'ME-2001' => 1,
+                'ME-2002' => 2,
+                'ME-2003' => 3,
+                'ME-2005' => 4,
+                'ME-2006' => 5,
+                'ME-2004' => 6,
             ],
         ],
         [
@@ -105,10 +109,10 @@ class ScheduleRuleSeeder extends Seeder
             'min' => 1,
             'priorities' => [
                 'ME-2004' => 1,
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2005' => 4,
-                'ME-2006' => 5,
+                'ME-2005' => 2,
+                'ME-2006' => 3,
+                'ME-2002' => 4,
+                'ME-2003' => 5,
             ],
         ],
         [
@@ -118,11 +122,11 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 2,
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2004' => 3,
-                'ME-2005' => 4,
-                'ME-2006' => 5,
+                'ME-2004' => 1,
+                'ME-2005' => 2,
+                'ME-2006' => 3,
+                'ME-2002' => 4,
+                'ME-2003' => 5,
             ],
         ],
         [
@@ -140,7 +144,7 @@ class ScheduleRuleSeeder extends Seeder
     ];
 
     /**
-     * Regras do JI Miosótis (EB23S).
+     * Regras do JI de Vale Verde (JIVV / EB23S).
      */
     public const RULES = [
         [
@@ -168,7 +172,7 @@ class ScheduleRuleSeeder extends Seeder
             ],
         ],
         [
-            'activity' => 'Vigilância almoço',
+            'activity' => 'Apoio às Refeições',
             'period_start' => '12:15',
             'period_end' => '13:30',
             'type' => 'optional',
@@ -176,6 +180,7 @@ class ScheduleRuleSeeder extends Seeder
             'priorities' => [
                 'ME-3001' => 1,
                 'ME-3003' => 2,
+                'ME-3004' => 3,
             ],
         ],
         [
@@ -185,15 +190,15 @@ class ScheduleRuleSeeder extends Seeder
             'type' => 'mandatory',
             'min' => 1,
             'priorities' => [
-                'ME-3001' => 1,
-                'ME-3003' => 2,
+                'ME-3003' => 1,
+                'ME-3001' => 2,
                 'ME-3004' => 3,
             ],
         ],
         [
             'activity' => 'Recreio JI',
             'period_start' => '15:00',
-            'period_end' => '15:45',
+            'period_end' => '15:30',
             'type' => 'mandatory',
             'min' => 2,
             'priorities' => [
@@ -225,7 +230,6 @@ class ScheduleRuleSeeder extends Seeder
             'priorities' => [
                 'ME-3001' => 1,
                 'ME-3003' => 2,
-                'ME-3004' => 3,
             ],
         ],
     ];
@@ -258,13 +262,13 @@ class ScheduleRuleSeeder extends Seeder
             }
 
             $assistantsByInternalNumber = $assistants->keyBy('internal_number');
-            $isEspl = $school->acronym === 'ESPL';
-            $rulesConfig = $isEspl ? self::ESPL_RULES : self::RULES;
+            $isEb1 = in_array($school->acronym, ['ESPL', 'EB1VV'], true);
+            $rulesConfig = $isEb1 ? self::ESPL_RULES : self::RULES;
             $keptRuleIds = [];
 
             // Remover quaisquer regras obsoletas (ex: com Apoio Turmas ou Apoio NEE)
             $obsoleteActivityIds = ActivityType::where('school_id', $school->id)
-                ->whereIn('name', ['Apoio Turmas/escola', 'Apoio Turmas', 'Apoio NEE'])
+                ->whereIn('name', ['Apoio Turmas/escola', 'Apoio Turmas', 'Apoio NEE', 'Apoio Alunos NEE'])
                 ->pluck('id');
 
             if ($obsoleteActivityIds->isNotEmpty()) {
@@ -343,6 +347,7 @@ class ScheduleRuleSeeder extends Seeder
             'Limpeza' => '#8B5CF6',
             'Entrega de alunos' => '#14B8A6',
             'Apoio Atividades JI' => '#3B82F6',
+            'Apoio às Refeições' => '#F97316',
             'Vigilância da Sesta' => '#EC4899',
             'Recreio JI' => '#06B6D4',
         ];
