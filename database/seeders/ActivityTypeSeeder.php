@@ -10,16 +10,15 @@ use Illuminate\Support\Facades\DB;
 class ActivityTypeSeeder extends Seeder
 {
     /**
-     * Atividades predefinidas por escola.
-     * "Apoio Escola" é a atividade base (is_fallback = true) usada pelo motor
-     * para preencher automaticamente os períodos livres do turno.
-     *
-     * @var array<int, array{name: string, color: string, is_fallback: bool}>
+     * Atividades da EB1 de Vale Verde (1.º ciclo).
+     * - Comuns às duas escolas: Acolhimento, Limpeza, Entrega de alunos (+ fallback Apoio Escola).
+     * - Exclusivas do 1.º ciclo: Intervalo, Vigilância almoço.
+     * - "Apoio Alunos NEE" NÃO é semeada (é criada ao vivo na demonstração).
+     * - "Apoio Turmas/escola" foi removida por ser coberta pelo fallback.
      */
-    public const DEFAULTS = [
+    public const EB1_ACTIVITIES = [
         ['name' => 'Apoio Escola', 'color' => '#6366F1', 'is_fallback' => true],
         ['name' => 'Acolhimento', 'color' => '#F59E0B', 'is_fallback' => false],
-        ['name' => 'Apoio Turmas/escola', 'color' => '#3B82F6', 'is_fallback' => false],
         ['name' => 'Intervalo', 'color' => '#10B981', 'is_fallback' => false],
         ['name' => 'Vigilância almoço', 'color' => '#A855F7', 'is_fallback' => false],
         ['name' => 'Limpeza', 'color' => '#8B5CF6', 'is_fallback' => false],
@@ -27,83 +26,51 @@ class ActivityTypeSeeder extends Seeder
     ];
 
     /**
-     * Semeia as atividades predefinidas (incluindo a atividade fallback)
-     * em todas as escolas existentes.
+     * Atividades do JI de Vale Verde (Pré-escolar).
+     * - Comuns às duas escolas: Acolhimento, Limpeza, Entrega de alunos (+ fallback Apoio Escola).
+     * - Exclusivas do pré-escolar: Apoio Atividades JI, Apoio às Refeições, Vigilância da Sesta, Recreio JI.
      */
+    public const JI_ACTIVITIES = [
+        ['name' => 'Apoio Escola', 'color' => '#6366F1', 'is_fallback' => true],
+        ['name' => 'Acolhimento', 'color' => '#F59E0B', 'is_fallback' => false],
+        ['name' => 'Apoio Atividades JI', 'color' => '#3B82F6', 'is_fallback' => false],
+        ['name' => 'Apoio às Refeições', 'color' => '#F97316', 'is_fallback' => false],
+        ['name' => 'Vigilância da Sesta', 'color' => '#EC4899', 'is_fallback' => false],
+        ['name' => 'Recreio JI', 'color' => '#06B6D4', 'is_fallback' => false],
+        ['name' => 'Limpeza', 'color' => '#8B5CF6', 'is_fallback' => false],
+        ['name' => 'Entrega de alunos', 'color' => '#14B8A6', 'is_fallback' => false],
+    ];
+
     public function run(): void
     {
         School::query()->each(fn (School $school) => $this->seedForSchool($school));
     }
 
-    /**
-     * Cria ou atualiza as atividades predefinidas para uma escola específica.
-     */
     public function seedForSchool(School $school): void
     {
         DB::transaction(function () use ($school) {
-            // Atualizar "Apoio Turmas" para "Apoio Turmas/escola" se já existir
-            ActivityType::where('school_id', $school->getKey())
-                ->where('name', 'Apoio Turmas')
-                ->update(['name' => 'Apoio Turmas/escola']);
+            $isJi = in_array($school->acronym, ['JIVV', 'EB23S', 'JIM'], true)
+                || str_contains(strtolower($school->name), 'ji');
+            $catalog = $isJi ? self::JI_ACTIVITIES : self::EB1_ACTIVITIES;
 
-            $alreadySeeded = ActivityType::where('school_id', $school->getKey())
-                ->where('is_system', true)
-                ->exists();
+            // Remover atividades obsoletas/excluídas se existirem
+            ActivityType::where('school_id', $school->id)
+                ->whereIn('name', ['Apoio Turmas/escola', 'Apoio Turmas', 'Apoio NEE', 'Apoio Alunos NEE'])
+                ->delete();
 
-            if ($alreadySeeded) {
-                $hasFallback = ActivityType::where('school_id', $school->getKey())
-                    ->where('is_fallback', true)
-                    ->exists();
-
-                if (! $hasFallback) {
-                    $updated = ActivityType::where('school_id', $school->getKey())
-                        ->where('is_system', true)
-                        ->where('name', 'Apoio Escola')
-                        ->update([
-                            'is_fallback' => true,
-                            'active' => true,
-                        ]);
-
-                    if ($updated === 0) {
-                        ActivityType::create([
-                            'school_id' => $school->getKey(),
-                            'name' => 'Apoio Escola',
-                            'color' => '#6366F1',
-                            'is_system' => true,
-                            'is_fallback' => true,
-                            'active' => true,
-                        ]);
-                    }
-                }
-
-                // Garantir que todas as atividades predefinidas existem
-                foreach (self::DEFAULTS as $item) {
-                    ActivityType::firstOrCreate(
-                        [
-                            'school_id' => $school->getKey(),
-                            'name' => $item['name'],
-                        ],
-                        [
-                            'color' => $item['color'],
-                            'is_system' => true,
-                            'is_fallback' => $item['is_fallback'],
-                            'active' => true,
-                        ]
-                    );
-                }
-
-                return;
-            }
-
-            foreach (self::DEFAULTS as $item) {
-                ActivityType::create([
-                    'school_id' => $school->getKey(),
-                    'name' => $item['name'],
-                    'color' => $item['color'],
-                    'is_system' => true,
-                    'is_fallback' => $item['is_fallback'],
-                    'active' => true,
-                ]);
+            foreach ($catalog as $item) {
+                ActivityType::updateOrCreate(
+                    [
+                        'school_id' => $school->id,
+                        'name' => $item['name'],
+                    ],
+                    [
+                        'color' => $item['color'],
+                        'is_system' => true,
+                        'is_fallback' => $item['is_fallback'],
+                        'active' => true,
+                    ]
+                );
             }
         });
     }

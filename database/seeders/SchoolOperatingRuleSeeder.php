@@ -8,33 +8,24 @@ use App\Models\Schools\SchoolOperatingRuleDay;
 use Illuminate\Database\Seeder;
 
 /**
- * Horário de funcionamento fixo das escolas (segunda a sexta), como na folha
- * "Escalas":
+ * Horário de funcionamento fixo das escolas (segunda a sexta):
  *
- *  - ESPL (1.º ciclo): 07:30 – 18:00
- *  - EB23S (pré-escolar): 07:30 – 18:30 (última saída da folha: Filipa/Jacinta)
+ *  - EB1VV / ESPL (1.º ciclo):   07:30 – 18:00
+ *  - JIVV  / EB23S (pré-escolar): 07:30 – 18:30
  *
- * O modelo exige uma janela de almoço; para testes usa-se 12:00 – 14:00 com
- * duração de 60 minutos (o admin define depois o valor real).
- *
- * Pode correr várias vezes: não duplica versões nem dias, e repõe as horas
- * desta versão. Não mexe em versões mais recentes criadas por um admin.
+ * Vigência desde 2025-09-01 para abranger todo o histórico.
  */
 class SchoolOperatingRuleSeeder extends Seeder
 {
-    /** Início da versão (começo do ano letivo). */
-    private const VALID_FROM = '2026-09-01';
+    private const VALID_FROM = '2025-09-01';
 
-    /** Segunda (1) a sexta (5); 1 = segunda ... 7 = domingo. */
+    /** Segunda (0) a sexta (4) */
     private const WEEK_DAYS = [0, 1, 2, 3, 4];
 
-    /**
-     * acronym => hora de fecho
-     *
-     * @var array<string, string>
-     */
     private const CLOSING_TIMES = [
+        'EB1VV' => '18:00',
         'ESPL' => '18:00',
+        'JIVV' => '18:30',
         'EB23S' => '18:30',
     ];
 
@@ -74,4 +65,3 @@ class SchoolOperatingRuleSeeder extends Seeder
         }
     }
 }
-

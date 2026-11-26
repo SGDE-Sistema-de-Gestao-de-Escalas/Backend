@@ -12,31 +12,19 @@ use Illuminate\Support\Facades\DB;
 /**
  * Seeder de Regras de Horário e Cobertura (Schedule Rules) por escola.
  *
- * Semeia a configuração real das regras de cobertura da EB1 Miosótis (ESPL)
- * — incluindo "Apoio NEE", prioridades específicas por assistente e dias da semana —
- * bem como o conjunto predefinido de regras para as restantes escolas (ex: JI Miosótis / EB23S).
+ * Vigência desde 2025-09-01 para assegurar histórico analítico nos relatórios.
+ * "Apoio Alunos NEE" NÃO é semeada (é adicionada na demonstração ao vivo pela Pessoa 3).
+ * "Apoio Turmas/escola" foi removida por ser redundante com a atividade de fallback.
  */
 class ScheduleRuleSeeder extends Seeder
 {
-    /** Início do ano letivo */
-    private const VALID_FROM = '2026-09-01';
+    private const VALID_FROM = '2025-09-01';
 
     /** Segunda (0) a sexta (4) */
     private const WEEK_DAYS = [0, 1, 2, 3, 4];
 
     /**
-     * Regras configuradas para a EB1 Miosótis (código ESPL).
-     *
-     * @var array<int, array{
-     *     activity: string,
-     *     period_start: string,
-     *     period_end: string,
-     *     type: 'mandatory'|'optional',
-     *     min: int,
-     *     days_of_week: array<int, int>,
-     *     valid_from: string,
-     *     priorities: array<string, int>
-     * }>
+     * Regras da EB1 de Vale Verde (EB1VV / ESPL).
      */
     public const ESPL_RULES = [
         [
@@ -45,13 +33,12 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '08:30',
             'type' => 'mandatory',
             'min' => 3,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-10-28',
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2005' => 3,
+                'ME-2001' => 1,
+                'ME-2002' => 2,
+                'ME-2003' => 3,
                 'ME-2004' => 4,
+                'ME-2005' => 5,
                 'ME-2006' => 6,
             ],
         ],
@@ -61,43 +48,13 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '08:45',
             'type' => 'mandatory',
             'min' => 3,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
             'priorities' => [
+                'ME-2001' => 1,
                 'ME-2002' => 2,
                 'ME-2003' => 3,
                 'ME-2004' => 4,
                 'ME-2005' => 5,
                 'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '08:45',
-            'period_end' => '10:15',
-            'type' => 'optional',
-            'min' => 3,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
-            'priorities' => [
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2004' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio NEE',
-            'period_start' => '08:45',
-            'period_end' => '12:15',
-            'type' => 'mandatory',
-            'min' => 1,
-            'days_of_week' => [3],
-            'valid_from' => '2026-10-28',
-            'priorities' => [
-                'ME-2005' => 1,
-                'ME-2003' => 2,
             ],
         ],
         [
@@ -105,44 +62,14 @@ class ScheduleRuleSeeder extends Seeder
             'period_start' => '10:15',
             'period_end' => '10:45',
             'type' => 'mandatory',
-            'min' => 5,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
+            'min' => 4,
             'priorities' => [
+                'ME-2001' => 1,
                 'ME-2002' => 2,
                 'ME-2003' => 3,
                 'ME-2004' => 4,
                 'ME-2005' => 5,
                 'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '10:45',
-            'period_end' => '12:15',
-            'type' => 'optional',
-            'min' => 3,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
-            'priorities' => [
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2004' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio NEE',
-            'period_start' => '10:45',
-            'period_end' => '12:15',
-            'type' => 'mandatory',
-            'min' => 1,
-            'days_of_week' => [0, 1, 2],
-            'valid_from' => '2026-10-28',
-            'priorities' => [
-                'ME-2005' => 1,
-                'ME-2003' => 2,
             ],
         ],
         [
@@ -151,43 +78,12 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '13:30',
             'type' => 'mandatory',
             'min' => 4,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
             'priorities' => [
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2004' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '13:30',
-            'period_end' => '15:00',
-            'type' => 'optional',
-            'min' => 3,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
-            'priorities' => [
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2004' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
-            ],
-        ],
-        [
-            'activity' => 'Apoio NEE',
-            'period_start' => '13:30',
-            'period_end' => '15:00',
-            'type' => 'mandatory',
-            'min' => 1,
-            'days_of_week' => [0],
-            'valid_from' => '2026-10-28',
-            'priorities' => [
-                'ME-2005' => 1,
-                'ME-2003' => 2,
+                'ME-2002' => 1,
+                'ME-2004' => 2,
+                'ME-2005' => 3,
+                'ME-2003' => 4,
+                'ME-2006' => 5,
             ],
         ],
         [
@@ -195,14 +91,14 @@ class ScheduleRuleSeeder extends Seeder
             'period_start' => '15:00',
             'period_end' => '15:30',
             'type' => 'mandatory',
-            'min' => 4,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
+            'min' => 3,
             'priorities' => [
+                'ME-2001' => 1,
                 'ME-2002' => 2,
                 'ME-2003' => 3,
                 'ME-2005' => 4,
                 'ME-2006' => 5,
+                'ME-2004' => 6,
             ],
         ],
         [
@@ -211,14 +107,12 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '15:30',
             'type' => 'mandatory',
             'min' => 1,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
             'priorities' => [
                 'ME-2004' => 1,
-                'ME-2002' => 3,
-                'ME-2003' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
+                'ME-2005' => 2,
+                'ME-2006' => 3,
+                'ME-2002' => 4,
+                'ME-2003' => 5,
             ],
         ],
         [
@@ -227,14 +121,12 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '17:30',
             'type' => 'mandatory',
             'min' => 2,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-09-01',
             'priorities' => [
-                'ME-2002' => 2,
-                'ME-2003' => 3,
-                'ME-2004' => 4,
-                'ME-2005' => 5,
-                'ME-2006' => 6,
+                'ME-2004' => 1,
+                'ME-2005' => 2,
+                'ME-2006' => 3,
+                'ME-2002' => 4,
+                'ME-2003' => 5,
             ],
         ],
         [
@@ -243,22 +135,16 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '17:45',
             'type' => 'mandatory',
             'min' => 1,
-            'days_of_week' => [0, 1, 2, 3, 4],
-            'valid_from' => '2026-10-28',
             'priorities' => [
-                'ME-2002' => 1,
-                'ME-2003' => 2,
-                'ME-2005' => 3,
-                'ME-2004' => 4,
-                'ME-2006' => 6,
+                'ME-2005' => 1,
+                'ME-2006' => 2,
+                'ME-2004' => 3,
             ],
         ],
     ];
 
     /**
-     * Regras base para as restantes escolas (ex: JI Miosótis / EB23S).
-     *
-     * @var array<int, array{activity: string, period_start: string, period_end: string, type: 'mandatory'|'optional', min: int}>
+     * Regras do JI de Vale Verde (JIVV / EB23S).
      */
     public const RULES = [
         [
@@ -267,62 +153,84 @@ class ScheduleRuleSeeder extends Seeder
             'period_end' => '08:30',
             'type' => 'mandatory',
             'min' => 1,
+            'priorities' => [
+                'ME-3001' => 1,
+                'ME-3003' => 2,
+            ],
         ],
         [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '08:45',
-            'period_end' => '10:15',
+            'activity' => 'Apoio Atividades JI',
+            'period_start' => '09:00',
+            'period_end' => '11:30',
             'type' => 'optional',
-            'min' => 1,
+            'min' => 2,
+            'priorities' => [
+                'ME-3002' => 1,
+                'ME-3004' => 2,
+                'ME-3001' => 3,
+                'ME-3003' => 4,
+            ],
         ],
         [
-            'activity' => 'Intervalo',
-            'period_start' => '10:15',
-            'period_end' => '10:45',
-            'type' => 'mandatory',
-            'min' => 1,
-        ],
-        [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '10:45',
-            'period_end' => '12:15',
-            'type' => 'optional',
-            'min' => 1,
-        ],
-        [
-            'activity' => 'Vigilância almoço',
+            'activity' => 'Apoio às Refeições',
             'period_start' => '12:15',
             'period_end' => '13:30',
             'type' => 'optional',
             'min' => 1,
+            'priorities' => [
+                'ME-3001' => 1,
+                'ME-3003' => 2,
+                'ME-3004' => 3,
+            ],
         ],
         [
-            'activity' => 'Apoio Turmas/escola',
-            'period_start' => '13:30',
-            'period_end' => '15:00',
-            'type' => 'optional',
+            'activity' => 'Vigilância da Sesta',
+            'period_start' => '13:00',
+            'period_end' => '14:30',
+            'type' => 'mandatory',
             'min' => 1,
+            'priorities' => [
+                'ME-3003' => 1,
+                'ME-3001' => 2,
+                'ME-3004' => 3,
+            ],
         ],
         [
-            'activity' => 'Intervalo',
+            'activity' => 'Recreio JI',
             'period_start' => '15:00',
             'period_end' => '15:30',
             'type' => 'mandatory',
-            'min' => 1,
+            'min' => 2,
+            'priorities' => [
+                'ME-3001' => 1,
+                'ME-3003' => 2,
+                'ME-3004' => 3,
+                'ME-3002' => 4,
+            ],
         ],
         [
             'activity' => 'Limpeza',
-            'period_start' => '15:30',
+            'period_start' => '16:30',
             'period_end' => '17:30',
-            'type' => 'optional',
+            'type' => 'mandatory',
             'min' => 1,
+            'priorities' => [
+                'ME-3001' => 1,
+                'ME-3003' => 2,
+                'ME-3004' => 3,
+                'ME-3002' => 4,
+            ],
         ],
         [
             'activity' => 'Entrega de alunos',
             'period_start' => '17:30',
-            'period_end' => '18:00',
+            'period_end' => '18:30',
             'type' => 'mandatory',
             'min' => 1,
+            'priorities' => [
+                'ME-3001' => 1,
+                'ME-3003' => 2,
+            ],
         ],
     ];
 
@@ -354,9 +262,20 @@ class ScheduleRuleSeeder extends Seeder
             }
 
             $assistantsByInternalNumber = $assistants->keyBy('internal_number');
-            $isEspl = $school->acronym === 'ESPL';
-            $rulesConfig = $isEspl ? self::ESPL_RULES : self::RULES;
+            $isEb1 = in_array($school->acronym, ['ESPL', 'EB1VV'], true);
+            $rulesConfig = $isEb1 ? self::ESPL_RULES : self::RULES;
             $keptRuleIds = [];
+
+            // Remover quaisquer regras obsoletas (ex: com Apoio Turmas ou Apoio NEE)
+            $obsoleteActivityIds = ActivityType::where('school_id', $school->id)
+                ->whereIn('name', ['Apoio Turmas/escola', 'Apoio Turmas', 'Apoio NEE', 'Apoio Alunos NEE'])
+                ->pluck('id');
+
+            if ($obsoleteActivityIds->isNotEmpty()) {
+                ScheduleRule::where('school_id', $school->id)
+                    ->whereIn('activity_type_id', $obsoleteActivityIds)
+                    ->delete();
+            }
 
             foreach ($rulesConfig as $item) {
                 $activity = $this->resolveActivityType($school, $item['activity']);
@@ -375,9 +294,9 @@ class ScheduleRuleSeeder extends Seeder
                     [
                         'min' => $item['min'],
                         'type' => $item['type'],
-                        'valid_from' => $item['valid_from'] ?? self::VALID_FROM,
+                        'valid_from' => self::VALID_FROM,
                         'valid_until' => null,
-                        'days_of_week' => $item['days_of_week'] ?? self::WEEK_DAYS,
+                        'days_of_week' => self::WEEK_DAYS,
                     ]
                 );
 
@@ -393,7 +312,6 @@ class ScheduleRuleSeeder extends Seeder
                     }
                 }
 
-                // Fallback caso os números internos não coincidam (ex: testes com factories)
                 if (empty($syncData)) {
                     foreach ($assistants as $idx => $assistant) {
                         $syncData[$assistant->id] = ['priority' => $idx + 1];
@@ -403,7 +321,7 @@ class ScheduleRuleSeeder extends Seeder
                 $rule->assistants()->sync($syncData);
             }
 
-            if ($isEspl && ! empty($keptRuleIds)) {
+            if (! empty($keptRuleIds)) {
                 ScheduleRule::where('school_id', $school->id)
                     ->whereNotIn('id', $keptRuleIds)
                     ->delete();
@@ -413,32 +331,6 @@ class ScheduleRuleSeeder extends Seeder
 
     private function resolveActivityType(School $school, string $activityName): ?ActivityType
     {
-        if ($activityName === 'Apoio Turmas/escola') {
-            $activity = ActivityType::where('school_id', $school->id)
-                ->where(function ($q) {
-                    $q->where('name', 'Apoio Turmas/escola')
-                      ->orWhere('name', 'Apoio Turmas');
-                })
-                ->where('is_fallback', false)
-                ->first();
-
-            if ($activity) {
-                if ($activity->name !== 'Apoio Turmas/escola') {
-                    $activity->update(['name' => 'Apoio Turmas/escola']);
-                }
-                return $activity;
-            }
-
-            return ActivityType::create([
-                'school_id' => $school->id,
-                'name' => 'Apoio Turmas/escola',
-                'color' => '#3B82F6',
-                'is_system' => true,
-                'is_fallback' => false,
-                'active' => true,
-            ]);
-        }
-
         $activity = ActivityType::where('school_id', $school->id)
             ->where('name', $activityName)
             ->where('is_fallback', false)
@@ -454,16 +346,17 @@ class ScheduleRuleSeeder extends Seeder
             'Vigilância almoço' => '#A855F7',
             'Limpeza' => '#8B5CF6',
             'Entrega de alunos' => '#14B8A6',
-            'Apoio NEE' => '#06B6D4',
+            'Apoio Atividades JI' => '#3B82F6',
+            'Apoio às Refeições' => '#F97316',
+            'Vigilância da Sesta' => '#EC4899',
+            'Recreio JI' => '#06B6D4',
         ];
-
-        $isCustom = $activityName === 'Apoio NEE';
 
         return ActivityType::create([
             'school_id' => $school->id,
             'name' => $activityName,
             'color' => $colors[$activityName] ?? '#6366F1',
-            'is_system' => ! $isCustom,
+            'is_system' => true,
             'is_fallback' => false,
             'active' => true,
         ]);
