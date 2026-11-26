@@ -25,9 +25,8 @@ class UserSeeder extends Seeder
         $adminPassword = (string) (config('app.seed_admin_password') ?: 'admin123');
         $staffPassword = (string) (config('app.seed_staff_password') ?: 'staff123');
 
-        // Administrador Principal utilizado na apresentação (Miguel Silva)
-        User::updateOrCreate(
-            ['email' => 'sgde@admin.com'],
+        User::firstOrCreate(
+            ['email' => 'sgde.admin@gmail.com'],
             [
                 'first_name' => 'Miguel',
                 'last_name' => 'Silva',

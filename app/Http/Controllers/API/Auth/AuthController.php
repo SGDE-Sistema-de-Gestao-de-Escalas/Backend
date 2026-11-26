@@ -27,11 +27,12 @@ class AuthController extends Controller
             'remember_me' => 'boolean'
         ]);
 
-        $cookieMinutes = !empty($credentials['remember_me'])
-            ? AuthService::REMEMBER_MINUTES
-            : AuthService::SESSION_MINUTES;
+        $remember = !empty($credentials['remember_me']);
+        $cookieMinutes = $remember
+            ? AuthService::rememberMinutes()
+            : AuthService::sessionMinutes();
 
-        $authData = $this->authService->attemptLogin($credentials, $cookieMinutes);
+        $authData = $this->authService->attemptLogin($credentials, $cookieMinutes, $remember);
 
         $cookie = $this->authService->makeAuthCookie($authData['token'], $cookieMinutes, $request);
 

@@ -54,6 +54,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Per-Token Session Durations (Minutes)
+    |--------------------------------------------------------------------------
+    |
+    | Em vez de usar a expiração global acima (que sobreporia o "Lembrar-me"),
+    | cada token define o seu próprio `expires_at` a partir destes valores.
+    |
+    */
+
+    'session_minutes' => (int) env('SANCTUM_SESSION_MINUTES', 240),
+
+    'session_max_minutes' => (int) env('SANCTUM_SESSION_MAX_MINUTES', 480),
+
+    'session_renew_before_minutes' => (int) env('SANCTUM_SESSION_RENEW_BEFORE_MINUTES', 30),
+
+    'remember_minutes' => (int) env('SANCTUM_REMEMBER_MINUTES', 43200),
+
+    /*
+    |--------------------------------------------------------------------------
     | Token Prefix
     |--------------------------------------------------------------------------
     |
