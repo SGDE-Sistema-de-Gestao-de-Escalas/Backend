@@ -1,18 +1,15 @@
 @props(['url'])
 <tr>
-<td class="header">
-<a href="{{ $url }}" class="header-link">
-<table class="header-brand-table" align="center" cellpadding="0" cellspacing="0" role="presentation">
-<tr>
-<td class="header-logo-cell" align="center" valign="middle">
-<img src="cid:sgde-logo" class="header-logo" width="44" height="44" alt="SGDE" />
-</td>
-<td align="left" valign="middle">
-<div class="header-title">SGDE</div>
-<div class="header-subtitle">Sistema de Gestão de Escalas</div>
-</td>
-</tr>
-</table>
+<td class="header" align="center">
+<a href="{{ $url }}" class="header-link" target="_blank" rel="noopener" style="display: inline-block; text-decoration: none;">
+    <!-- Logótipo para modo claro (Light Mode) -->
+    <img src="cid:sgde-logo-light" class="header-logo light-img" width="200" height="67" alt="SGDE - Sistema de Gestão de Escalas" border="0" style="display: block; width: 200px; max-width: 200px; height: auto; border: 0; margin: 0 auto;" />
+    <!-- Logótipo para modo escuro (Dark Mode) -->
+    <!--[if !mso]><!-->
+    <div class="dark-img-wrapper" style="display: none; overflow: hidden; mso-hide: all;">
+        <img src="cid:sgde-logo-dark" class="header-logo dark-img" width="200" height="67" alt="SGDE - Sistema de Gestão de Escalas" border="0" style="display: none; width: 200px; max-width: 200px; height: auto; border: 0; margin: 0 auto;" />
+    </div>
+    <!--<![endif]-->
 </a>
 </td>
 </tr>

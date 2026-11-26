@@ -68,6 +68,8 @@ class AuthService
 
         $token = $user->createToken($tokenName, ['*'], now()->addMinutes($minutes))->plainTextToken;
 
+        $user->load(['role', 'assistant.school']);
+
         return [
             'user' => $user,
             'token' => $token,

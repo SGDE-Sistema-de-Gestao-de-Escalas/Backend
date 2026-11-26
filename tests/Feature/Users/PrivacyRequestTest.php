@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\PrivacyDeactivationRequestMail;
+use App\Mail\PrivacyDeactivationReceiptMail;
 use App\Models\Assistants\Assistant;
 use App\Models\Auth\Role;
 use App\Models\Auth\User;
@@ -97,6 +98,22 @@ class PrivacyRequestTest extends TestCase
                 && $mail->schoolName === 'Escola Básica de Teste'
                 && $mail->reason === 'Mudança de funções e pedido de eliminação dos dados.';
         });
+
+        Mail::assertSent(PrivacyDeactivationReceiptMail::class, function (PrivacyDeactivationReceiptMail $mail) use ($staff) {
+            return $mail->hasTo($staff->email)
+                && $mail->user->id === $staff->id
+                && $mail->schoolName === 'Escola Básica de Teste'
+                && $mail->reason === 'Mudança de funções e pedido de eliminação dos dados.';
+        });
+
+        $staff->refresh();
+        $this->assertNotNull($staff->deactivation_requested_at);
+
+        // Tentativa repetida deve ser bloqueada
+        $duplicateResponse = $this->postJson('/api/privacy/request-deactivation', [
+            'reason' => 'Tentativa repetida',
+        ]);
+        $duplicateResponse->assertUnprocessable();
     }
 
     public function test_user_without_assistant_can_request_deactivation_without_reason(): void
@@ -130,6 +147,13 @@ class PrivacyRequestTest extends TestCase
 
         Mail::assertSent(PrivacyDeactivationRequestMail::class, function (PrivacyDeactivationRequestMail $mail) use ($admin, $staff) {
             return $mail->hasTo($admin->email)
+                && $mail->user->id === $staff->id
+                && $mail->schoolName === 'Geral / Sem Escola Específica'
+                && $mail->reason === null;
+        });
+
+        Mail::assertSent(PrivacyDeactivationReceiptMail::class, function (PrivacyDeactivationReceiptMail $mail) use ($staff) {
+            return $mail->hasTo($staff->email)
                 && $mail->user->id === $staff->id
                 && $mail->schoolName === 'Geral / Sem Escola Específica'
                 && $mail->reason === null;

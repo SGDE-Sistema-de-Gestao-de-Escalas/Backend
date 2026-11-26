@@ -48,6 +48,10 @@ class UserResource extends JsonResource
             'assistant_id' => $this->assistant?->id,
             'school_id' => $this->assistant?->school_id,
             'school_name' => $this->assistant?->school?->name,
+            'internal_number' => $this->assistant?->internal_number,
+            'mecanografico' => $this->assistant?->internal_number,
+            'deactivation_requested' => $this->deactivation_requested_at !== null,
+            'deactivation_requested_at' => $this->deactivation_requested_at?->toIso8601String(),
             'role' => $this->whenLoaded('role', function () {
                 return $this->role->slug;
             }),

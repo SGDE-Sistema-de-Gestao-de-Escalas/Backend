@@ -235,7 +235,7 @@ class UserUpdateTest extends TestCase
         $this->assertNotNull($target->anonymized_at);
     }
 
-    public function test_staff_can_update_own_profile_via_put_me(): void
+    public function test_staff_cannot_update_own_profile_via_put_me(): void
     {
         Role::factory()->create(['name' => 'Administrator', 'slug' => 'admin']);
         $staffRole = Role::factory()->create(['name' => 'Staff', 'slug' => 'staff']);
@@ -253,22 +253,19 @@ class UserUpdateTest extends TestCase
             'first_name' => 'Carlos Daniel',
             'last_name' => 'Ferreira Santos',
             'email' => 'carlos.santos@example.com',
-            'current_password' => 'password', // mudar o próprio email exige a password atual (F-08)
+            'current_password' => 'password',
         ]);
 
         $response
-            ->assertOk()
-            ->assertJsonPath('data.first_name', 'Carlos Daniel')
-            ->assertJsonPath('data.last_name', 'Ferreira Santos')
-            ->assertJsonPath('data.email', 'carlos.santos@example.com')
-            ->assertJsonPath('message', 'Perfil atualizado com sucesso.');
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Os assistentes operacionais não podem alterar os seus dados cadastrais diretamente. Contacte a administração escolar.');
 
         $staff->refresh();
-        $this->assertSame('Carlos Daniel', $staff->first_name);
-        $this->assertSame('carlos.santos@example.com', $staff->email);
+        $this->assertSame('Carlos', $staff->first_name);
+        $this->assertSame('carlos@example.com', $staff->email);
     }
 
-    public function test_staff_can_update_own_profile_via_put_users_id(): void
+    public function test_staff_cannot_update_own_profile_via_put_users_id(): void
     {
         Role::factory()->create(['name' => 'Administrator', 'slug' => 'admin']);
         $staffRole = Role::factory()->create(['name' => 'Staff', 'slug' => 'staff']);
@@ -286,16 +283,15 @@ class UserUpdateTest extends TestCase
             'first_name' => 'Maria João',
             'last_name' => 'Sousa',
             'email' => 'maria.joao@example.com',
-            'current_password' => 'password', // mudar o próprio email exige a password atual (F-08)
+            'current_password' => 'password',
         ]);
 
         $response
-            ->assertOk()
-            ->assertJsonPath('data.first_name', 'Maria João')
-            ->assertJsonPath('data.email', 'maria.joao@example.com');
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Os assistentes operacionais não podem alterar os seus dados cadastrais diretamente. Contacte a administração escolar.');
 
         $staff->refresh();
-        $this->assertSame('Maria João', $staff->first_name);
+        $this->assertSame('Maria', $staff->first_name);
     }
 
     public function test_staff_cannot_update_another_user_via_put_users_id(): void
@@ -324,7 +320,7 @@ class UserUpdateTest extends TestCase
 
         $response
             ->assertForbidden()
-            ->assertJsonPath('message', 'Não tem permissão para alterar dados de outros utilizadores.');
+            ->assertJsonPath('message', 'Os assistentes operacionais não podem alterar os seus dados cadastrais diretamente. Contacte a administração escolar.');
 
         $anotherUser->refresh();
         $this->assertSame('Outro', $anotherUser->first_name);
@@ -354,22 +350,21 @@ class UserUpdateTest extends TestCase
         ]);
 
         $response
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['role_id', 'is_active', 'school_id']);
+            ->assertForbidden();
 
         $staff->refresh();
         $this->assertSame($staffRole->id, $staff->role_id);
     }
 
-    public function test_put_requires_first_name_last_name_and_email(): void
+    public function test_put_requires_first_name_last_name_and_email_for_admin(): void
     {
-        $staffRole = Role::factory()->create(['name' => 'Staff', 'slug' => 'staff']);
-        $staff = User::factory()->create([
-            'role_id' => $staffRole->id,
+        $adminRole = Role::factory()->create(['name' => 'Administrator', 'slug' => 'admin']);
+        $admin = User::factory()->create([
+            'role_id' => $adminRole->id,
             'is_active' => true,
         ]);
 
-        Sanctum::actingAs($staff);
+        Sanctum::actingAs($admin);
 
         $response = $this->putJson('/api/me', []);
 
@@ -377,5 +372,4 @@ class UserUpdateTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['first_name', 'last_name', 'email']);
     }
-
 }

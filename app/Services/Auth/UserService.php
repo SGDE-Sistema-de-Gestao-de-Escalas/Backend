@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use App\Models\Assistants\Assistant;
 use App\Mail\PrivacyDeactivationRequestMail;
+use App\Mail\PrivacyDeactivationReceiptMail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class UserService
@@ -344,6 +346,17 @@ class UserService
 
     public function requestDeactivation(User $user, ?string $reason = null): void
     {
+        if ($user->deactivation_requested_at !== null) {
+            $formattedDate = $user->deactivation_requested_at->format('d/m/Y \à\s H:i');
+            throw ValidationException::withMessages([
+                'deactivation' => ["Já submeteu um pedido de anonimização em {$formattedDate}. O seu pedido encontra-se em análise pela administração escolar."],
+            ]);
+        }
+
+        $user->update([
+            'deactivation_requested_at' => now(),
+        ]);
+
         $user->loadMissing(['role', 'assistant.school']);
 
         $schoolName = $user->assistant?->school?->name ?? 'Geral / Sem Escola Específica';
@@ -356,11 +369,27 @@ class UserService
         app(NotificationService::class)->deactivationRequested($user, $reason);
 
         if ($admins->isNotEmpty()) {
-            Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
-                user: $user,
-                schoolName: $schoolName,
-                reason: $reason
-            ));
+            try {
+                Mail::to($admins)->send(new PrivacyDeactivationRequestMail(
+                    user: $user,
+                    schoolName: $schoolName,
+                    reason: $reason
+                ));
+            } catch (\Throwable $e) {
+                Log::warning('Erro ao enviar email de pedido de desativação aos administradores: ' . $e->getMessage());
+            }
+        }
+
+        if (! empty($user->email)) {
+            try {
+                Mail::to($user->email)->send(new PrivacyDeactivationReceiptMail(
+                    user: $user,
+                    schoolName: $schoolName,
+                    reason: $reason
+                ));
+            } catch (\Throwable $e) {
+                Log::warning('Erro ao enviar comprovativo de pedido de desativação ao assistente: ' . $e->getMessage());
+            }
         }
     }
 
