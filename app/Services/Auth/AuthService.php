@@ -16,12 +16,42 @@ use Symfony\Component\HttpFoundation\Cookie;
 
 class AuthService
 {
-    public const SESSION_MINUTES = 60 * 24;
+    public const TOKEN_NAME_SESSION = 'sgde-session-token';
+
+    public const TOKEN_NAME_REMEMBER = 'sgde-remember-token';
+
+    public const SESSION_MINUTES = 60 * 4;
+
+    public const SESSION_MAX_MINUTES = 60 * 8;
+
+    public const SESSION_RENEW_BEFORE_MINUTES = 30;
 
     public const REMEMBER_MINUTES = 60 * 24 * 30;
 
-    public function attemptLogin(array $credentials, int $minutes = self::SESSION_MINUTES): array
+    public static function sessionMinutes(): int
     {
+        return (int) config('sanctum.session_minutes', self::SESSION_MINUTES);
+    }
+
+    public static function sessionMaxMinutes(): int
+    {
+        return (int) config('sanctum.session_max_minutes', self::SESSION_MAX_MINUTES);
+    }
+
+    public static function sessionRenewBeforeMinutes(): int
+    {
+        return (int) config('sanctum.session_renew_before_minutes', self::SESSION_RENEW_BEFORE_MINUTES);
+    }
+
+    public static function rememberMinutes(): int
+    {
+        return (int) config('sanctum.remember_minutes', self::REMEMBER_MINUTES);
+    }
+
+    public function attemptLogin(array $credentials, ?int $minutes = null, bool $remember = false): array
+    {
+        $minutes ??= $remember ? self::rememberMinutes() : self::sessionMinutes();
+        $tokenName = $remember ? self::TOKEN_NAME_REMEMBER : self::TOKEN_NAME_SESSION;
         $user = User::with('role')->where('email', $credentials['email'])->first();
 
         $passwordMatches = $user 
@@ -36,7 +66,7 @@ class AuthService
 
         $user->tokens()->delete();
 
-        $token = $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
+        $token = $user->createToken($tokenName, ['*'], now()->addMinutes($minutes))->plainTextToken;
 
         return [
             'user' => $user,
@@ -65,8 +95,9 @@ class AuthService
         }
     }
 
-    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser, int $minutes = self::REMEMBER_MINUTES): string
+    public function handleOAuthCallback(string $provider, \Laravel\Socialite\Contracts\User $socialUser, ?int $minutes = null): string
     {
+        $minutes ??= self::rememberMinutes();
         $user = User::where('email', $socialUser->getEmail())->first();
 
         if (!$user) {
@@ -99,7 +130,7 @@ class AuthService
 
         $user->tokens()->delete();
         
-        return $user->createToken('sgde-access-token', ['*'], now()->addMinutes($minutes))->plainTextToken;
+        return $user->createToken(self::TOKEN_NAME_REMEMBER, ['*'], now()->addMinutes($minutes))->plainTextToken;
     }
 
     public function resetPasswordWithToken(array $data): void

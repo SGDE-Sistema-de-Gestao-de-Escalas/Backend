@@ -79,13 +79,56 @@ class SessionExpiryTest extends TestCase
         $this->assertNull(config('sanctum.expiration'));
     }
 
-    public function test_a_normal_login_expires_after_24_hours(): void
+    public function test_a_normal_login_expires_after_4_hours_without_late_activity(): void
     {
         $start = now();
         $token = $this->passwordLogin(false);
 
-        $this->assertSame(200, $this->statusAt($token, $start->copy()->addHours(23)));
-        $this->assertSame(401, $this->statusAt($token, $start->copy()->addHours(25)));
+        // Atividade antes da janela dos últimos 30 min (às 3h) não prolonga a sessão.
+        $this->assertSame(200, $this->statusAt($token, $start->copy()->addHours(3)));
+        $this->assertSame(401, $this->statusAt($token, $start->copy()->addHours(4)->addMinute()));
+    }
+
+    public function test_a_normal_login_renews_once_when_active_up_to_8_hours_max(): void
+    {
+        $start = now();
+        $token = $this->passwordLogin(false);
+
+        // Ativo nos últimos 30 min (às 3h35): renova 1x por +4h (até às 8h totais) e atualiza o cookie.
+        $this->travelTo($start->copy()->addHours(3)->addMinutes(35));
+        $this->app['auth']->forgetGuards();
+        $renewResponse = $this->withCredentials()->withCookie('access_token', $token)->getJson('/api/me');
+        $renewResponse->assertOk();
+        $this->assertNotNull($renewResponse->getCookie('access_token'));
+
+        // Continua válido após as 4h iniciais e até às 8h.
+        $this->assertSame(200, $this->statusAt($token, $start->copy()->addHours(5)));
+        $this->assertSame(200, $this->statusAt($token, $start->copy()->addHours(7)->addMinutes(45)));
+
+        // Não renova uma segunda vez: expira obrigatoriamente às 8h totais.
+        $this->assertSame(401, $this->statusAt($token, $start->copy()->addHours(8)->addMinute()));
+    }
+
+    public function test_session_durations_follow_sanctum_config(): void
+    {
+        config([
+            'sanctum.session_minutes' => 60,
+            'sanctum.session_max_minutes' => 120,
+            'sanctum.session_renew_before_minutes' => 10,
+            'sanctum.remember_minutes' => 180,
+        ]);
+
+        $start = now();
+        $normalToken = $this->passwordLogin(false);
+        $this->assertSame(200, $this->statusAt($normalToken, $start->copy()->addMinutes(55)));
+        $this->assertSame(200, $this->statusAt($normalToken, $start->copy()->addMinutes(115)));
+        $this->assertSame(401, $this->statusAt($normalToken, $start->copy()->addMinutes(125)));
+
+        $this->travelBack();
+        $start = now();
+        $rememberToken = $this->passwordLogin(true);
+        $this->assertSame(200, $this->statusAt($rememberToken, $start->copy()->addMinutes(170)));
+        $this->assertSame(401, $this->statusAt($rememberToken, $start->copy()->addMinutes(185)));
     }
 
     public function test_a_remembered_login_expires_after_30_days(): void

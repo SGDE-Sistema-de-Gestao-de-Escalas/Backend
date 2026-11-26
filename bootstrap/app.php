@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateFromCookie;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\RenewSessionToken;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetSchoolContext;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -20,15 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Atrás de um proxy (Nginx) o IP real vem em X-Forwarded-For. Só se
-        // confia no cabeçalho se o pedido vier de um proxy desta lista, senão
-        // qualquer cliente podia inventar o IP e fugir aos limites de pedidos.
-        // TRUSTED_PROXIES: IPs separados por vírgulas, ou "*" (só se a aplicação
-        // não for acessível diretamente).
-        $trusted = trim((string) env('TRUSTED_PROXIES', '127.0.0.1'));
-        $middleware->trustProxies(at: $trusted === '*'
-            ? '*'
-            : array_values(array_filter(array_map('trim', explode(',', $trusted)))));
+        // Os proxies de confiança (F-05) são configurados em config/trustedproxy.php
+        // para que funcionem corretamente mesmo com `php artisan config:cache`.
 
         $middleware->append(SecurityHeaders::class);
 
@@ -36,6 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             AuthenticateFromCookie::class,
+        ], append: [
+            RenewSessionToken::class,
         ]);
 
         $middleware->alias([
