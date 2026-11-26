@@ -25,6 +25,7 @@ return new class extends Migration
             $table->rememberToken()->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamp('anonymized_at')->nullable();
+            $table->timestamp('deactivation_requested_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
